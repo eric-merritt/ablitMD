@@ -7,11 +7,13 @@ import inferenceRouter from './routes/api/inference.js'
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ablitmd'
 
-if (process.env.NODE_ENV !== 'test') {
-  mongoose.connect(MONGO_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err))
-}
+mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => {
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('MongoDB connection error:', err)
+    }
+  })
 
 const app = express()
 
