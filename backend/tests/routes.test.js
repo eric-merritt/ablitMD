@@ -9,6 +9,16 @@ import { Prompt } from '../models/prompt.js'
 let mongod
 
 beforeAll(async () => {
+  // Wait briefly for app.js connection attempt to timeout, then disconnect and reconnect to MongoMemoryServer
+  await new Promise(resolve => setTimeout(resolve, 100))
+
+  // Force disconnect from any pending connection
+  try {
+    await mongoose.connection.close()
+  } catch (e) {
+    // Connection may not exist yet
+  }
+
   mongod = await MongoMemoryServer.create()
   await mongoose.connect(mongod.getUri())
 })
