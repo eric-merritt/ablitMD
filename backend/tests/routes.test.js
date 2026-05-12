@@ -126,3 +126,37 @@ describe('POST /api/prompts/selected', () => {
     expect(res.status).toBe(400)
   })
 })
+
+describe('POST /api/runs', () => {
+  it('creates a run and returns run_id', async () => {
+    await Prompt.create([
+      { category: 'dangerous_activity', category_group: 'violence_physical_harm', type: 'harmful', text: 'p1', triggers: [] },
+    ])
+    const res = await request(app)
+      .post('/api/runs')
+      .send({
+        models: ['Qwen/Qwen3.6-27B'],
+        mode_selection: 'non_thinking',
+        prompt_scope: { categories: ['dangerous_activity'] },
+      })
+    expect(res.status).toBe(201)
+    expect(res.body.run_id).toMatch(/^run_/)
+    expect(res.body.incomplete).toBe(true)
+    expect(res.body.prompts).toHaveLength(1)
+  })
+})
+
+describe('GET /api/runs', () => {
+  it('returns run list', async () => {
+    const res = await request(app).get('/api/runs')
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+  })
+})
+
+describe('GET /api/runs/:runId', () => {
+  it('returns 404 for unknown run', async () => {
+    const res = await request(app).get('/api/runs/nonexistent')
+    expect(res.status).toBe(404)
+  })
+})
