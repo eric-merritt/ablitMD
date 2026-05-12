@@ -28,3 +28,4 @@ torch = { index = "pytorch-cu118" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["."]
