@@ -1,0 +1,14 @@
+{
+  "name": "ablitmd",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev": "concurrently --names backend,inference,frontend --prefix-colors cyan,yellow,magenta \"npm run dev --workspace=backend\" \"uv run python backend/inference/service.py\" \"npm run dev --workspace=frontend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
