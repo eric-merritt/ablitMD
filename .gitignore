@@ -1,0 +1,11 @@
+# Run data — keep .gitkeep, ignore actual run files
+data/runs/*.json
+data/runs/*/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
