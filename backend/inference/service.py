@@ -1,5 +1,12 @@
 import json
+import sys
 from pathlib import Path
+
+# Ensure project root is on sys.path so `backend.*` imports resolve when the
+# script is invoked directly (e.g. `uv run python backend/inference/service.py`).
+_project_root = Path(__file__).resolve().parents[2]
+if str(_project_root) not in sys.path:
+  sys.path.insert(0, str(_project_root))
 
 import numpy as np
 import uvicorn
@@ -112,4 +119,4 @@ def compute(req: ComputeRequest):
 
 
 if __name__ == "__main__":
-  uvicorn.run("backend.inference.service:app", host="0.0.0.0", port=8200, reload=False)
+  uvicorn.run(app, host="0.0.0.0", port=8200, reload=False)
