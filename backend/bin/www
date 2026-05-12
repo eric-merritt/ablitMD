@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 import http from 'http'
+import mongoose from 'mongoose'
 import app from '../app.js'
 
 const PORT = process.env.PORT || 8199
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ablitmd'
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err))
 
 const server = http.createServer(app)
 server.listen(PORT, () => console.log(`backend listening on :${PORT}`))
