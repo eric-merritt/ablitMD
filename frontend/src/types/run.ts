@@ -1,3 +1,12 @@
+export interface Prompt {
+  _id: string
+  category: string
+  category_group: string
+  type: 'harmful' | 'harmless'
+  text: string
+  triggers: string[]
+}
+
 export type RefusalMode = 'hard' | 'redirect' | 'disclaimer' | 'none'
 export type RunMode = 'non_thinking' | 'thinking' | 'both'
 

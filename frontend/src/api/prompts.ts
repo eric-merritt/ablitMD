@@ -1,6 +1,8 @@
+import type { Prompt } from '../types/run'
+
 export const fetchSelectedPrompts = async (
   categories: string[]
-): Promise<{ _id: string; category: string; category_group: string; type: string; text: string; triggers: string[] }[]> => {
+): Promise<Prompt[]> => {
   const res = await fetch('/api/prompts/selected', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
