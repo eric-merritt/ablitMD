@@ -7,6 +7,11 @@ cd "$PROJECT_DIR"
 # git clone git@github.com:eric-merritt/ablitMD.git /workspace/ablitMD && bash /workspace/ablitMD/startup.sh
 
 echo "==> Checking MongoDB..."
+if ! command -v mongod &>/dev/null; then
+  curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+  echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+  apt-get update -qq && apt-get install -y mongodb-org
+fi
 if ! pgrep -x mongod > /dev/null; then
   mkdir -p /data/db
   mongod --fork --logpath /var/log/mongod.log --bind_ip 127.0.0.1
@@ -17,6 +22,8 @@ else
 fi
 
 echo "==> Installing dependencies..."
+command -v node &>/dev/null || { curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs; }
+command -v uv &>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 npm install --silent
 uv sync
 
