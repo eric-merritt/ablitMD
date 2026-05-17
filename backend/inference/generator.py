@@ -25,19 +25,20 @@ def run_prompt(
 
   messages = [{"role": "user", "content": prompt_text}]
 
+  def _tokenize(extra_kwargs):
+    result = tokenizer.apply_chat_template(
+      conversation=messages,
+      add_generation_prompt=True,
+      return_tensors="pt",
+      **extra_kwargs,
+    )
+    ids = result["input_ids"] if hasattr(result, "__getitem__") and not isinstance(result, torch.Tensor) else result
+    return ids.to(DEVICE)
+
   try:
-    input_ids = tokenizer.apply_chat_template(
-      conversation=messages,
-      add_generation_prompt=True,
-      return_tensors="pt",
-      enable_thinking=enable_thinking,
-    ).to(DEVICE)
+    input_ids = _tokenize({"enable_thinking": enable_thinking})
   except TypeError:
-    input_ids = tokenizer.apply_chat_template(
-      conversation=messages,
-      add_generation_prompt=True,
-      return_tensors="pt",
-    ).to(DEVICE)
+    input_ids = _tokenize({})
 
   output = model(input_ids, output_hidden_states=True, use_cache=False)
   n_layers = model.config.num_hidden_layers
