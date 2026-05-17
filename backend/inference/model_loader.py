@@ -1,11 +1,13 @@
 import gc
 import os
+import threading
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 _loaded_model_id: str | None = None
 _model = None
 _tokenizer = None
+_load_lock = threading.Lock()
 DEVICE = "cuda:0"
 LOCAL_MODELS_DIR = "/workspace/models"
 
@@ -22,30 +24,31 @@ def get_loaded_model_id() -> str | None:
 def load_model(model_id: str, api_model_id: str) -> None:
   global _loaded_model_id, _model, _tokenizer
 
-  if _loaded_model_id == model_id:
-    return
+  with _load_lock:
+    if _loaded_model_id == model_id:
+      return
 
-  unload_model()
+    unload_model()
 
-  model_path = _resolve_model_path(api_model_id)
-  print(f"Loading model {model_path} on {DEVICE}...")
-  try:
-    _model = AutoModelForCausalLM.from_pretrained(
-      model_path,
-      torch_dtype=torch.bfloat16,
-      device_map=DEVICE,
-      trust_remote_code=True,
-    )
-    _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    _loaded_model_id = model_id
-    print(f"Model loaded: {model_id}")
-  except Exception:
-    _model = None
-    _tokenizer = None
-    _loaded_model_id = None
-    gc.collect()
-    torch.cuda.empty_cache()
-    raise
+    model_path = _resolve_model_path(api_model_id)
+    print(f"Loading model {model_path} on {DEVICE}...")
+    try:
+      _model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        torch_dtype=torch.bfloat16,
+        device_map=DEVICE,
+        trust_remote_code=True,
+      )
+      _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+      _loaded_model_id = model_id
+      print(f"Model loaded: {model_id}")
+    except Exception:
+      _model = None
+      _tokenizer = None
+      _loaded_model_id = None
+      gc.collect()
+      torch.cuda.empty_cache()
+      raise
 
 
 def unload_model() -> None:
