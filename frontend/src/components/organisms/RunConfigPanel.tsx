@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import { ModeRadioGroup } from '../molecules/ModeRadioGroup'
 import { ModelCheckboxList } from '../molecules/ModelCheckboxList'
 import { createRun, fetchRuns, fetchRun } from '../../api/runs'
@@ -12,7 +13,7 @@ interface RunConfigPanelProps {
   onRunOpen: (run: Run) => void
 }
 
-const PanelStyle: React.CSSProperties = {
+const PanelStyle: CSSProperties = {
   maxWidth: '520px',
   margin: '48px auto',
   padding: '0 24px',
@@ -21,21 +22,21 @@ const PanelStyle: React.CSSProperties = {
   gap: '28px',
 }
 
-const btnBase: React.CSSProperties = {
+const btnBase: CSSProperties = {
   padding: '9px 20px',
   borderRadius: 'var(--radius)',
   border: 'none',
   fontWeight: 600,
 }
 
-const PrimaryBtn = (disabled: boolean): React.CSSProperties => ({
+const PrimaryBtn = (disabled: boolean): CSSProperties => ({
   ...btnBase,
   background: disabled ? '#333' : 'var(--accent)',
   color: disabled ? 'var(--text-muted)' : '#fff',
   cursor: disabled ? 'not-allowed' : 'pointer',
 })
 
-const SecondaryBtn: React.CSSProperties = {
+const SecondaryBtn: CSSProperties = {
   ...btnBase,
   background: 'var(--surface)',
   color: 'var(--text-dim)',
@@ -94,9 +95,12 @@ export const RunConfigPanel = ({ models, onRunStart, onRunOpen }: RunConfigPanel
 
   const handleOpenExisting = async () => {
     setLoadingRuns(true)
-    const runs = await fetchRuns()
-    setExistingRuns(runs)
-    setLoadingRuns(false)
+    try {
+      const runs = await fetchRuns()
+      setExistingRuns(runs)
+    } finally {
+      setLoadingRuns(false)
+    }
   }
 
   const handleSelectRun = async (summary: RunSummary) => {
