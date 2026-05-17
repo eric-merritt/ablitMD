@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+[ -f /opt/nvm/nvm.sh ] && source /opt/nvm/nvm.sh
+
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 # When invoked via VAST.ai onstart:
