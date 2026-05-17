@@ -91,7 +91,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete }: PromptWalk
       }
 
       if (!isLastStep) {
-        await updateRunFields({ current_sequence_index: run.current_sequence_index + 1 })
+        await updateRunFields({ current_sequence_index: updatedRun.current_sequence_index + 1 })
         setPromptIndex(0)
         return
       }
