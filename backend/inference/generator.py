@@ -39,7 +39,7 @@ def run_prompt(
       return_tensors="pt",
     ).to(DEVICE)
 
-  output = model(input_ids, output_hidden_states=True)
+  output = model(input_ids, output_hidden_states=True, use_cache=False)
   n_layers = model.config.num_hidden_layers
 
   hidden_states = np.array([
