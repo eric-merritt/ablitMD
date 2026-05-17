@@ -1,17 +1,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:         #111111;
-  --surface:    #1a1a1a;
-  --surface-2:  #161616;
-  --surface-3:  #131313;
-  --border:     #2e2e2e;
-  --border-2:   #252525;
-  --text:       #e0e0e0;
-  --text-dim:   #aaaaaa;
-  --text-muted: #888888;
-  --accent:     #7c6aff;
-  --accent-dim: rgba(124, 106, 255, 0.2);
+  --bg:         #0e1117;
+  --surface:    #13161f;
+  --surface-2:  #191d28;
+  --surface-3:  #1e2230;
+  --border:     #272d3d;
+  --border-2:   #303749;
+  --text:       #e2e8f5;
+  --text-dim:   #8896b3;
+  --text-muted: #4a5470;
+  --accent:     #5b9cf6;
+  --accent-dim: rgba(91, 156, 246, 0.1);
   --radius:     8px;
   --font:       system-ui, 'Segoe UI', Roboto, sans-serif;
 }
@@ -22,10 +22,25 @@ body {
   font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-items: center;
   -webkit-font-smoothing: antialiased;
 }
 
-#root { min-height: 100vh; }
+#root {
+  position: relative;
+  height: 90vh;
+  width: 66vw;
+  overflow: hidden;
+  display: flex;
+  padding: 2rem 2rem 0;
+  margin-top: 3rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+}
 
 button { cursor: pointer; font-family: inherit; font-size: inherit; }
 input[type="checkbox"] { accent-color: var(--accent); }

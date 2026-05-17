@@ -4,20 +4,21 @@ from datetime import timezone, datetime
 
 def compute_direction(
   refusal_states: np.ndarray,
-  non_refusal_states: np.ndarray
-) -> np.ndarray:
+  non_refusal_states: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
   refusal_mean = refusal_states.mean(axis=0)
   non_refusal_mean = non_refusal_states.mean(axis=0)
   diff = refusal_mean - non_refusal_mean
   norms = np.linalg.norm(diff, axis=1, keepdims=True)
   safe_norms = np.where(norms < 1e-8, 1.0, norms)
   direction = np.where(norms < 1e-8, np.zeros_like(diff), diff / safe_norms)
-  return direction.astype(np.float32)
+  magnitude = norms.squeeze(axis=1)
+  return direction.astype(np.float32), magnitude.astype(np.float32)
 
 
 def compute_similarity(
   hidden_state: np.ndarray,
-  direction: np.ndarray
+  direction: np.ndarray,
 ) -> np.ndarray:
   hs_norms = np.linalg.norm(hidden_state, axis=1, keepdims=True)
   dir_norms = np.linalg.norm(direction, axis=1, keepdims=True)
@@ -31,31 +32,69 @@ def compute_similarity(
 def compute_run_directions(
   hidden_states: dict[str, np.ndarray],
   classifications: list[dict],
-  category: str
+  category: str,
+  visitors: dict[str, np.ndarray] | None = None,
 ) -> dict | None:
-  refused_keys = [c['hidden_states_key'] for c in classifications if c['refused']]
-  non_refused_keys = [c['hidden_states_key'] for c in classifications if not c['refused']]
+  groups: dict[str, list[str]] = {'none': [], 'hard': [], 'redirect': [], 'disclaimer': []}
+  for c in classifications:
+    key = c['hidden_states_key']
+    if key not in hidden_states:
+      continue
+    mode = c.get('refusal_mode', 'none')
+    if mode in groups:
+      groups[mode].append(key)
 
-  if len(refused_keys) == 0 or len(non_refused_keys) == 0:
+  none_keys = groups['none']
+  if not none_keys:
     return None
 
-  refused_stack = np.stack([hidden_states[key] for key in refused_keys if key in hidden_states])
-  non_refused_stack = np.stack([hidden_states[key] for key in non_refused_keys if key in hidden_states])
+  none_stack = np.stack([hidden_states[k] for k in none_keys])
 
-  if refused_stack.shape[0] == 0 or non_refused_stack.shape[0] == 0:
+  by_mode: dict = {}
+  for mode in ('hard', 'redirect', 'disclaimer'):
+    mode_keys = groups[mode]
+    if not mode_keys:
+      continue
+
+    mode_stack = np.stack([hidden_states[k] for k in mode_keys])
+    direction, magnitude = compute_direction(mode_stack, none_stack)
+
+    sims_per_prompt = {
+      c['hidden_states_key']: compute_similarity(
+        hidden_states[c['hidden_states_key']], direction
+      ).tolist()
+      for c in classifications
+      if c['hidden_states_key'] in hidden_states
+    }
+
+    by_mode[mode] = {
+      'direction_per_layer': direction.tolist(),
+      'magnitude_per_layer': magnitude.tolist(),
+      'sample_count': len(mode_keys),
+      'similarity_per_prompt': sims_per_prompt,
+    }
+
+  if not by_mode:
     return None
 
-  direction = compute_direction(refused_stack, non_refused_stack)
+  alignment: dict[str, list] = {}
+  computed = list(by_mode.keys())
+  for i, m1 in enumerate(computed):
+    d1 = np.array(by_mode[m1]['direction_per_layer'])
+    for m2 in computed[i + 1:]:
+      d2 = np.array(by_mode[m2]['direction_per_layer'])
+      alignment[f'{m1}_vs_{m2}'] = (d1 * d2).sum(axis=1).tolist()
 
-  similarity_per_prompt = {}
-  for classification in classifications:
-    key = classification['hidden_states_key']
-    if key in hidden_states:
-      sims = compute_similarity(hidden_states[key], direction)
-      similarity_per_prompt[key] = sims.tolist()
+  if visitors:
+    for mode_data in by_mode.values():
+      direction = np.array(mode_data['direction_per_layer'])
+      mode_data['trigger_similarity_per_prompt'] = {
+        key: compute_similarity(hs, direction).tolist()
+        for key, hs in visitors.items()
+      }
 
   return {
     'computed_at': datetime.now(timezone.utc).isoformat(),
-    'direction_per_layer': direction.tolist(),
-    'similarity_per_prompt': similarity_per_prompt,
+    'by_mode': by_mode,
+    'alignment': alignment,
   }

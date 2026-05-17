@@ -7,5 +7,10 @@ __pycache__/
 *.pyc
 .venv/
 
+# Secrets
+.env
+backend/.env
+frontend/.env
+
 # Node
 node_modules/

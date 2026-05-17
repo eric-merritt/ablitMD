@@ -8,14 +8,14 @@ interface ModelCheckboxProps {
 }
 
 const BG = {
-  model:    'var(--surface)',
-  group:    'var(--surface-2)',
+  model:    'var(--surface-3)',
+  group:    'var(--surface-3)',
   category: 'var(--surface-3)',
 }
 
 const BORDER = {
-  model:    'var(--border)',
-  group:    'var(--border)',
+  model:    'var(--border-2)',
+  group:    'var(--border-2)',
   category: 'var(--border-2)',
 }
 
@@ -42,7 +42,7 @@ export const ModelCheckbox = ({
       checked={checked}
       onChange={evt => onChange(evt.target.checked)}
     />
-    <span style={{ flex: 1, color: variant === 'model' ? 'var(--text)' : 'var(--text-dim)' }}>
+    <span style={{ flex: 1, color: 'var(--text-dim)' }}>
       {label}
     </span>
     {onExpand && (

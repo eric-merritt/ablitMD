@@ -7,8 +7,8 @@ const llmSchema = new Schema({
   apiProvider: { type: String, required: true },
   apiModelId: { type: String, required: true },
   architecture: {
-    numLayers: { type: Number, required: true },
-    hiddenSize: { type: Number, required: true },
+    numLayers: { type: Number },
+    hiddenSize: { type: Number },
     intermediateSize: { type: Number },
     numAttentionHeads: { type: Number },
     architectureType: { type: String, default: 'transformer' },

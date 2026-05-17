@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Run Config List Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #111; color: #e0e0e0; font-family: system-ui, sans-serif; font-size: 14px; padding: 32px; }
+
+  .config-panel { max-width: 480px; }
+  h2 { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+
+  .tree { display: flex; flex-direction: column; gap: 4px; }
+
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid #2e2e2e; border-radius: 8px;
+    padding: 7px 4px 7px 10px; background: #1a1a1a;
+    cursor: default; user-select: none;
+  }
+  .row:hover { border-color: #444; background: #1e1e1e; }
+
+  .row input[type="checkbox"] { accent-color: #7c6aff; width: 14px; height: 14px; flex-shrink: 0; cursor: pointer; }
+  .row .label { flex: 1; }
+  .row .expand {
+    font-size: 16px; line-height: 1; color: #555; padding: 0 4px;
+    cursor: pointer; border-radius: 4px; flex-shrink: 0;
+  }
+  .row .expand:hover { color: #aaa; background: #2a2a2a; }
+
+  .children { margin-left: 20px; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+  .children.hidden { display: none; }
+
+  .row.group { background: #161616; }
+  .row.group .label { color: #c0c0c0; }
+
+  .row.category { background: #131313; border-color: #252525; }
+  .row.category .label { color: #aaa; }
+  .row.category:hover { border-color: #333; }
+</style>
+</head>
+<body>
+<div class="config-panel">
+  <h2>Models &amp; Categories</h2>
+  <div class="tree" id="tree"></div>
+</div>
+
+<script>
+const models = [
+  { id: 'qwen', label: 'Qwen3.6 27B' },
+  { id: 'gemma', label: 'Gemma 4 31B IT' },
+  { id: 'llama', label: 'Llama 4 Maverick' },
+  { id: 'deepseek', label: 'DeepSeek V4 Pro' },
+]
+
+const groups = [
+  { id: 'violence_physical_harm', label: 'Violence & Physical Harm', categories: [
+    'Violence & Terrorism', 'Mass-Casualty Violence', 'Dangerous Activity Instructions'
+  ]},
+  { id: 'weapons_wmd', label: 'Weapons & WMD', categories: [
+    'CBRN Weapons Uplift', 'Weapons & Explosives', 'Hazardous Materials'
+  ]},
+  { id: 'child_safety', label: 'Child Safety', categories: [
+    'CSAM', 'Child Grooming & Non-Sexual Exploitation'
+  ]},
+  { id: 'hate_discrimination', label: 'Hate & Discrimination', categories: [
+    'Hate Speech / Dehumanization', 'Harassment & Bullying', 'Identity-Based Discrimination'
+  ]},
+  { id: 'privacy', label: 'Privacy', categories: [
+    'PII Requests / Doxxing', 'Confidential Data', 'Non-Consensual Surveillance'
+  ]},
+]
+
+const tree = document.getElementById('tree')
+
+const makeRow = (label, cls, hasExpand) => {
+  const row = document.createElement('div')
+  row.className = 'row' + (cls ? ' ' + cls : '')
+
+  const cb = document.createElement('input')
+  cb.type = 'checkbox'
+  cb.checked = true
+  row.appendChild(cb)
+
+  const lbl = document.createElement('span')
+  lbl.className = 'label'
+  lbl.textContent = label
+  row.appendChild(lbl)
+
+  let expandBtn = null
+  if (hasExpand) {
+    expandBtn = document.createElement('span')
+    expandBtn.className = 'expand'
+    expandBtn.textContent = '+'
+    row.appendChild(expandBtn)
+  }
+
+  return { row, expandBtn }
+}
+
+models.forEach(model => {
+  const { row: modelRow, expandBtn: modelExpand } = makeRow(model.label, '', true)
+  tree.appendChild(modelRow)
+
+  const groupChildren = document.createElement('div')
+  groupChildren.className = 'children hidden'
+  tree.appendChild(groupChildren)
+
+  modelExpand.addEventListener('click', () => {
+    const open = groupChildren.classList.toggle('hidden') === false
+    modelExpand.textContent = open ? '−' : '+'
+  })
+
+  groups.forEach(group => {
+    const { row: groupRow, expandBtn: groupExpand } = makeRow(group.label, 'group', true)
+    groupChildren.appendChild(groupRow)
+
+    const catChildren = document.createElement('div')
+    catChildren.className = 'children hidden'
+    groupChildren.appendChild(catChildren)
+
+    groupExpand.addEventListener('click', () => {
+      const open = catChildren.classList.toggle('hidden') === false
+      groupExpand.textContent = open ? '−' : '+'
+    })
+
+    group.categories.forEach(cat => {
+      const { row: catRow } = makeRow(cat, 'category', false)
+      catChildren.appendChild(catRow)
+    })
+  })
+})
+</script>
+</body>
+</html>

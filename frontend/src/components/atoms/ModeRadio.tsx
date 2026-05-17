@@ -6,7 +6,18 @@ interface ModeRadioProps {
 }
 
 export const ModeRadio = ({ value, label, selected, onChange }: ModeRadioProps) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-dim)' }}>
+  <label style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    cursor: 'pointer',
+    color: 'var(--text-dim)',
+    background: 'var(--surface-3)',
+    border: '1px solid var(--border-2)',
+    borderRadius: 'var(--radius)',
+    padding: '7px 10px',
+    userSelect: 'none',
+  }}>
     <input
       type="radio"
       name="mode"

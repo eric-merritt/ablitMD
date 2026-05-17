@@ -22,8 +22,8 @@ const App = () => {
     [models]
   )
 
-  const handleRunStart = (run: Run) => { setActiveRun(run); setPhase('running') }
-  const handleRunOpen  = (run: Run) => { setActiveRun(run); setPhase(run.incomplete ? 'running' : 'results') }
+  const handleRunStart    = (run: Run) => { setActiveRun(run); setPhase('running') }
+  const handleRunOpen     = (run: Run) => { setActiveRun(run); setPhase(run.incomplete ? 'running' : 'results') }
   const handleRunComplete = (run: Run) => { setActiveRun(run); setPhase('results') }
 
   return (
@@ -32,10 +32,21 @@ const App = () => {
         <RunConfigPanel models={models} onRunStart={handleRunStart} onRunOpen={handleRunOpen} />
       )}
       {phase === 'running' && activeRun && (
-        <PromptWalkthrough initialRun={activeRun} models={walkthroughModels} onComplete={handleRunComplete} />
+        <PromptWalkthrough
+          initialRun={activeRun}
+          models={walkthroughModels}
+          onComplete={handleRunComplete}
+          onBack={() => setPhase('config')}
+          onHome={() => setPhase('config')}
+        />
       )}
       {phase === 'results' && activeRun && (
-        <ResultsGrid run={activeRun} modelNames={modelNames} />
+        <ResultsGrid
+          run={activeRun}
+          modelNames={modelNames}
+          onBack={() => setPhase('running')}
+          onHome={() => setPhase('config')}
+        />
       )}
     </>
   )
