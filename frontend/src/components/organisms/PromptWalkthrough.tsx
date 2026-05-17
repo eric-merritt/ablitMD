@@ -22,6 +22,34 @@ interface PromptWalkthroughProps {
   onHome: () => void
 }
 
+const ModelLoadingBar = ({ modelName }: { modelName: string }) => {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const mins = Math.floor(elapsed / 60)
+  const secs = String(elapsed % 60).padStart(2, '0')
+  const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${elapsed}s`
+  return (
+    <div style={{ padding: '12px 14px', background: 'var(--accent-dim)', border: '1px solid var(--accent)44', borderRadius: 'var(--radius)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <span style={{ color: 'var(--accent)', fontSize: '13px' }}>Loading {modelName} into GPU…</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: '11px', fontVariantNumeric: 'tabular-nums' }}>{timeStr}</span>
+      </div>
+      <div style={{ height: '3px', background: 'var(--surface-3)', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%',
+          width: '40%',
+          background: 'var(--accent)',
+          borderRadius: '2px',
+          animation: 'inferenceSlide 1.6s ease-in-out infinite',
+        }} />
+      </div>
+    </div>
+  )
+}
+
 const HomeIcon = () => (
   <svg width="13" height="13" viewBox="0 0 14 14" fill="none" style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: '5px' }}>
     <path d="M1 7L7 1L13 7V13H9.5V9H4.5V13H1V7Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
@@ -163,11 +191,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           total={sortedPendingPrompts.length}
         />
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {modelLoading && (
-            <div style={{ padding: '10px', background: 'var(--accent-dim)', borderRadius: 'var(--radius)', color: 'var(--accent)', fontSize: '13px' }}>
-              Loading {currentModel.name} into GPU…
-            </div>
-          )}
+          {modelLoading && <ModelLoadingBar modelName={currentModel.name} />}
           {isOnSkipped && (
             <div style={{ padding: '8px 12px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 'var(--radius)', color: '#eab308', fontSize: '12px' }}>
               Revisiting skipped prompt — {skippedRemaining} remaining
