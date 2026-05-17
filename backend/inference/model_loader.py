@@ -1,3 +1,4 @@
+import gc
 import os
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -28,15 +29,23 @@ def load_model(model_id: str, api_model_id: str) -> None:
 
   model_path = _resolve_model_path(api_model_id)
   print(f"Loading model {model_path} on {DEVICE}...")
-  _model = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    torch_dtype=torch.bfloat16,
-    device_map=DEVICE,
-    trust_remote_code=True,
-  )
-  _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-  _loaded_model_id = model_id
-  print(f"Model loaded: {model_id}")
+  try:
+    _model = AutoModelForCausalLM.from_pretrained(
+      model_path,
+      torch_dtype=torch.bfloat16,
+      device_map=DEVICE,
+      trust_remote_code=True,
+    )
+    _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    _loaded_model_id = model_id
+    print(f"Model loaded: {model_id}")
+  except Exception:
+    _model = None
+    _tokenizer = None
+    _loaded_model_id = None
+    gc.collect()
+    torch.cuda.empty_cache()
+    raise
 
 
 def unload_model() -> None:
