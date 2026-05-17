@@ -3,13 +3,29 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 import { Run } from '../models/run.js'
+import { Direction } from '../models/direction.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RUNS_DIR = process.env.RUNS_DIR || join(__dirname, '../../data/runs')
 
+const mirrorRunToMongo = (run) => {
+  const { direction_results, ...runDoc } = run
+  Run.updateOne({ run_id: run.run_id }, runDoc, { upsert: true })
+    .catch(err => console.error(`[runs] Mongo Run mirror failed for ${run.run_id}: ${err.message}`))
+}
+
+const mirrorDirectionsToMongo = (run) => {
+  if (!run.direction_results) return
+  for (const [category_id, payload] of Object.entries(run.direction_results)) {
+    const doc = { run_id: run.run_id, category_id, ...payload }
+    Direction.updateOne({ run_id: run.run_id, category_id }, doc, { upsert: true })
+      .catch(err => console.error(`[runs] Mongo Direction mirror failed for ${run.run_id}/${category_id}: ${err.message}`))
+  }
+}
+
 const mirrorToMongo = (run) => {
-  Run.updateOne({ run_id: run.run_id }, run, { upsert: true })
-    .catch(err => console.error(`[runs] Mongo mirror failed for ${run.run_id}: ${err.message}`))
+  mirrorRunToMongo(run)
+  mirrorDirectionsToMongo(run)
 }
 
 export const runPath = (run_id) => join(RUNS_DIR, `${run_id}.json`)
