@@ -62,14 +62,14 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
 
   const [modelReady, setModelReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [promptIndex, setPromptIndex] = useState(0)
-  const [completedCount, setCompletedCount] = useState(0)
+  const [stepPosition, setStepPosition] = useState(0)
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set())
   const [responses, setResponses] = useState<Record<string, string>>({})
   const [genErrors, setGenErrors] = useState<Record<string, string>>({})
+  const [selection, setSelection] = useState<RefusalMode | 'none' | null>(null)
   const [backHovered, setBackHovered] = useState(false)
   const [skipHovered, setSkipHovered] = useState(false)
-  const [homeHovered, setHomeHovered] = useState(false)
+  const [nextHovered, setNextHovered] = useState(false)
   const classifying = useRef(false)
 
   const currentStep = run ? run.sequence[run.current_sequence_index] : null
@@ -83,12 +83,14 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     ]
   }, [run, currentStep, skippedIds])
 
-  const currentPrompt = sortedPendingPrompts[promptIndex] ?? null
+  const currentPrompt = sortedPendingPrompts[0] ?? null
   const currentModel = models.find(m => m.modelId === currentStep?.model) ?? null
   const response = currentPrompt ? responses[currentPrompt.prompt_id] ?? null : null
   const genError = currentPrompt ? genErrors[currentPrompt.prompt_id] ?? null : null
   const isOnSkipped = currentPrompt ? skippedIds.has(currentPrompt.prompt_id) : false
   const skippedRemaining = sortedPendingPrompts.filter(p => skippedIds.has(p.prompt_id)).length
+
+  useEffect(() => { setSelection(null) }, [currentPrompt?.prompt_id])
 
   // Effect 1 — load model whenever the active model changes
   useEffect(() => {
@@ -130,16 +132,16 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
 
   const handleBack = () => {
     if (generating) return
-    if (promptIndex === 0) onBack()
-    else setPromptIndex(prev => prev - 1)
+    onBack()
   }
 
   const handleClassify = async (refused: boolean, mode: RefusalMode) => {
     if (classifying.current) return
     if (!currentPrompt || !currentStep || !run) return
     classifying.current = true
+    setStepPosition(prev => prev + 1)
     try {
-      const isLastPrompt = promptIndex >= sortedPendingPrompts.length - 1
+      const isLastPrompt = sortedPendingPrompts.length === 1
       const isLastStep = run.current_sequence_index >= run.sequence.length - 1
 
       const result = {
@@ -156,14 +158,13 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
       if (!updatedRun) return
 
       setSkippedIds(prev => { const next = new Set(prev); next.delete(currentPrompt.prompt_id); return next })
-      setCompletedCount(prev => prev + 1)
 
       if (!isLastPrompt) return
 
       if (!isLastStep) {
         await updateRunFields({ current_sequence_index: updatedRun.current_sequence_index + 1 })
-        setPromptIndex(0)
-        setCompletedCount(0)
+        setStepPosition(0)
+        setSelection(null)
         setSkippedIds(new Set())
         setResponses({})
         setGenErrors({})
@@ -180,6 +181,13 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     } finally {
       classifying.current = false
     }
+  }
+
+  const handleNext = () => {
+    if (!selection || !response || classifying.current) return
+    const refused = selection !== 'none'
+    const mode: RefusalMode = refused ? selection as RefusalMode : 'none'
+    handleClassify(refused, mode)
   }
 
   if (!run || !currentStep || !currentModel) {
@@ -214,7 +222,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     )
   }
 
-  const navDisabled = generating
+  const nextDisabled = !selection || generating || !response
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -222,8 +230,8 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
         <RunProgress
           modelName={currentModel.name}
           mode={currentStep.mode}
-          currentIndex={completedCount}
-          total={sortedPendingPrompts.length}
+          currentIndex={stepPosition}
+          total={sortedPendingPrompts.length + stepPosition}
         />
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {isOnSkipped && (
@@ -234,9 +242,9 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           <PromptCard prompt={currentPrompt} />
           <ResponsePanel generating={generating} response={response} error={genError} />
           <RefusalClassifier
-            key={currentPrompt.prompt_id}
             disabled={generating || !response}
-            onClassify={handleClassify}
+            selected={selection}
+            onChange={setSelection}
           />
         </div>
       </div>
@@ -249,15 +257,15 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
             onMouseEnter={() => setBackHovered(true)}
             onMouseLeave={() => setBackHovered(false)}
             style={{
-              color: navDisabled ? 'var(--text-muted)' : backHovered ? 'var(--accent)' : 'var(--text)',
+              color: generating ? 'var(--text-muted)' : backHovered ? 'var(--accent)' : 'var(--text)',
               fontSize: '19px',
-              cursor: navDisabled ? 'default' : 'pointer',
+              cursor: generating ? 'default' : 'pointer',
               userSelect: 'none',
               transition: 'color 0.15s',
             }}
           >
             ←{' '}
-            <span style={{ textDecoration: !navDisabled && backHovered ? 'underline' : 'none' }}>
+            <span style={{ textDecoration: !generating && backHovered ? 'underline' : 'none' }}>
               Back
             </span>
           </span>
@@ -269,36 +277,37 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
               </span>
             )}
             <span
-              onClick={onHome}
-              onMouseEnter={() => setHomeHovered(true)}
-              onMouseLeave={() => setHomeHovered(false)}
+              onClick={handleSkip}
+              onMouseEnter={() => setSkipHovered(true)}
+              onMouseLeave={() => setSkipHovered(false)}
               style={{
-                color: homeHovered ? 'var(--accent)' : 'var(--text)',
+                color: isOnSkipped ? 'var(--text-muted)' : skipHovered ? 'var(--accent)' : 'var(--text)',
                 fontSize: '19px',
-                cursor: 'pointer',
+                cursor: isOnSkipped ? 'default' : 'pointer',
                 userSelect: 'none',
                 transition: 'color 0.15s',
               }}
             >
-              <HomeIcon />
-              <span style={{ textDecoration: homeHovered ? 'underline' : 'none' }}>Home</span>
+              <span style={{ textDecoration: !isOnSkipped && skipHovered ? 'underline' : 'none' }}>
+                Skip
+              </span>
             </span>
           </div>
 
           <span
-            onClick={handleSkip}
-            onMouseEnter={() => setSkipHovered(true)}
-            onMouseLeave={() => setSkipHovered(false)}
+            onClick={handleNext}
+            onMouseEnter={() => setNextHovered(true)}
+            onMouseLeave={() => setNextHovered(false)}
             style={{
-              color: isOnSkipped ? 'var(--text-muted)' : skipHovered ? 'var(--accent)' : 'var(--text)',
+              color: nextDisabled ? 'var(--text-muted)' : nextHovered ? 'var(--accent)' : 'var(--text)',
               fontSize: '19px',
-              cursor: isOnSkipped ? 'default' : 'pointer',
+              cursor: nextDisabled ? 'default' : 'pointer',
               userSelect: 'none',
               transition: 'color 0.15s',
             }}
           >
-            <span style={{ textDecoration: !isOnSkipped && skipHovered ? 'underline' : 'none' }}>
-              Skip
+            <span style={{ textDecoration: !nextDisabled && nextHovered ? 'underline' : 'none' }}>
+              Next
             </span>
             {' '}→
           </span>
