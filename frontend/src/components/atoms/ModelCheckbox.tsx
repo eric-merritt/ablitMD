@@ -46,12 +46,13 @@ export const ModelCheckbox = ({
       {label}
     </span>
     {onExpand && (
-      <span
+      <button
+        type="button"
         onClick={onExpand}
-        style={{ fontSize: '16px', lineHeight: '1', color: 'var(--text-muted)', padding: '0 4px', cursor: 'pointer', borderRadius: '4px', flexShrink: 0 }}
+        style={{ fontSize: '16px', lineHeight: '1', color: 'var(--text-muted)', padding: '0 4px', cursor: 'pointer', borderRadius: '4px', flexShrink: 0, background: 'none', border: 'none' }}
       >
         {expanded ? '−' : '+'}
-      </span>
+      </button>
     )}
   </div>
 )
