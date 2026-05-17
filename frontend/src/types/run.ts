@@ -33,10 +33,25 @@ export interface SequenceStep {
   mode: string
 }
 
+export interface RefusalModeDirectionEntry {
+  direction_per_layer: number[][]
+  magnitude_per_layer: number[]
+  sample_count: number
+  similarity_per_prompt: Record<string, number[]>
+  trigger_similarity_per_prompt?: Record<string, number[]>
+}
+
+export interface TriggerMeta {
+  source_category: string
+  refused: boolean
+  refusal_mode: RefusalMode
+}
+
 export interface CategoryDirectionResult {
   computed_at: string
-  direction_per_layer: number[][]
-  similarity_per_prompt: Record<string, number[]>
+  by_mode: Partial<Record<'hard' | 'redirect' | 'disclaimer', RefusalModeDirectionEntry>>
+  alignment: Record<string, number[]>
+  trigger_meta?: Record<string, TriggerMeta>
 }
 
 export interface ModeDirectionResult {

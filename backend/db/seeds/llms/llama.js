@@ -2,16 +2,16 @@ import { LLM } from '../../../models/llm.js'
 import { CAT } from '../../../constants/Categories.js'
 
 export const llamaSeed = new LLM({
-  name: 'Llama 4 Maverick',
-  modelId: 'meta-llama/Llama-4-Maverick',
+  name: 'Llama 3.3 70B Instruct',
+  modelId: 'meta-llama/Llama-3.3-70B-Instruct',
   vendor: 'Meta',
-  apiProvider: 'OpenRouter',
-  apiModelId: 'meta-llama/llama-4-maverick',
+  apiProvider: 'self_hosted',
+  apiModelId: 'meta-llama/Llama-3.3-70B-Instruct',
   architecture: {
-    numLayers: null,
-    hiddenSize: null,
-    intermediateSize: null,
-    numAttentionHeads: null,
+    numLayers: 80,
+    hiddenSize: 8192,
+    intermediateSize: 28672,
+    numAttentionHeads: 64,
     architectureType: 'transformer',
     outputProjections: ['o_proj', 'down_proj'],
     dtype: 'bfloat16',
@@ -25,10 +25,14 @@ export const llamaSeed = new LLM({
     hiddenStatesCached: false,
     cacheHash: null,
     selfReportedCategories: [
-      CAT.ambiguous_context, CAT.hate_speech, CAT.explicit_nsfw,
-      CAT.pii_doxxing, CAT.copyright_ip, CAT.crime_assistance,
-      CAT.high_stakes_falsehoods, CAT.realtime_information, CAT.excessive_requests,
+      CAT.violence_terrorism, CAT.weapons_explosives, CAT.csam,
+      CAT.hate_speech, CAT.harassment_bullying, CAT.self_harm_methods,
+      CAT.explicit_nsfw, CAT.nonconsensual_sexual, CAT.pii_doxxing,
+      CAT.crime_assistance, CAT.regulated_goods, CAT.malicious_code,
+      CAT.hacking_unauthorized, CAT.high_stakes_falsehoods,
+      CAT.medical_advice, CAT.legal_advice, CAT.copyright_ip,
+      CAT.social_engineering, CAT.impersonation,
     ],
   },
-  notes: 'Thinnest self-report in dataset. Accessed via OpenRouter free tier.',
+  notes: 'Replaces Llama 4 Maverick (MoE, parked). Dense, ~140GB bf16, fits 2× PRO6000. Third distinct RLHF pipeline alongside Qwen and Gemma.',
 })

@@ -84,39 +84,59 @@ def compute(req: ComputeRequest):
   run_data = json.loads(run_file.read_text())
   state_dir = RUNS_DIR / req.run_id
 
-  per_category: dict[str, list] = {}
+  all_hidden: dict[str, np.ndarray] = {}
+  all_meta: dict[str, dict] = {}
 
   for prompt in run_data["prompts"]:
     result = prompt.get("model_results", {}).get(req.model_id, {}).get(req.mode)
     if not result:
       continue
-
     key = result["hidden_states_key"]
     npy_path = state_dir / f"{key}.npy"
     if not npy_path.exists():
       continue
-
-    category = prompt["category"]
-    per_category.setdefault(category, []).append({
-      "hidden_states_key": key,
+    all_hidden[key] = np.load(str(npy_path))
+    all_meta[key] = {
+      "category": prompt["category"],
+      "triggers": prompt.get("triggers", []),
       "refused": result["refused"],
-      "hidden_state": np.load(str(npy_path)),
+      "refusal_mode": result.get("refusal_mode", "hard" if result["refused"] else "none"),
+    }
+
+  per_category: dict[str, list] = {}
+  for key, meta in all_meta.items():
+    per_category.setdefault(meta["category"], []).append({
+      "hidden_states_key": key,
+      "refused": meta["refused"],
+      "refusal_mode": meta["refusal_mode"],
     })
 
   direction_results: dict[str, dict] = {}
 
-  for category, entries in per_category.items():
-    hidden_states_map = {e["hidden_states_key"]: e["hidden_state"] for e in entries}
-    classifications = [
-      {"hidden_states_key": e["hidden_states_key"], "refused": e["refused"]}
-      for e in entries
-    ]
-    result = compute_run_directions(hidden_states_map, classifications, category=category)
+  for category, classifications in per_category.items():
+    cat_hidden = {c["hidden_states_key"]: all_hidden[c["hidden_states_key"]] for c in classifications}
+
+    visitors = {
+      key: all_hidden[key]
+      for key, meta in all_meta.items()
+      if meta["category"] != category and category in meta["triggers"]
+    }
+    trigger_meta = {
+      key: {
+        "source_category": all_meta[key]["category"],
+        "refused": all_meta[key]["refused"],
+        "refusal_mode": all_meta[key]["refusal_mode"],
+      }
+      for key in visitors
+    }
+
+    result = compute_run_directions(cat_hidden, classifications, category=category, visitors=visitors or None)
     if result:
+      result["trigger_meta"] = trigger_meta
       direction_results[category] = result
 
   return direction_results
 
 
 if __name__ == "__main__":
-  uvicorn.run(app, host="0.0.0.0", port=8200, reload=False)
+  uvicorn.run(app, host="0.0.0.0", port=8238, reload=False)

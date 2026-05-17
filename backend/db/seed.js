@@ -8,11 +8,12 @@ import { Prompt } from '../models/prompt.js'
 import { qwenSeed } from './seeds/llms/qwen.js'
 import { gemmaSeed } from './seeds/llms/gemma.js'
 import { llamaSeed } from './seeds/llms/llama.js'
-import { deepseekSeed } from './seeds/llms/deepseek.js'
+// deepseek parked — MoE, ~1.3TB bf16, infeasible pre-abliteration
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REFCATS_DIR = join(__dirname, 'seeds/refCats')
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/ablitmd'
+const MONGO_URI = process.env.MONGO_URI
+if (!MONGO_URI) throw new Error('MONGO_URI is not set')
 
 const catGroupMap = Object.fromEntries(CATEGORIES.map(cat => [cat.id, cat.group]))
 
@@ -35,8 +36,17 @@ const loadAllPromptSeeds = async () => {
   return allPrompts
 }
 
+const STALE_MODEL_IDS = [
+  'meta-llama/Llama-4-Maverick',  // replaced by Llama-3.3-70B-Instruct (MoE, too large)
+]
+
 const seedLLMs = async () => {
-  const seeds = [qwenSeed, gemmaSeed, llamaSeed, deepseekSeed]
+  for (const staleId of STALE_MODEL_IDS) {
+    const removed = await LLM.deleteOne({ modelId: staleId })
+    if (removed.deletedCount) console.log(`  - removed stale: ${staleId}`)
+  }
+
+  const seeds = [qwenSeed, gemmaSeed, llamaSeed]
   let inserted = 0
 
   for (const seed of seeds) {

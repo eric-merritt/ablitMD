@@ -8,9 +8,9 @@ export const gemmaSeed = new LLM({
   apiProvider: 'self_hosted',
   apiModelId: 'google/gemma-4-31b-it',
   architecture: {
-    numLayers: null,
-    hiddenSize: null,
-    intermediateSize: null,
+    numLayers: 60,
+    hiddenSize: 5376,
+    intermediateSize: 21504,
     numAttentionHeads: null,
     architectureType: 'transformer',
     outputProjections: ['o_proj', 'down_proj'],
