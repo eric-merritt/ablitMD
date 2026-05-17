@@ -18,8 +18,7 @@ npm run seed --workspace=backend
 echo "==> Pre-fetching model weights from HuggingFace..."
 export HF_HOME=/workspace/models
 mkdir -p /workspace/models
-uv run huggingface-cli download Qwen/Qwen3.6-27B \
-  --local-dir-use-symlinks False \
+hf download Qwen/Qwen3.6-27B --local-dir /workspace/models/Qwen3.6-27B \
   || echo "    Warning: HF download failed — model will download on first load"
 
 echo "==> Starting services..."
