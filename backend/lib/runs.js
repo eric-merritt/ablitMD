@@ -2,9 +2,18 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
+import { Run } from '../models/run.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RUNS_DIR = process.env.RUNS_DIR || join(__dirname, '../../data/runs')
+
+const mirrorToMongo = async (run) => {
+  try {
+    await Run.updateOne({ run_id: run.run_id }, run, { upsert: true })
+  } catch (err) {
+    console.error(`[runs] Mongo mirror failed for ${run.run_id}: ${err.message}`)
+  }
+}
 
 export const runPath = (run_id) => join(RUNS_DIR, `${run_id}.json`)
 export const statesDir = (run_id) => join(RUNS_DIR, run_id)
@@ -29,6 +38,7 @@ export const createRun = async ({ models, mode_selection, prompt_scope, sequence
   }
   await writeFile(runPath(run_id), JSON.stringify(run, null, 2))
   await mkdir(statesDir(run_id), { recursive: true })
+  await mirrorToMongo(run)
   return run
 }
 
@@ -39,6 +49,7 @@ export const readRun = async (run_id) => {
 
 export const writeRun = async (run) => {
   await writeFile(runPath(run.run_id), JSON.stringify(run, null, 2))
+  await mirrorToMongo(run)
 }
 
 export const writePromptResult = async (run_id, prompt_id, model_id, mode, result) => {
