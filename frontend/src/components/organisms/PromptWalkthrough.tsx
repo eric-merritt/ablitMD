@@ -63,6 +63,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
   const [modelReady, setModelReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [promptIndex, setPromptIndex] = useState(0)
+  const [completedCount, setCompletedCount] = useState(0)
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set())
   const [responses, setResponses] = useState<Record<string, string>>({})
   const [genErrors, setGenErrors] = useState<Record<string, string>>({})
@@ -123,7 +124,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
   }, [modelReady, currentPrompt?.prompt_id, currentStep?.model, currentStep?.mode])
 
   const handleSkip = () => {
-    if (!currentPrompt || generating || isOnSkipped) return
+    if (!currentPrompt || isOnSkipped) return
     setSkippedIds(prev => new Set([...prev, currentPrompt.prompt_id]))
   }
 
@@ -155,12 +156,14 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
       if (!updatedRun) return
 
       setSkippedIds(prev => { const next = new Set(prev); next.delete(currentPrompt.prompt_id); return next })
+      setCompletedCount(prev => prev + 1)
 
       if (!isLastPrompt) return
 
       if (!isLastStep) {
         await updateRunFields({ current_sequence_index: updatedRun.current_sequence_index + 1 })
         setPromptIndex(0)
+        setCompletedCount(0)
         setSkippedIds(new Set())
         setResponses({})
         setGenErrors({})
@@ -219,7 +222,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
         <RunProgress
           modelName={currentModel.name}
           mode={currentStep.mode}
-          currentIndex={promptIndex}
+          currentIndex={completedCount}
           total={sortedPendingPrompts.length}
         />
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -231,6 +234,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           <PromptCard prompt={currentPrompt} />
           <ResponsePanel generating={generating} response={response} error={genError} />
           <RefusalClassifier
+            key={currentPrompt.prompt_id}
             disabled={generating || !response}
             onClassify={handleClassify}
           />
@@ -286,14 +290,14 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
             onMouseEnter={() => setSkipHovered(true)}
             onMouseLeave={() => setSkipHovered(false)}
             style={{
-              color: navDisabled || isOnSkipped ? 'var(--text-muted)' : skipHovered ? 'var(--accent)' : 'var(--text)',
+              color: isOnSkipped ? 'var(--text-muted)' : skipHovered ? 'var(--accent)' : 'var(--text)',
               fontSize: '19px',
-              cursor: navDisabled || isOnSkipped ? 'default' : 'pointer',
+              cursor: isOnSkipped ? 'default' : 'pointer',
               userSelect: 'none',
               transition: 'color 0.15s',
             }}
           >
-            <span style={{ textDecoration: !navDisabled && !isOnSkipped && skipHovered ? 'underline' : 'none' }}>
+            <span style={{ textDecoration: !isOnSkipped && skipHovered ? 'underline' : 'none' }}>
               Skip
             </span>
             {' '}→
