@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import './App.css'
 import { RunConfigPanel } from './components/organisms/RunConfigPanel'
 import { PromptWalkthrough } from './components/organisms/PromptWalkthrough'
@@ -13,8 +13,14 @@ const App = () => {
   const [phase, setPhase] = useState<Phase>('config')
   const [activeRun, setActiveRun] = useState<Run | null>(null)
 
-  const modelNames = Object.fromEntries(models.map(m => [m.modelId, m.name]))
-  const walkthroughModels = models.map(m => ({ modelId: m.modelId, apiModelId: m.apiModelId, name: m.name }))
+  const modelNames = useMemo(
+    () => Object.fromEntries(models.map(model => [model.modelId, model.name])),
+    [models]
+  )
+  const walkthroughModels = useMemo(
+    () => models.map(model => ({ modelId: model.modelId, apiModelId: model.apiModelId, name: model.name })),
+    [models]
+  )
 
   const handleRunStart = (run: Run) => { setActiveRun(run); setPhase('running') }
   const handleRunOpen  = (run: Run) => { setActiveRun(run); setPhase(run.incomplete ? 'running' : 'results') }
