@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { RunProgress } from '../molecules/RunProgress'
 import { PromptCard } from '../molecules/PromptCard'
 import { ResponsePanel } from '../molecules/ResponsePanel'
@@ -27,6 +27,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete }: PromptWalk
   const [promptIndex, setPromptIndex] = useState(0)
   const [response, setResponse] = useState<string | null>(null)
   const [genError, setGenError] = useState<string | null>(null)
+  const classifying = useRef(false)
 
   const currentStep = run ? run.sequence[run.current_sequence_index] : null
 
@@ -64,42 +65,47 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete }: PromptWalk
   }, [currentPrompt?.prompt_id, currentStep?.model, currentStep?.mode])
 
   const handleClassify = async (refused: boolean, mode: RefusalMode) => {
+    if (classifying.current) return
     if (!currentPrompt || !currentStep || !run) return
+    classifying.current = true
+    try {
+      const isLastPrompt = promptIndex >= pendingPrompts.length - 1
+      const isLastStep = run.current_sequence_index >= run.sequence.length - 1
 
-    const isLastPrompt = promptIndex >= pendingPrompts.length - 1
-    const isLastStep = run.current_sequence_index >= run.sequence.length - 1
+      const result = {
+        response: response ?? '',
+        refused,
+        refusal_mode: mode,
+        classified_at: new Date().toISOString(),
+        hidden_states_key: `${currentPrompt.prompt_id}__${currentStep.model.replace('/', '__')}__${currentStep.mode}`,
+      }
 
-    const result = {
-      response: response ?? '',
-      refused,
-      refusal_mode: mode,
-      classified_at: new Date().toISOString(),
-      hidden_states_key: `${currentPrompt.prompt_id}__${currentStep.model.replace('/', '__')}__${currentStep.mode}`,
+      const updatedRun = await updatePromptResult(
+        currentPrompt.prompt_id, currentStep.model, currentStep.mode, result
+      )
+      if (!updatedRun) return
+
+      if (!isLastPrompt) {
+        setPromptIndex(prev => prev + 1)
+        return
+      }
+
+      if (!isLastStep) {
+        await updateRunFields({ current_sequence_index: run.current_sequence_index + 1 })
+        setPromptIndex(0)
+        return
+      }
+
+      const direction_results = await computeAllDirections(updatedRun)
+      const finalRun = await patchRun(updatedRun.run_id, {
+        direction_results,
+        incomplete: false,
+        completed_at: new Date().toISOString(),
+      })
+      onComplete(finalRun)
+    } finally {
+      classifying.current = false
     }
-
-    const updatedRun = await updatePromptResult(
-      currentPrompt.prompt_id, currentStep.model, currentStep.mode, result
-    )
-    if (!updatedRun) return
-
-    if (!isLastPrompt) {
-      setPromptIndex(prev => prev + 1)
-      return
-    }
-
-    if (!isLastStep) {
-      await updateRunFields({ current_sequence_index: run.current_sequence_index + 1 })
-      setPromptIndex(0)
-      return
-    }
-
-    const direction_results = await computeAllDirections(updatedRun)
-    const finalRun = await patchRun(updatedRun.run_id, {
-      direction_results,
-      incomplete: false,
-      completed_at: new Date().toISOString(),
-    })
-    onComplete(finalRun)
   }
 
   if (!run || !currentStep || !currentModel) {
