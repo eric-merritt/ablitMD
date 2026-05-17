@@ -2,12 +2,26 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { CategoryDirectionChart } from './CategoryDirectionChart'
 import { CATEGORIES } from '../../types/categories'
-import type { Run } from '../../types/run'
+import type { Run, ModeDirectionResult } from '../../types/run'
 
 interface ModelResultsRowProps {
   modelId: string
   modelName: string
   run: Run
+  visibleGroups: Set<string>
+}
+
+interface TabBarProps {
+  availableModes: string[]
+  activeTab: string
+  onTabChange: (mode: string) => void
+}
+
+interface ChartGridProps {
+  mode: string
+  modelResults: Record<string, ModeDirectionResult>
+  run: Run
+  modelId: string
   visibleGroups: Set<string>
 }
 
@@ -22,46 +36,46 @@ const tabBtnStyle = (active: boolean): CSSProperties => ({
   cursor: 'pointer',
 })
 
+const TabBar = ({ availableModes, activeTab, onTabChange }: TabBarProps) => (
+  <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+    {availableModes.map(mode => (
+      <button key={mode} onClick={() => onTabChange(mode)} style={tabBtnStyle(activeTab === mode)}>
+        {mode === 'non_thinking' ? 'Non-Thinking' : 'Thinking'}
+      </button>
+    ))}
+  </div>
+)
+
+const ChartGrid = ({ mode, modelResults, run, modelId, visibleGroups }: ChartGridProps) => {
+  const modeResult = modelResults[mode]
+  if (!modeResult) return <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No data</div>
+
+  const visibleCats = CATEGORIES.filter(
+    cat => visibleGroups.has(cat.group) && modeResult.per_category[cat.id]
+  )
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px' }}>
+      {visibleCats.map(cat => (
+        <CategoryDirectionChart
+          key={cat.id}
+          categoryName={cat.name}
+          directionResult={modeResult.per_category[cat.id]}
+          prompts={run.prompts}
+          modelId={modelId}
+          mode={mode}
+        />
+      ))}
+    </div>
+  )
+}
+
 export const ModelResultsRow = ({ modelId, modelName, run, visibleGroups }: ModelResultsRowProps) => {
   const [activeTab, setActiveTab] = useState('non_thinking')
   const [expanded, setExpanded] = useState(false)
 
   const modelResults = run.direction_results?.[modelId] ?? {}
   const availableModes = Object.keys(modelResults)
-
-  const TabBar = () => (
-    <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
-      {availableModes.map(mode => (
-        <button key={mode} onClick={() => setActiveTab(mode)} style={tabBtnStyle(activeTab === mode)}>
-          {mode === 'non_thinking' ? 'Non-Thinking' : 'Thinking'}
-        </button>
-      ))}
-    </div>
-  )
-
-  const ChartGrid = ({ mode }: { mode: string }) => {
-    const modeResult = modelResults[mode]
-    if (!modeResult) return <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No data</div>
-
-    const visibleCats = CATEGORIES.filter(
-      cat => visibleGroups.has(cat.group) && modeResult.per_category[cat.id]
-    )
-
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '8px' }}>
-        {visibleCats.map(cat => (
-          <CategoryDirectionChart
-            key={cat.id}
-            categoryName={cat.name}
-            directionResult={modeResult.per_category[cat.id]}
-            prompts={run.prompts}
-            modelId={modelId}
-            mode={mode}
-          />
-        ))}
-      </div>
-    )
-  }
 
   return (
     <div style={{ marginBottom: '32px' }}>
@@ -81,14 +95,14 @@ export const ModelResultsRow = ({ modelId, modelName, run, visibleGroups }: Mode
               <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
                 {mode === 'non_thinking' ? 'Non-Thinking' : 'Thinking'}
               </div>
-              <ChartGrid mode={mode} />
+              <ChartGrid mode={mode} modelResults={modelResults} run={run} modelId={modelId} visibleGroups={visibleGroups} />
             </div>
           ))}
         </div>
       ) : (
         <div>
-          <TabBar />
-          <ChartGrid mode={activeTab} />
+          <TabBar availableModes={availableModes} activeTab={activeTab} onTabChange={setActiveTab} />
+          <ChartGrid mode={activeTab} modelResults={modelResults} run={run} modelId={modelId} visibleGroups={visibleGroups} />
         </div>
       )}
     </div>
