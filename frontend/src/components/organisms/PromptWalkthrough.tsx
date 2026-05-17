@@ -58,8 +58,10 @@ const HomeIcon = () => (
 
 export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHome }: PromptWalkthroughProps) => {
   const { run, updatePromptResult, updateRunFields } = useRun(initialRun)
-  const { modelLoading, generating, computing, ensureModelLoaded, generate, computeAllDirections } = useInference()
+  const { generating, computing, ensureModelLoaded, generate, computeAllDirections } = useInference()
 
+  const [modelReady, setModelReady] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [promptIndex, setPromptIndex] = useState(0)
   const [skippedIds, setSkippedIds] = useState<Set<string>>(new Set())
   const [responses, setResponses] = useState<Record<string, string>>({})
@@ -87,14 +89,24 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
   const isOnSkipped = currentPrompt ? skippedIds.has(currentPrompt.prompt_id) : false
   const skippedRemaining = sortedPendingPrompts.filter(p => skippedIds.has(p.prompt_id)).length
 
+  // Effect 1 — load model whenever the active model changes
   useEffect(() => {
-    if (!currentPrompt || !currentStep || !currentModel || !run) return
+    if (!currentModel) return
+    setModelReady(false)
+    setLoadError(null)
+    ensureModelLoaded(currentModel.modelId, currentModel.apiModelId)
+      .then(() => setModelReady(true))
+      .catch(err => setLoadError(err instanceof Error ? err.message : 'Failed to load model'))
+  }, [currentStep?.model])
+
+  // Effect 2 — generate once model is ready and prompt changes
+  useEffect(() => {
+    if (!modelReady || !currentPrompt || !currentStep || !currentModel || !run) return
     if (responses[currentPrompt.prompt_id]) return
 
     const promptId = currentPrompt.prompt_id
     const doGenerate = async () => {
       try {
-        await ensureModelLoaded(currentModel.modelId, currentModel.apiModelId)
         const result = await generate({
           prompt_id: promptId,
           prompt_text: currentPrompt.text,
@@ -108,15 +120,15 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
       }
     }
     doGenerate()
-  }, [currentPrompt?.prompt_id, currentStep?.model, currentStep?.mode])
+  }, [modelReady, currentPrompt?.prompt_id, currentStep?.model, currentStep?.mode])
 
   const handleSkip = () => {
-    if (!currentPrompt || generating || modelLoading || isOnSkipped) return
+    if (!currentPrompt || generating || isOnSkipped) return
     setSkippedIds(prev => new Set([...prev, currentPrompt.prompt_id]))
   }
 
   const handleBack = () => {
-    if (generating || modelLoading) return
+    if (generating) return
     if (promptIndex === 0) onBack()
     else setPromptIndex(prev => prev - 1)
   }
@@ -171,6 +183,26 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     return <div style={{ padding: '48px', color: 'var(--text-muted)' }}>Loading run…</div>
   }
 
+  if (!modelReady) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', maxWidth: '480px', width: '100%', margin: '0 auto' }}>
+          {loadError
+            ? <div style={{ color: '#ef4444', fontSize: '13px' }}>{loadError}</div>
+            : <ModelLoadingBar modelName={currentModel.name} />
+          }
+        </div>
+        <div>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: 0 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 32px' }}>
+            <span onClick={onBack} style={{ cursor: 'pointer', color: 'var(--text)', fontSize: '19px', userSelect: 'none' }}>← Back</span>
+            <span onClick={onHome} style={{ cursor: 'pointer', color: 'var(--text)', fontSize: '19px', userSelect: 'none' }}><HomeIcon />Home</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!currentPrompt) {
     return (
       <div style={{ padding: '48px', color: 'var(--text-muted)' }}>
@@ -179,7 +211,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     )
   }
 
-  const navDisabled = generating || modelLoading
+  const navDisabled = generating
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -191,16 +223,15 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           total={sortedPendingPrompts.length}
         />
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {modelLoading && <ModelLoadingBar modelName={currentModel.name} />}
           {isOnSkipped && (
             <div style={{ padding: '8px 12px', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 'var(--radius)', color: '#eab308', fontSize: '12px' }}>
               Revisiting skipped prompt — {skippedRemaining} remaining
             </div>
           )}
           <PromptCard prompt={currentPrompt} />
-          <ResponsePanel generating={generating || modelLoading} response={response} error={genError} />
+          <ResponsePanel generating={generating} response={response} error={genError} />
           <RefusalClassifier
-            disabled={generating || modelLoading || !response}
+            disabled={generating || !response}
             onClassify={handleClassify}
           />
         </div>
