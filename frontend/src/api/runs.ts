@@ -1,4 +1,4 @@
-import type { Run, RunSummary } from '../types/run'
+import type { Run, RunSummary, RunMode, ModelResult } from '../types/run'
 
 export const fetchRuns = async (): Promise<RunSummary[]> => {
   const res = await fetch('/api/runs')
@@ -8,7 +8,7 @@ export const fetchRuns = async (): Promise<RunSummary[]> => {
 
 export const createRun = async (body: {
   models: string[]
-  mode_selection: string
+  mode_selection: RunMode
   prompt_scope: { categories: string[] }
 }): Promise<Run> => {
   const res = await fetch('/api/runs', {
@@ -41,7 +41,7 @@ export const patchRunPrompt = async (
   promptId: string,
   model_id: string,
   mode: string,
-  result: object
+  result: Partial<ModelResult>
 ): Promise<Run> => {
   const res = await fetch(`/api/runs/${runId}/prompts/${promptId}`, {
     method: 'PATCH',
