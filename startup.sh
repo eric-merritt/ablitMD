@@ -18,6 +18,7 @@ fi
 
 echo "==> Installing dependencies..."
 npm install --silent
+uv sync
 
 echo "==> Seeding database..."
 npm run seed --workspace=backend
