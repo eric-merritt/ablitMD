@@ -11,9 +11,12 @@ export const useInference = () => {
   const ensureModelLoaded = async (modelId: string, apiModelId: string) => {
     if (loadedModel === modelId) return
     setModelLoading(true)
-    await inferenceLoad({ model_id: modelId, api_model_id: apiModelId })
-    setLoadedModel(modelId)
-    setModelLoading(false)
+    try {
+      await inferenceLoad({ model_id: modelId, api_model_id: apiModelId })
+      setLoadedModel(modelId)
+    } finally {
+      setModelLoading(false)
+    }
   }
 
   const generate = async (body: {
