@@ -1,7 +1,7 @@
 import { Router } from 'express'
 
 const router = Router()
-const INFERENCE_BASE = process.env.INFERENCE_URL || 'http://localhost:8200'
+const INFERENCE_BASE = process.env.INFERENCE_URL || 'http://localhost:8238'
 
 const proxyPost = (path) => async (req, res) => {
   const response = await fetch(`${INFERENCE_BASE}${path}`, {
