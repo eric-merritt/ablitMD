@@ -23,7 +23,28 @@ router.get('/status', async (req, res) => {
 })
 
 router.post('/load', proxyPost('/load'))
-router.post('/generate', proxyPost('/generate'))
 router.post('/compute', proxyPost('/compute'))
+
+router.post('/generate', async (req, res) => {
+  const upstream = await fetch(`${INFERENCE_BASE}/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req.body),
+  })
+
+  res.status(upstream.status)
+  res.setHeader('Content-Type', 'application/x-ndjson')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no')
+
+  if (!upstream.body) { res.end(); return }
+
+  req.on('close', () => { upstream.body.destroy?.() })
+
+  for await (const chunk of upstream.body) {
+    if (!res.write(chunk)) await new Promise(resolve => res.once('drain', resolve))
+  }
+  res.end()
+})
 
 export default router

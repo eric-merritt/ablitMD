@@ -102,12 +102,15 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
       .catch(err => setLoadError(err instanceof Error ? err.message : 'Failed to load model'))
   }, [currentStep?.model])
 
-  // Effect 2 — generate once model is ready and prompt changes
+  // Effect 2 — stream generate once model is ready and prompt changes
   useEffect(() => {
     if (!modelReady || !currentPrompt || !currentStep || !currentModel || !run) return
     if (responses[currentPrompt.prompt_id]) return
 
     const promptId = currentPrompt.prompt_id
+    const controller = new AbortController()
+    setResponses(prev => ({ ...prev, [promptId]: '' }))
+
     const doGenerate = async () => {
       try {
         const result = await generate({
@@ -116,13 +119,18 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           run_id: run.run_id,
           model_id: currentStep.model,
           mode: currentStep.mode,
-        })
+        }, (token) => {
+          setResponses(prev => ({ ...prev, [promptId]: (prev[promptId] ?? '') + token }))
+        }, controller.signal)
         setResponses(prev => ({ ...prev, [promptId]: result.response }))
       } catch (err: unknown) {
+        if ((err as Error)?.name === 'AbortError') return
         setGenErrors(prev => ({ ...prev, [promptId]: err instanceof Error ? err.message : 'Generation failed' }))
       }
     }
     doGenerate()
+
+    return () => controller.abort()
   }, [modelReady, currentPrompt?.prompt_id, currentStep?.model, currentStep?.mode])
 
   const handleSkip = () => {
@@ -222,7 +230,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
     )
   }
 
-  const nextDisabled = !selection || generating || !response
+  const nextDisabled = !selection || !response
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -242,7 +250,7 @@ export const PromptWalkthrough = ({ initialRun, models, onComplete, onBack, onHo
           <PromptCard prompt={currentPrompt} />
           <ResponsePanel generating={generating} response={response} error={genError} />
           <RefusalClassifier
-            disabled={generating || !response}
+            disabled={!response}
             selected={selection}
             onChange={setSelection}
           />

@@ -14,10 +14,11 @@ if str(_project_root) not in sys.path:
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.inference.direction import compute_run_directions
-from backend.inference.generator import run_prompt
+from backend.inference.generator import stream_prompt
 from backend.inference.model_loader import (
   get_loaded_model_id,
   load_model,
@@ -67,15 +68,17 @@ def generate(req: GenerateRequest):
   safe_model = req.model_id.replace("/", "__")
   hidden_states_key = f"{req.prompt_id}__{safe_model}__{req.mode}"
 
-  response = run_prompt(
-    prompt_text=req.prompt_text,
-    mode=req.mode,
-    run_id=req.run_id,
-    hidden_states_key=hidden_states_key,
-    runs_dir=RUNS_DIR,
-  )
+  def ndjson_events():
+    for event in stream_prompt(
+      prompt_text=req.prompt_text,
+      mode=req.mode,
+      run_id=req.run_id,
+      hidden_states_key=hidden_states_key,
+      runs_dir=RUNS_DIR,
+    ):
+      yield json.dumps(event) + "\n"
 
-  return {"response": response, "hidden_states_key": hidden_states_key}
+  return StreamingResponse(ndjson_events(), media_type="application/x-ndjson")
 
 
 @app.post("/compute")

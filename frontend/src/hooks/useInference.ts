@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { inferenceLoad, inferenceGenerate, inferenceCompute } from '../api/inference'
+import { inferenceLoad, inferenceGenerateStream, inferenceCompute } from '../api/inference'
 import type { Run, ModeDirectionResult } from '../types/run'
 
 export const useInference = () => {
@@ -19,16 +19,29 @@ export const useInference = () => {
     }
   }
 
-  const generate = async (body: {
-    prompt_id: string
-    prompt_text: string
-    run_id: string
-    model_id: string
-    mode: string
-  }) => {
+  const generate = async (
+    body: {
+      prompt_id: string
+      prompt_text: string
+      run_id: string
+      model_id: string
+      mode: string
+    },
+    onToken: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<{ response: string; hidden_states_key: string }> => {
     setGenerating(true)
+    let hidden_states_key = ''
+    let finalResponse = ''
+    let accumulated = ''
     try {
-      return await inferenceGenerate(body)
+      await inferenceGenerateStream(body, (event) => {
+        if (event.type === 'ready') hidden_states_key = event.hidden_states_key
+        else if (event.type === 'token') { accumulated += event.text; onToken(event.text) }
+        else if (event.type === 'done' || event.type === 'aborted') finalResponse = event.response
+        else if (event.type === 'error') throw new Error(event.error)
+      }, signal)
+      return { response: finalResponse || accumulated, hidden_states_key }
     } finally {
       setGenerating(false)
     }
