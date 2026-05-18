@@ -12,10 +12,10 @@ export type RunMode = 'non_thinking' | 'thinking' | 'both'
 
 export interface ModelResult {
   response: string
-  refused: boolean
-  refusal_mode: RefusalMode
-  classified_at: string
   hidden_states_key: string
+  refused?: boolean
+  refusal_mode?: RefusalMode
+  classified_at?: string
 }
 
 export interface RunPrompt {
