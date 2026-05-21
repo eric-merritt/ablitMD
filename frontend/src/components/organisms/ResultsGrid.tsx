@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ModelResultsRow } from '../molecules/ModelResultsRow'
 import { DirectionVectorChart } from './DirectionVectorChart'
+import { AblationPanel } from './AblationPanel'
 import { GROUPS, GROUP_LABELS } from '../../types/categories'
 import type { Run } from '../../types/run'
 
@@ -35,6 +36,9 @@ export const ResultsGrid = ({ run, modelNames, onBack, onHome }: ResultsGridProp
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
           <div style={{ marginBottom: '24px' }}>
             <DirectionVectorChart />
+          </div>
+          <div style={{ marginBottom: '24px' }}>
+            <AblationPanel runId={run.run_id} />
           </div>
           <div style={{ marginBottom: '24px' }}>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
