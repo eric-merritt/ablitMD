@@ -1,3 +1,5 @@
+import type { CategoryDirectionResult } from '../types/run'
+
 export const inferenceStatus = async (): Promise<{ loaded_model: string | null }> => {
   const res = await fetch('/api/inference/status')
   if (!res.ok) throw new Error(`inferenceStatus failed: ${res.status}`)
@@ -66,11 +68,7 @@ export const inferenceCompute = async (body: {
   run_id: string
   model_id: string
   mode: string
-}): Promise<Record<string, {
-  computed_at: string
-  direction_per_layer: number[][]
-  similarity_per_prompt: Record<string, number[]>
-}>> => {
+}): Promise<Record<string, CategoryDirectionResult>> => {
   const res = await fetch('/api/inference/compute', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
