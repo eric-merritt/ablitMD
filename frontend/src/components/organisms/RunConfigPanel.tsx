@@ -336,9 +336,9 @@ export const RunConfigPanel = ({
                           gap: "2px",
                         }}
                       >
-                        <li>Mode: {run.mode_selection}</li>
-                        <li>Models: {run.models.join(", ")}</li>
-                        <li>{run.prompt_count} prompts</li>
+                        <li>Mode: {run.mode_selection ?? "—"}</li>
+                        <li>Models: {(run.models ?? []).join(", ") || "—"}</li>
+                        <li>{run.prompt_count ?? 0} prompts</li>
                       </ul>
                     </li>
                   </ul>

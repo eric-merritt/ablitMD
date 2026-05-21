@@ -151,11 +151,19 @@ export const listRuns = async () => {
       .map(async (file) => {
         const content = await readFile(join(RUNS_DIR, file), 'utf-8')
         const { prompts, direction_results, ...summary } = JSON.parse(content)
-        return { ...summary, prompt_count: prompts?.length ?? 0 }
+        return {
+          run_id: summary.run_id ?? file.replace(/\.json$/, ''),
+          started_at: summary.started_at ?? null,
+          completed_at: summary.completed_at ?? null,
+          incomplete: summary.incomplete ?? true,
+          models: Array.isArray(summary.models) ? summary.models : [],
+          mode_selection: summary.mode_selection ?? null,
+          prompt_count: prompts?.length ?? 0,
+        }
       })
   )
 
-  return summaries.sort((first, second) =>
-    new Date(second.started_at) - new Date(first.started_at)
-  )
+  return summaries
+    .filter(run => run.started_at)
+    .sort((first, second) => new Date(second.started_at) - new Date(first.started_at))
 }
