@@ -24,7 +24,7 @@ from backend.inference.model_loader import (
   load_model,
   unload_model,
 )
-from backend.inference.ablation import set_ablation, clear_ablation, ablation_status, bake_and_save
+from backend.inference.ablation import set_ablation, clear_ablation, ablation_status, bake_and_save, reset_hook_diag, hook_fire_count
 from backend.inference.verify import looks_like_refusal, projection_strength
 from backend.inference.generator import run_prompt
 
@@ -208,7 +208,9 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   if not recipe_path.exists():
     raise HTTPException(status_code=404, detail="Recipe not found")
   recipe = json.loads(recipe_path.read_text())
+  reset_hook_diag()
   set_ablation(recipe, get_model())
+  print(f"[ablation] verify start: handles registered, fa={recipe.get('factor_a')} fb={recipe.get('factor_b')}", flush=True)
 
   run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
@@ -265,6 +267,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
           f"verify__{key}", RUNS_DIR,
         )
+        print(f"[ablation] post-prompt hook_fire_count={hook_fire_count()}", flush=True)
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
           after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))

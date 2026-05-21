@@ -26,12 +26,36 @@ _ablation_handles: list = []
 _ablation_recipe: dict | None = None
 
 
+_hook_fire_count = 0
+_hook_diag_logged = False
+
+
 def _make_hook(directions: list[tuple[torch.Tensor, float]]):
   def hook(_module, _inputs, output):
-    if isinstance(output, tuple):
+    global _hook_fire_count, _hook_diag_logged
+    _hook_fire_count += 1
+    is_tup = isinstance(output, tuple)
+    if not _hook_diag_logged:
+      _hook_diag_logged = True
+      tensor = output[0] if is_tup else output
+      print(f"[ablation] first hook fire: output_is_tuple={is_tup} "
+            f"tensor_shape={tuple(tensor.shape) if hasattr(tensor, 'shape') else 'N/A'} "
+            f"tensor_dtype={tensor.dtype if hasattr(tensor, 'dtype') else 'N/A'} "
+            f"num_directions={len(directions)}", flush=True)
+    if is_tup:
       return (ablate_hidden(output[0], directions),) + tuple(output[1:])
     return ablate_hidden(output, directions)
   return hook
+
+
+def reset_hook_diag():
+  global _hook_fire_count, _hook_diag_logged
+  _hook_fire_count = 0
+  _hook_diag_logged = False
+
+
+def hook_fire_count():
+  return _hook_fire_count
 
 
 def _decoder_layers(model):
