@@ -187,7 +187,17 @@ def ablate_status_endpoint():
   return ablation_status()
 
 
-_verify_lock = asyncio.Lock()
+_verify_cancel: asyncio.Event | None = None
+
+
+def _claim_verify_slot() -> asyncio.Event:
+  """Cancel any in-flight verify stream and return a fresh cancel event for this call."""
+  global _verify_cancel
+  if _verify_cancel is not None:
+    _verify_cancel.set()
+  event = asyncio.Event()
+  _verify_cancel = event
+  return event
 
 
 @app.post("/ablate/verify")
@@ -216,61 +226,64 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
   total_prompts = sum(len(items) for items in by_category.values())
 
+  cancel_event = _claim_verify_slot()
+
+  def is_cancelled() -> bool:
+    return cancel_event.is_set()
+
   async def events():
-    # Serialize verify streams so a stale fetch from the client can't race with a fresh one.
-    async with _verify_lock:
-      yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
-      for category, items in by_category.items():
-        if await request.is_disconnected():
+    yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
+    for category, items in by_category.items():
+      if is_cancelled() or await request.is_disconnected():
+        return
+      yield json.dumps({ "type": "category_start", "category": category }) + "\n"
+      hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
+      redirect_phase_b = recipe["modes"].get("redirect", {}).get("phase_b", {}).get("per_category", {})
+      vector = hard_phase_b.get(category) or redirect_phase_b.get(category) or [0.0]
+      direction = np.array(vector, dtype=np.float32)
+
+      before_proj, after_proj, refused_before, refused_after = [], [], 0, 0
+      for item in items:
+        if is_cancelled() or await request.is_disconnected():
           return
-        yield json.dumps({ "type": "category_start", "category": category }) + "\n"
-        hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
-        redirect_phase_b = recipe["modes"].get("redirect", {}).get("phase_b", {}).get("per_category", {})
-        vector = hard_phase_b.get(category) or redirect_phase_b.get(category) or [0.0]
-        direction = np.array(vector, dtype=np.float32)
+        key = item["result"]["hidden_states_key"]
+        before_npy = state_dir / f"{key}.npy"
+        if before_npy.exists() and direction.shape[0] > 1:
+          before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
+        prompt_refused_before = bool(item["result"].get("refused"))
+        refused_before += 1 if prompt_refused_before else 0
 
-        before_proj, after_proj, refused_before, refused_after = [], [], 0, 0
-        for item in items:
-          if await request.is_disconnected():
-            return
-          key = item["result"]["hidden_states_key"]
-          before_npy = state_dir / f"{key}.npy"
-          if before_npy.exists() and direction.shape[0] > 1:
-            before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
-          prompt_refused_before = bool(item["result"].get("refused"))
-          refused_before += 1 if prompt_refused_before else 0
+        response_after = await asyncio.to_thread(
+          run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
+          f"verify__{key}", RUNS_DIR,
+        )
+        after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
+        if after_npy.exists() and direction.shape[0] > 1:
+          after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+        prompt_refused_after = looks_like_refusal(response_after)
+        if prompt_refused_after:
+          refused_after += 1
 
-          response_after = await asyncio.to_thread(
-            run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
-            f"verify__{key}", RUNS_DIR,
-          )
-          after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
-          if after_npy.exists() and direction.shape[0] > 1:
-            after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
-          prompt_refused_after = looks_like_refusal(response_after)
-          if prompt_refused_after:
-            refused_after += 1
-
-          yield json.dumps({
-            "type": "prompt",
-            "category": category,
-            "prompt_id": item["prompt"].get("prompt_id") or key,
-            "prompt_text": item["prompt"]["text"],
-            "response_before": (item["result"].get("response") or "")[:1000],
-            "response_after": response_after[:1000],
-            "refused_before": prompt_refused_before,
-            "refused_after": prompt_refused_after,
-          }) + "\n"
-
-        count = max(len(items), 1)
         yield json.dumps({
-          "type": "category_result",
+          "type": "prompt",
           "category": category,
-          "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
-          "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
-          "refusal_rate_before": refused_before / count,
-          "refusal_rate_after": refused_after / count,
+          "prompt_id": item["prompt"].get("prompt_id") or key,
+          "prompt_text": item["prompt"]["text"],
+          "response_before": (item["result"].get("response") or "")[:1000],
+          "response_after": response_after[:1000],
+          "refused_before": prompt_refused_before,
+          "refused_after": prompt_refused_after,
         }) + "\n"
+
+      count = max(len(items), 1)
+      yield json.dumps({
+        "type": "category_result",
+        "category": category,
+        "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
+        "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
+        "refusal_rate_before": refused_before / count,
+        "refusal_rate_after": refused_after / count,
+      }) + "\n"
 
   return StreamingResponse(events(), media_type="application/x-ndjson")
 
