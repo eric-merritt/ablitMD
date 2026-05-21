@@ -4,25 +4,29 @@ import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
 import { VerifyResults } from '../molecules/VerifyResults'
 import { getDivergence, buildRecipe, applyAblation, clearAblation, verifyAblation, bakeModel } from '../../api/ablation'
+import { inferenceStatus, inferenceLoad } from '../../api/inference'
 import type { ModeDivergence, SlimRecipe, VerifyCategoryResult } from '../../types/ablation'
 
 interface AblationPanelProps {
   runId: string
+  models: { modelId: string; apiModelId: string; name: string }[]
 }
 
-const pickFirstModeMap = (payload: Record<string, unknown>) => {
+type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
+
+const pickFirstModelEntry = (payload: Record<string, unknown>) => {
   // payload = { computed_at, [model]: { [gen_mode]: { hard?, redirect? } } }
   for (const [key, value] of Object.entries(payload)) {
     if (key !== 'computed_at' && value && typeof value === 'object') {
       const genModes = value as Record<string, Record<string, ModeDivergence>>
       const firstGenMode = Object.values(genModes)[0]
-      if (firstGenMode) return firstGenMode
+      if (firstGenMode) return { modelId: key, modeMap: firstGenMode }
     }
   }
   return null
 }
 
-export const AblationPanel = ({ runId }: AblationPanelProps) => {
+export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
   const [hard, setHard]         = useState<ModeDivergence>()
   const [redirect, setRedirect] = useState<ModeDivergence>()
   const [onset, setOnset]       = useState(38)
@@ -36,12 +40,16 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
   const [verifying, setVerifying] = useState(false)
   const [bakedPath, setBakedPath] = useState<string>()
   const [baking, setBaking]       = useState(false)
+  const [modelId, setModelId]     = useState<string>()
+  const [modelLoad, setModelLoad] = useState<ModelLoadState>('idle')
 
   useEffect(() => {
     getDivergence(runId)
-      .then(payload => {
-        const modeMap = pickFirstModeMap(payload as Record<string, unknown>)
-        if (!modeMap) { setError('No divergence data for this run'); setStatus('idle'); return }
+      .then(async payload => {
+        const entry = pickFirstModelEntry(payload as Record<string, unknown>)
+        if (!entry) { setError('No divergence data for this run'); setStatus('idle'); return }
+        const { modelId: foundModelId, modeMap } = entry
+        setModelId(foundModelId)
         setHard(modeMap.hard)
         setRedirect(modeMap.redirect)
         const reference = modeMap.hard ?? modeMap.redirect
@@ -50,9 +58,23 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
           setSplit(reference.suggested_divergence)
         }
         setStatus('idle')
+
+        const modelInfo = models.find(model => model.modelId === foundModelId)
+        if (!modelInfo) { setModelLoad('error'); setError(`Model ${foundModelId} not in registry`); return }
+
+        try {
+          const { loaded_model } = await inferenceStatus()
+          if (loaded_model === foundModelId) { setModelLoad('ready'); return }
+          setModelLoad('loading')
+          await inferenceLoad({ model_id: foundModelId, api_model_id: modelInfo.apiModelId })
+          setModelLoad('ready')
+        } catch (err) {
+          setModelLoad('error')
+          setError(`Model load failed: ${ String((err as Error).message) }`)
+        }
       })
       .catch(err => { setError(String(err.message)); setStatus('idle') })
-  }, [runId])
+  }, [runId, models])
 
   const rebuildRecipe = () => {
     setStatus('building')
@@ -113,21 +135,37 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
         <>
           <RecipePanel recipe={recipe} factorA={factorA} factorB={factorB}
             onFactorChange={next => { setFactorA(next.factorA); setFactorB(next.factorB) }} />
+          {modelLoad === 'loading' && (
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+              <span className="spinner" /> Model loading: <code>{modelId}</code>
+            </div>
+          )}
+          {modelLoad === 'ready' && (
+            <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
+              Model loaded: <code>{modelId}</code>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '12px' }}>
             <button onClick={() => applyAblation(runId).then(() => setStatus('applied')).catch(err => setError(String(err.message)))}
-              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+              disabled={modelLoad !== 'ready'}
+              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
+              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' ? 'pointer' : 'not-allowed' }}>
               Apply hooks
             </button>
             <button onClick={() => clearAblation(runId).then(() => setStatus('idle')).catch(err => setError(String(err.message)))}
-              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+              disabled={modelLoad !== 'ready'}
+              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
+              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' ? 'pointer' : 'not-allowed' }}>
               Clear hooks
             </button>
-            <button onClick={runVerify} disabled={verifying}
-              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+            <button onClick={runVerify} disabled={verifying || modelLoad !== 'ready'}
+              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
+              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' && !verifying ? 'pointer' : 'not-allowed' }}>
               {verifying ? 'Verifying…' : 'Verify'}
             </button>
-            <button onClick={runBake} disabled={baking}
-              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+            <button onClick={runBake} disabled={baking || modelLoad !== 'ready'}
+              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
+              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' && !baking ? 'pointer' : 'not-allowed' }}>
               {baking ? 'Baking…' : 'Bake & save model'}
             </button>
             {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}

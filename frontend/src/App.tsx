@@ -71,6 +71,7 @@ const App = () => {
         <ResultsGrid
           run={ activeRun }
           modelNames={ modelNames }
+          models={ walkthroughModels }
           onBack={ () => setPhase('review') }
           onHome={ () => setPhase('config') }
         />
