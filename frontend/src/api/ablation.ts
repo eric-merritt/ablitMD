@@ -34,11 +34,13 @@ export const verifyAblation = async (
   runId: string,
   body: { model_id: string; gen_mode: string; categories?: string[]; samples_per_category?: number },
   onEvent: (event: VerifyEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> => {
   const response = await fetch(`/api/ablation/${runId}/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal,
   })
   if (!response.ok || !response.body) throw new Error(`verify failed (${response.status})`)
 
