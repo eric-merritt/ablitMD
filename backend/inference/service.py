@@ -19,10 +19,11 @@ from backend.inference.generator import stream_prompt
 from backend.inference.model_loader import (
   get_loaded_model_id,
   get_model,
+  get_tokenizer,
   load_model,
   unload_model,
 )
-from backend.inference.ablation import set_ablation, clear_ablation, ablation_status
+from backend.inference.ablation import set_ablation, clear_ablation, ablation_status, bake_and_save
 from backend.inference.verify import looks_like_refusal, projection_strength
 from backend.inference.generator import run_prompt
 
@@ -238,6 +239,24 @@ def ablate_verify(req: VerifyRequest):
       }) + "\n"
 
   return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
+@app.post("/ablate/bake")
+def ablate_bake(req: AblateRequest):
+  if get_loaded_model_id() is None:
+    raise HTTPException(status_code=400, detail="No model loaded")
+  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+  if not recipe_path.exists():
+    raise HTTPException(status_code=404, detail="Recipe not found")
+  recipe = json.loads(recipe_path.read_text())
+
+  base_name = recipe["model_id"].split("/")[-1]
+  out_path = f"/workspace/models/{base_name}-ablit-{req.run_id}"
+  bake_and_save(recipe, get_model(), get_tokenizer(), out_path)
+
+  # baking mutated the in-memory weights — drop them so the next /load is clean
+  unload_model()
+  return {"saved_to": out_path}
 
 
 if __name__ == "__main__":

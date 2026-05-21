@@ -68,3 +68,34 @@ def ablation_status() -> dict:
     "active": len(_ablation_handles) > 0,
     "run_id": _ablation_recipe["run_id"] if _ablation_recipe else None,
   }
+
+
+def directions_match_hook(baked: torch.Tensor, hooked: torch.Tensor, atol: float = 1e-5) -> bool:
+  """True when a baked-weight output equals the equivalent hook output — the bake/hook
+  equivalence check used by tests."""
+  return bool(torch.allclose(baked, hooked, atol=atol))
+
+
+def bake_and_save(recipe: dict, model, tokenizer, out_path: str) -> str:
+  """Permanently orthogonalize o_proj + down_proj of each decoder layer against the
+  recipe's directions, then save the modified model + tokenizer. Returns out_path."""
+  device = next(model.parameters()).device
+  dtype = next(model.parameters()).dtype
+  layers = model.model.layers
+
+  with torch.no_grad():
+    for decoder_idx in range(len(layers)):
+      raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
+      if not raw:
+        continue
+      layer = layers[decoder_idx]
+      for vector, factor in raw:
+        direction = torch.tensor(vector, device=device, dtype=dtype)
+        for projection in (layer.self_attn.o_proj, layer.mlp.down_proj):
+          projection.weight.copy_(
+            orthogonalize_weight(projection.weight.data, direction, float(factor))
+          )
+
+  model.save_pretrained(out_path)
+  tokenizer.save_pretrained(out_path)
+  return out_path

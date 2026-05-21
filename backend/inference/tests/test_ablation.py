@@ -26,3 +26,17 @@ class TestOrthogonalizeWeight:
     new_weight = orthogonalize_weight(weight, d, 1.0)
     out = new_weight @ x
     assert abs(float(out[0])) < 1e-5
+
+
+from backend.inference.ablation import directions_match_hook
+
+
+class TestBakeEquivalence:
+  def test_baked_weight_matches_hook_output(self):
+    # orthogonalizing a weight == ablating every output it produces
+    d = torch.tensor([0.6, 0.8, 0.0])
+    weight = torch.tensor([[1.0, 2.0], [3.0, 1.0], [0.5, 0.5]])
+    x = torch.tensor([1.0, -1.0])
+    baked_out = orthogonalize_weight(weight, d, 0.3) @ x
+    hooked_out = ablate_hidden((weight @ x).unsqueeze(0), [(d, 0.3)])[0]
+    assert directions_match_hook(baked_out, hooked_out)
