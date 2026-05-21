@@ -8,6 +8,7 @@ import type { Run } from '../../types/run'
 interface ResultsGridProps {
   run: Run
   modelNames: Record<string, string>
+  models: { modelId: string; apiModelId: string; name: string }[]
   onBack: () => void
   onHome: () => void
 }
@@ -18,7 +19,7 @@ const HomeIcon = () => (
   </svg>
 )
 
-export const ResultsGrid = ({ run, modelNames, onBack, onHome }: ResultsGridProps) => {
+export const ResultsGrid = ({ run, modelNames, models, onBack, onHome }: ResultsGridProps) => {
   const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(GROUPS))
   const [backHovered, setBackHovered] = useState(false)
   const [homeHovered, setHomeHovered] = useState(false)
@@ -38,7 +39,7 @@ export const ResultsGrid = ({ run, modelNames, onBack, onHome }: ResultsGridProp
             <DirectionVectorChart />
           </div>
           <div style={{ marginBottom: '24px' }}>
-            <AblationPanel runId={run.run_id} />
+            <AblationPanel runId={run.run_id} models={models} />
           </div>
           <div style={{ marginBottom: '24px' }}>
             <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
