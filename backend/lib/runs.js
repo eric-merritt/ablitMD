@@ -151,7 +151,7 @@ export const listRuns = async () => {
       .map(async (file) => {
         const content = await readFile(join(RUNS_DIR, file), 'utf-8')
         const { prompts, direction_results, ...summary } = JSON.parse(content)
-        return { ...summary, prompt_count: prompts.length }
+        return { ...summary, prompt_count: prompts?.length ?? 0 }
       })
   )
 
