@@ -73,6 +73,10 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         proj.weight.copy_(W.to(dtype))
     torch.cuda.synchronize(device)
 
+  print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
+        f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
+        f"factor_a={recipe['factor_a']} factor_b={recipe['factor_b']} "
+        f"modes={list(recipe['modes'].keys())}", flush=True)
   return snapshots
 
 
