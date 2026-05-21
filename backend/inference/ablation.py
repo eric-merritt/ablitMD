@@ -34,13 +34,22 @@ def _make_hook(directions: list[tuple[torch.Tensor, float]]):
   return hook
 
 
+def _decoder_layers(model):
+  """Resolve the list of decoder layers, handling multimodal wrappers where
+  the language tower lives under model.language_model rather than model directly."""
+  inner = model.model
+  if hasattr(inner, "language_model") and hasattr(inner.language_model, "layers"):
+    return inner.language_model.layers
+  return inner.layers
+
+
 def set_ablation(recipe: dict, model) -> None:
   """Register a forward hook on each decoder layer per the recipe."""
   clear_ablation()
   global _ablation_recipe
   _ablation_recipe = recipe
 
-  layers = model.model.layers
+  layers = _decoder_layers(model)
   device = next(model.parameters()).device
   dtype = next(model.parameters()).dtype
 
@@ -81,7 +90,7 @@ def bake_and_save(recipe: dict, model, tokenizer, out_path: str) -> str:
   recipe's directions, then save the modified model + tokenizer. Returns out_path."""
   device = next(model.parameters()).device
   dtype = next(model.parameters()).dtype
-  layers = model.model.layers
+  layers = _decoder_layers(model)
 
   with torch.no_grad():
     for decoder_idx in range(len(layers)):
@@ -89,9 +98,17 @@ def bake_and_save(recipe: dict, model, tokenizer, out_path: str) -> str:
       if not raw:
         continue
       layer = layers[decoder_idx]
+      projections = []
+      if hasattr(layer, "self_attn") and hasattr(layer.self_attn, "o_proj"):
+        projections.append(layer.self_attn.o_proj)
+      if hasattr(layer, "linear_attn") and hasattr(layer.linear_attn, "out_proj"):
+        projections.append(layer.linear_attn.out_proj)
+      if hasattr(layer, "mlp") and hasattr(layer.mlp, "down_proj"):
+        projections.append(layer.mlp.down_proj)
+
       for vector, factor in raw:
         direction = torch.tensor(vector, device=device, dtype=dtype)
-        for projection in (layer.self_attn.o_proj, layer.mlp.down_proj):
+        for projection in projections:
           projection.weight.copy_(
             orthogonalize_weight(projection.weight.data, direction, float(factor))
           )
