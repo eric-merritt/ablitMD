@@ -201,7 +201,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           {mode === 'classic' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>factor</span>
-              <input type="range" min={0.1} max={1.0} step={0.05}
+              <input type="range" min={0.1} max={2.0} step={0.05}
                 value={classicFactor}
                 onChange={e => setClassicFactor(Number(e.target.value))}
                 style={{ flex: 1 }} />
