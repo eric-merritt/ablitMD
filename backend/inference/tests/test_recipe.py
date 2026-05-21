@@ -49,3 +49,29 @@ class TestDirectionsForLayer:
 
   def test_layer_below_onset_returns_nothing(self):
     assert directions_for_layer(self._recipe(), hidden_index=1) == []
+
+
+from backend.inference.recipe import build_recipe
+from backend.inference.tests._fixtures import make_mini_run, HIDDEN, N_LAYERS
+
+
+class TestBuildRecipe:
+  def test_recipe_structure(self, tmp_path):
+    meta = make_mini_run(tmp_path)
+    recipe = build_recipe(meta["run"], meta["model_id"], meta["gen_mode"],
+                          onset=2, split=6, factor_a=0.1, factor_b=0.2,
+                          state_dir=meta["state_dir"])
+    assert recipe["onset"] == 2 and recipe["split"] == 6
+    assert recipe["last_layer"] == N_LAYERS - 1
+    assert recipe["factor_a"] == 0.1 and recipe["factor_b"] == 0.2
+    assert set(recipe["modes"].keys()) == {"hard", "redirect"}
+
+  def test_phase_directions_have_hidden_dim(self, tmp_path):
+    meta = make_mini_run(tmp_path)
+    recipe = build_recipe(meta["run"], meta["model_id"], meta["gen_mode"],
+                          onset=2, split=6, factor_a=0.1, factor_b=0.2,
+                          state_dir=meta["state_dir"])
+    hard = recipe["modes"]["hard"]
+    assert len(hard["phase_a"]["direction"]) == HIDDEN
+    assert set(hard["phase_b"]["per_category"].keys()) == {"cat_a", "cat_b"}
+    assert len(hard["phase_b"]["per_category"]["cat_a"]) == HIDDEN
