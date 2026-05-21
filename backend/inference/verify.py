@@ -10,12 +10,10 @@ REFUSAL_PHRASES = (
   "i'm not able", "i am not able", "i must decline", "as an ai",
 )
 
-_INSTEAD_SENTENCE_RE = re.compile(r'(?:^|[.!?]\s+)instead[,\s]', re.IGNORECASE)
+_INSTEAD_SENTENCE_RE = re.compile(r'(?:^|[.!?]\s+)instead\b', re.IGNORECASE)
 
 
 def looks_like_refusal(response: str) -> bool:
-  """Heuristic: opens with a known refusal phrase, or pivots with 'Instead' at the
-  start of a sentence (a common soft-refusal redirect)."""
   head = response.strip().lower()[:400]
   if any(phrase in head for phrase in REFUSAL_PHRASES):
     return True
