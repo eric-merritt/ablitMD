@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { verifyAblation } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult } from '../../types/ablation'
 
@@ -104,8 +104,12 @@ export const VerifyDashboard = ({ runId, modelId, genMode, samplesPerCategory, o
   const [categories, setCategories]       = useState<VerifyCategoryResult[]>([])
   const [error, setError]                 = useState<string>()
   const [finished, setFinished]           = useState(false)
+  const startedRef                        = useRef(false)
 
   useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+
     verifyAblation(runId, {
       model_id: modelId,
       gen_mode: genMode,
