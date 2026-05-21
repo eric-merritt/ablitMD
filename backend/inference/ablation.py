@@ -65,9 +65,13 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
       for proj in _projection_modules(layers[decoder_idx]):
         if id(proj) not in snapshots:
           snapshots[id(proj)] = (proj, proj.weight.data.clone())
+        # Work in float32 to avoid bf16 rounding zeroing the edit, cast back on copy.
+        W = proj.weight.data.to(torch.float32)
         for vector, factor in raw:
-          direction = torch.tensor(vector, device=device, dtype=dtype)
-          proj.weight.copy_(orthogonalize_weight(proj.weight.data, direction, float(factor)))
+          direction = torch.tensor(vector, device=device, dtype=torch.float32)
+          W = orthogonalize_weight(W, direction, float(factor))
+        proj.weight.copy_(W.to(dtype))
+    torch.cuda.synchronize(device)
 
   return snapshots
 
@@ -132,7 +136,8 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
   def _snap_and_edit(proj, direction_t):
     if id(proj) not in snapshots:
       snapshots[id(proj)] = (proj, proj.weight.data.clone())
-    proj.weight.copy_(orthogonalize_weight(proj.weight.data, direction_t, factor))
+    W = proj.weight.data.to(torch.float32)
+    proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), factor).to(dtype))
 
   with torch.no_grad():
     for layer_idx, direction in directions.items():
