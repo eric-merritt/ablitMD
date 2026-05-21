@@ -57,20 +57,27 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
   layers = _decoder_layers(model)
   snapshots: dict = {}
 
+  _first_logged = False
   with torch.no_grad():
     for decoder_idx in range(len(layers)):
       raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
       if not raw:
         continue
       for proj in _projection_modules(layers[decoder_idx]):
+        original = proj.weight.data.clone()
         if id(proj) not in snapshots:
-          snapshots[id(proj)] = (proj, proj.weight.data.clone())
+          snapshots[id(proj)] = (proj, original)
         # Work in float32 to avoid bf16 rounding zeroing the edit, cast back on copy.
-        W = proj.weight.data.to(torch.float32)
+        W = original.to(torch.float32)
         for vector, factor in raw:
           direction = torch.tensor(vector, device=device, dtype=torch.float32)
           W = orthogonalize_weight(W, direction, float(factor))
         proj.weight.copy_(W.to(dtype))
+        if not _first_logged:
+          _first_logged = True
+          delta = float((proj.weight.data.to(torch.float32) - original.to(torch.float32)).norm())
+          print(f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
+                f"proj={type(proj).__name__} shape={tuple(proj.weight.shape)}", flush=True)
     torch.cuda.synchronize(device)
 
   print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
