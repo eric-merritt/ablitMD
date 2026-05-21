@@ -2,6 +2,8 @@ import type { SlimRecipe } from '../../types/ablation'
 
 interface RecipePanelProps {
   recipe: SlimRecipe
+  onset: number
+  split: number
   factorA: number
   factorB: number
   onFactorChange: (next: { factorA: number; factorB: number }) => void
@@ -23,7 +25,7 @@ const FactorSlider = ({ label, value, onCommit }: {
   </label>
 )
 
-export const RecipePanel = ({ recipe, factorA, factorB, onFactorChange }: RecipePanelProps) => {
+export const RecipePanel = ({ recipe, onset, split, factorA, factorB, onFactorChange }: RecipePanelProps) => {
   const modeNames = Object.keys(recipe.modes)
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px' }}>
@@ -31,8 +33,8 @@ export const RecipePanel = ({ recipe, factorA, factorB, onFactorChange }: Recipe
         Recipe · {modeNames.join(' + ')}
       </div>
       <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '12px' }}>
-        Phase A (shared) layers {recipe.onset}–{recipe.split} · Phase B (per-category)
-        layers {recipe.split}–{recipe.last_layer}
+        Phase A (shared) layers {onset}–{split} · Phase B (per-category)
+        layers {split}–{recipe.last_layer}
       </div>
       <div style={{ display: 'flex', gap: '24px' }}>
         <FactorSlider label="factor A (shared)" value={factorA}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
-import { getDivergence, buildRecipe, applyAblation, clearAblation, bakeModel } from '../../api/ablation'
+import { getDivergence, buildRecipe, bakeModel } from '../../api/ablation'
 import { inferenceStatus, inferenceLoad } from '../../api/inference'
 import type { ModeDivergence, SlimRecipe } from '../../types/ablation'
 
@@ -163,7 +163,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
       {recipe && (
         <>
-          <RecipePanel recipe={recipe} factorA={factorA} factorB={factorB}
+          <RecipePanel recipe={recipe} onset={onset} split={split} factorA={factorA} factorB={factorB}
             onFactorChange={next => { setFactorA(next.factorA); setFactorB(next.factorB) }} />
           {modelLoad === 'loading' && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
@@ -178,16 +178,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           <div style={{ display: 'flex', gap: '12px' }}>
             <GatedButton disabled={modelLoad !== 'ready'}
               tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={() => applyAblation(runId).then(() => setStatus('applied')).catch(err => setError(String(err.message)))}>
-              Apply hooks
-            </GatedButton>
-            <GatedButton disabled={modelLoad !== 'ready'}
-              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={() => clearAblation(runId).then(() => setStatus('idle')).catch(err => setError(String(err.message)))}>
-              Clear hooks
-            </GatedButton>
-            <GatedButton disabled={modelLoad !== 'ready'}
-              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
               onClick={runVerify}>
               Verify
             </GatedButton>
@@ -196,7 +186,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
               onClick={runBake}>
               {baking ? 'Baking…' : 'Bake & save model'}
             </GatedButton>
-            {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}
           </div>
           {bakedPath && (
             <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
