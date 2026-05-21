@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { verifyAblation } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult } from '../../types/ablation'
 
@@ -104,17 +104,16 @@ export const VerifyDashboard = ({ runId, modelId, genMode, samplesPerCategory, o
   const [categories, setCategories]       = useState<VerifyCategoryResult[]>([])
   const [error, setError]                 = useState<string>()
   const [finished, setFinished]           = useState(false)
-  const startedRef                        = useRef(false)
-
   useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
+    const controller = new AbortController()
+    let cancelled = false
 
     verifyAblation(runId, {
       model_id: modelId,
       gen_mode: genMode,
       samples_per_category: samplesPerCategory,
     }, (event) => {
+      if (cancelled) return
       if (event.type === 'total') setTotal(event.prompts)
       else if (event.type === 'category_start') setCurrentCategory(event.category)
       else if (event.type === 'prompt') {
@@ -124,9 +123,14 @@ export const VerifyDashboard = ({ runId, modelId, genMode, samplesPerCategory, o
       else if (event.type === 'category_result') {
         setCategories(prev => [...prev, event])
       }
-    })
-      .then(() => setFinished(true))
-      .catch(err => setError(String(err.message)))
+    }, controller.signal)
+      .then(() => { if (!cancelled) setFinished(true) })
+      .catch(err => { if (!cancelled && err.name !== 'AbortError') setError(String(err.message)) })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [runId, modelId, genMode, samplesPerCategory])
 
   return (
