@@ -14,6 +14,33 @@ interface AblationPanelProps {
 
 type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
 
+const GatedButton = ({ disabled, tooltip, onClick, children }: {
+  disabled: boolean
+  tooltip: string
+  onClick: () => void
+  children: React.ReactNode
+}) => {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <span style={{ position: 'relative', display: 'inline-block' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}>
+      <button onClick={onClick} disabled={disabled}
+        style={{ padding: '6px 14px', cursor: disabled ? 'not-allowed' : 'pointer' }}>
+        {children}
+      </button>
+      {disabled && hovered && tooltip && (
+        <span style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+          padding: '4px 8px', fontSize: '11px', color: 'var(--text)', whiteSpace: 'nowrap',
+          pointerEvents: 'none', zIndex: 10,
+        }}>{tooltip}</span>
+      )}
+    </span>
+  )
+}
+
 const pickFirstModelEntry = (payload: Record<string, unknown>) => {
   // payload = { computed_at, [model]: { [gen_mode]: { hard?, redirect? } } }
   for (const [key, value] of Object.entries(payload)) {
@@ -146,28 +173,26 @@ export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
             </div>
           )}
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button onClick={() => applyAblation(runId).then(() => setStatus('applied')).catch(err => setError(String(err.message)))}
-              disabled={modelLoad !== 'ready'}
-              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
-              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' ? 'pointer' : 'not-allowed' }}>
+            <GatedButton disabled={modelLoad !== 'ready'}
+              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+              onClick={() => applyAblation(runId).then(() => setStatus('applied')).catch(err => setError(String(err.message)))}>
               Apply hooks
-            </button>
-            <button onClick={() => clearAblation(runId).then(() => setStatus('idle')).catch(err => setError(String(err.message)))}
-              disabled={modelLoad !== 'ready'}
-              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
-              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' ? 'pointer' : 'not-allowed' }}>
+            </GatedButton>
+            <GatedButton disabled={modelLoad !== 'ready'}
+              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+              onClick={() => clearAblation(runId).then(() => setStatus('idle')).catch(err => setError(String(err.message)))}>
               Clear hooks
-            </button>
-            <button onClick={runVerify} disabled={verifying || modelLoad !== 'ready'}
-              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
-              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' && !verifying ? 'pointer' : 'not-allowed' }}>
+            </GatedButton>
+            <GatedButton disabled={verifying || modelLoad !== 'ready'}
+              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+              onClick={runVerify}>
               {verifying ? 'Verifying…' : 'Verify'}
-            </button>
-            <button onClick={runBake} disabled={baking || modelLoad !== 'ready'}
-              title={modelLoad === 'loading' ? 'Model loading…' : modelLoad !== 'ready' ? 'Model not loaded' : ''}
-              style={{ padding: '6px 14px', cursor: modelLoad === 'ready' && !baking ? 'pointer' : 'not-allowed' }}>
+            </GatedButton>
+            <GatedButton disabled={baking || modelLoad !== 'ready'}
+              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+              onClick={runBake}>
               {baking ? 'Baking…' : 'Bake & save model'}
-            </button>
+            </GatedButton>
             {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}
           </div>
           <VerifyResults results={verifyResults} />
