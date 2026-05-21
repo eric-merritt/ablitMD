@@ -23,6 +23,8 @@ from backend.inference.model_loader import (
   unload_model,
 )
 from backend.inference.ablation import set_ablation, clear_ablation, ablation_status
+from backend.inference.verify import looks_like_refusal, projection_strength
+from backend.inference.generator import run_prompt
 
 app = FastAPI(title="ablitMD inference service")
 
@@ -50,6 +52,13 @@ class ComputeRequest(BaseModel):
 
 class AblateRequest(BaseModel):
   run_id: str
+
+
+class VerifyRequest(BaseModel):
+  run_id: str
+  model_id: str
+  gen_mode: str
+  categories: list[str] | None = None
 
 
 @app.get("/status")
@@ -173,6 +182,62 @@ def ablate_clear():
 @app.get("/ablate/status")
 def ablate_status_endpoint():
   return ablation_status()
+
+
+@app.post("/ablate/verify")
+def ablate_verify(req: VerifyRequest):
+  if get_loaded_model_id() is None:
+    raise HTTPException(status_code=400, detail="No model loaded")
+  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+  if not recipe_path.exists():
+    raise HTTPException(status_code=404, detail="Recipe not found")
+  recipe = json.loads(recipe_path.read_text())
+
+  run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  state_dir = RUNS_DIR / req.run_id
+  phase_b_range = tuple(next(iter(recipe["modes"].values()))["phase_b"]["layers"])
+
+  by_category: dict[str, list[dict]] = {}
+  for prompt in run_data["prompts"]:
+    if req.categories and prompt["category"] not in req.categories:
+      continue
+    result = prompt.get("model_results", {}).get(req.model_id, {}).get(req.gen_mode)
+    if result:
+      by_category.setdefault(prompt["category"], []).append({"prompt": prompt, "result": result})
+
+  def events():
+    for category, items in by_category.items():
+      hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
+      direction = np.array(hard_phase_b.get(category, [0.0]), dtype=np.float32)
+
+      before_proj, after_proj, refused_before, refused_after, sample = [], [], 0, 0, ""
+      for item in items:
+        key = item["result"]["hidden_states_key"]
+        before_npy = state_dir / f"{key}.npy"
+        if before_npy.exists() and direction.shape[0] > 1:
+          before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
+        refused_before += 1 if item["result"].get("refused") else 0
+
+        response = run_prompt(item["prompt"]["text"], req.gen_mode, req.run_id,
+                              f"verify__{key}", RUNS_DIR)
+        after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
+        if after_npy.exists() and direction.shape[0] > 1:
+          after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+        if looks_like_refusal(response):
+          refused_after += 1
+        sample = sample or response
+
+      count = max(len(items), 1)
+      yield json.dumps({
+        "category": category,
+        "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
+        "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
+        "refusal_rate_before": refused_before / count,
+        "refusal_rate_after": refused_after / count,
+        "sample_response": sample[:400],
+      }) + "\n"
+
+  return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
 if __name__ == "__main__":
