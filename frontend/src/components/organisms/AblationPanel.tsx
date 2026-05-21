@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
-import { getDivergence, buildRecipe, applyAblation, clearAblation } from '../../api/ablation'
-import type { ModeDivergence, SlimRecipe } from '../../types/ablation'
+import { VerifyResults } from '../molecules/VerifyResults'
+import { getDivergence, buildRecipe, applyAblation, clearAblation, verifyAblation } from '../../api/ablation'
+import type { ModeDivergence, SlimRecipe, VerifyCategoryResult } from '../../types/ablation'
 
 interface AblationPanelProps {
   runId: string
@@ -31,6 +32,8 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
   const [recipe, setRecipe]     = useState<SlimRecipe>()
   const [status, setStatus]     = useState<'idle' | 'loading' | 'building' | 'applied'>('loading')
   const [error, setError]       = useState<string>()
+  const [verifyResults, setVerifyResults] = useState<VerifyCategoryResult[]>([])
+  const [verifying, setVerifying] = useState(false)
 
   useEffect(() => {
     getDivergence(runId)
@@ -55,6 +58,17 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
     buildRecipe(runId, { onset, split, factorA, factorB })
       .then(next => { setRecipe(next); setStatus('idle') })
       .catch(err => { setError(String(err.message)); setStatus('idle') })
+  }
+
+  const runVerify = () => {
+    if (!recipe) return
+    setVerifying(true)
+    setVerifyResults([])
+    setError(undefined)
+    verifyAblation(runId, { model_id: recipe.model_id, gen_mode: recipe.gen_mode },
+      result => setVerifyResults(prev => [...prev, result]))
+      .catch(err => setError(String(err.message)))
+      .finally(() => setVerifying(false))
   }
 
   const lastLayer = (hard ?? redirect)?.clumping.length
@@ -97,8 +111,13 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
               style={{ padding: '6px 14px', cursor: 'pointer' }}>
               Clear hooks
             </button>
+            <button onClick={runVerify} disabled={verifying}
+              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+              {verifying ? 'Verifying…' : 'Verify'}
+            </button>
             {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}
           </div>
+          <VerifyResults results={verifyResults} />
         </>
       )}
     </div>
