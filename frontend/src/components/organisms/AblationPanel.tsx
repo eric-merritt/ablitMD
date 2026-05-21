@@ -109,6 +109,17 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
       .catch(err => { setError(String(err.message)); setStatus('idle') })
   }
 
+  useEffect(() => {
+    if (!recipe) return
+    const timer = setTimeout(() => {
+      setStatus('building')
+      buildRecipe(runId, { onset, split, factorA, factorB })
+        .then(next => { setRecipe(next); setStatus('idle') })
+        .catch(err => { setError(String(err.message)); setStatus('idle') })
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [onset, split, factorA, factorB])
+
   const runVerify = () => {
     if (!recipe) return
     onVerify(recipe.model_id, recipe.gen_mode)
