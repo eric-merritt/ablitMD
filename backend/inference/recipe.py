@@ -19,11 +19,6 @@ def phase_a_direction(directions: list[np.ndarray], onset: int, split: int) -> n
   return _renormalize(flat.mean(axis=0)).astype(np.float32)
 
 
-def phase_b_direction(direction_per_layer: np.ndarray, split: int, last: int) -> np.ndarray:
-  """One category's direction: mean of its unit vectors in [split..last], renormalized."""
-  window = direction_per_layer[split:last + 1, :]
-  return _renormalize(window.mean(axis=0)).astype(np.float32)
-
 
 def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarray, float]]:
   """Directions active at a hidden-state index: phase-A mean if onset<=L<=split,
@@ -36,8 +31,14 @@ def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarr
     if onset <= hidden_index <= split:
       result.append((np.array(mode_data["phase_a"]["direction"], dtype=np.float32), factor_a))
     elif split < hidden_index <= last:
-      for vector in mode_data["phase_b"]["per_category"].values():
-        result.append((np.array(vector, dtype=np.float32), factor_b))
+      layer_offset = hidden_index - split - 1
+      for per_layer in mode_data["phase_b"]["per_category"].values():
+        arr = np.array(per_layer, dtype=np.float32)
+        # arr is either (n_layers, dim) per-layer or a single (dim,) averaged vector
+        vec = arr[layer_offset] if arr.ndim == 2 else arr
+        norm = float(np.linalg.norm(vec))
+        if norm > 1e-8:
+          result.append((vec / norm, factor_b))
   return result
 
 
@@ -67,7 +68,7 @@ def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int
       "phase_b": {
         "layers": [split, last_layer],
         "per_category": {
-          category_id: phase_b_direction(dpl, split, last_layer).tolist()
+          category_id: dpl[split:last_layer + 1, :].tolist()
           for category_id, dpl in category_directions.items()
         },
       },
