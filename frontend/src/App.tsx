@@ -10,7 +10,8 @@ import type { Run } from './types/run'
 
 type Phase = 'config' | 'running' | 'review' | 'results' | 'verify'
 
-interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number }
+type AblationMode = 'ablitmd' | 'classic'
+interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number }
 
 const hasUnclassified = (run: Run): boolean =>
   run.prompts.some(prompt =>
@@ -25,8 +26,8 @@ const App = () => {
   const [activeRun, setActiveRun] = useState<Run | null>(null)
   const [verifyContext, setVerifyContext] = useState<VerifyContext | null>(null)
 
-  const handleVerifyStart = (modelId: string, genMode: string) => {
-    setVerifyContext({ modelId, genMode, samplesPerCategory: 2 })
+  const handleVerifyStart = (modelId: string, genMode: string, mode: AblationMode, classicFactor: number) => {
+    setVerifyContext({ modelId, genMode, samplesPerCategory: 2, mode, classicFactor })
     setPhase('verify')
   }
 

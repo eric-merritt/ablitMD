@@ -46,16 +46,23 @@ router.get('/:runId/divergence', async (req, res) => {
   res.json(JSON.parse(await readFile(divFile, 'utf8')))
 })
 
+const buildLocks = new Map()
+
 router.post('/:runId/recipe', async (req, res) => {
   const { runId } = req.params
   const { onset, split, factorA, factorB } = req.body
   if (!await fileExists(path.join(RUNS_DIR, `${runId}.json`))) {
     res.status(404).json({ detail: 'Run not found' }); return
   }
-  try {
+  const prev = buildLocks.get(runId) || Promise.resolve()
+  const work = prev.then(async () => {
     await runPython(['scripts/build_recipe.py', runId,
       '--onset', String(onset), '--split', String(split),
       '--factor-a', String(factorA), '--factor-b', String(factorB)])
+  })
+  buildLocks.set(runId, work.catch(() => {}))
+  try {
+    await work
   } catch (err) { res.status(500).json({ detail: String(err.message) }); return }
   const recipe = JSON.parse(await readFile(path.join(RUNS_DIR, `${runId}.recipe.json`), 'utf8'))
   res.json(slimRecipe(recipe))
@@ -75,13 +82,14 @@ const proxyToInference = (inferencePath, buildBody) => async (req, res) => {
   res.status(response.status).json(await safeJson(response))
 }
 
-router.post('/:runId/apply', proxyToInference('/ablate', req => ({ run_id: req.params.runId })))
-router.post('/:runId/clear', proxyToInference('/ablate/clear', () => ({})))
 router.post('/:runId/bake',
   proxyToInference('/ablate/bake', req => ({ run_id: req.params.runId, ...req.body })))
 
-router.post('/:runId/verify', async (req, res) => {
-  const upstream = await fetch(`${INFERENCE_BASE}/ablate/verify`, {
+router.post('/:runId/directions/compare',
+  proxyToInference('/ablate/directions/compare', req => ({ run_id: req.params.runId, ...req.body })))
+
+const proxyNdjsonStream = (inferencePath) => async (req, res) => {
+  const upstream = await fetch(`${INFERENCE_BASE}${inferencePath}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ run_id: req.params.runId, ...req.body }),
@@ -96,6 +104,14 @@ router.post('/:runId/verify', async (req, res) => {
     if (!res.write(chunk)) await new Promise(resolve => res.once('drain', resolve))
   }
   res.end()
+}
+
+router.post('/:runId/verify', async (req, res) => {
+  const pending = buildLocks.get(req.params.runId)
+  if (pending) { try { await pending } catch {} }
+  return proxyNdjsonStream('/ablate/verify')(req, res)
 })
+
+router.post('/:runId/verify/classic', proxyNdjsonStream('/ablate/verify/classic'))
 
 export default router
