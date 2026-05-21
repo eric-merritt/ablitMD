@@ -72,8 +72,9 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [modelLoad, setModelLoad] = useState<ModelLoadState>('idle')
   const [mode, setMode]           = useState<AblationMode>('ablitmd')
   const [classicFactor, setClassicFactor] = useState(0.6)
-  const [compareRows, setCompareRows]     = useState<DirectionCompareRow[]>([])
+  const [compareRows, setCompareRows]       = useState<DirectionCompareRow[]>([])
   const [compareLoading, setCompareLoading] = useState(false)
+  const [compareError, setCompareError]     = useState<string>()
 
   useEffect(() => {
     getDivergence(runId)
@@ -132,17 +133,14 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
     onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)
   }
 
-  const loadCompare = () => {
+  useEffect(() => {
     if (!recipe || !modelId) return
     setCompareLoading(true)
+    setCompareError(undefined)
     compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode })
       .then(rows => { setCompareRows(rows); setCompareLoading(false) })
-      .catch(err => { setError(String(err.message)); setCompareLoading(false) })
-  }
-
-  useEffect(() => {
-    if (recipe && modelId) loadCompare()
-  }, [recipe])
+      .catch(err => { setCompareError(String(err.message)); setCompareLoading(false) })
+  }, [recipe, modelId])
 
   const runBake = () => {
     setBaking(true)
@@ -213,6 +211,9 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
           {compareLoading && compareRows.length === 0 && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Computing direction comparison…</div>
+          )}
+          {compareError && compareRows.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Direction compare: {compareError}</div>
           )}
           {compareRows.length > 0 && <DirectionCompareChart rows={compareRows} />}
 
