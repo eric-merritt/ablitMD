@@ -60,6 +60,13 @@ export interface VerifyPromptResult {
   refused_after: boolean
 }
 
+export interface DirectionCompareRow {
+  layer: number
+  ablitmd_magnitude: number | null
+  classic_magnitude: number | null
+  cosine_similarity: number | null
+}
+
 export type VerifyEvent =
   | { type: 'total'; categories: number; prompts: number }
   | { type: 'category_start'; category: string }

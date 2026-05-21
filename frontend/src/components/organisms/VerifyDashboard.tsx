@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { verifyAblation } from '../../api/ablation'
+import { verifyAblation, verifyAblationClassic } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult } from '../../types/ablation'
 
 interface VerifyDashboardProps {
   runId: string
   modelId: string
   genMode: string
+  mode: 'ablitmd' | 'classic'
+  classicFactor: number
   samplesPerCategory: number
   onBack: () => void
   onHome: () => void
@@ -96,7 +98,7 @@ const CategorySummary = ({ rows }: { rows: VerifyCategoryResult[] }) => {
   )
 }
 
-export const VerifyDashboard = ({ runId, modelId, genMode, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
+export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
   const [total, setTotal]                 = useState(0)
   const [done, setDone]                   = useState(0)
   const [currentCategory, setCurrentCategory] = useState('')
@@ -104,34 +106,29 @@ export const VerifyDashboard = ({ runId, modelId, genMode, samplesPerCategory, o
   const [categories, setCategories]       = useState<VerifyCategoryResult[]>([])
   const [error, setError]                 = useState<string>()
   const [finished, setFinished]           = useState(false)
+
   useEffect(() => {
     const controller = new AbortController()
     let cancelled = false
 
-    verifyAblation(runId, {
-      model_id: modelId,
-      gen_mode: genMode,
-      samples_per_category: samplesPerCategory,
-    }, (event) => {
+    const stream = mode === 'classic'
+      ? verifyAblationClassic(runId, { model_id: modelId, gen_mode: genMode, factor: classicFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+      : verifyAblation(runId, { model_id: modelId, gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+
+    function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
       if (event.type === 'total') setTotal(event.prompts)
       else if (event.type === 'category_start') setCurrentCategory(event.category)
-      else if (event.type === 'prompt') {
-        setPrompts(prev => [...prev, event])
-        setDone(prev => prev + 1)
-      }
-      else if (event.type === 'category_result') {
-        setCategories(prev => [...prev, event])
-      }
-    }, controller.signal)
+      else if (event.type === 'prompt') { setPrompts(prev => [...prev, event]); setDone(prev => prev + 1) }
+      else if (event.type === 'category_result') setCategories(prev => [...prev, event])
+    }
+
+    stream
       .then(() => { if (!cancelled) setFinished(true) })
       .catch(err => { if (!cancelled && err.name !== 'AbortError') setError(String(err.message)) })
 
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [runId, modelId, genMode, samplesPerCategory])
+    return () => { cancelled = true; controller.abort() }
+  }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

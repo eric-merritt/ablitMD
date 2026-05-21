@@ -24,7 +24,11 @@ from backend.inference.model_loader import (
   load_model,
   unload_model,
 )
-from backend.inference.ablation import set_ablation, clear_ablation, ablation_status, bake_and_save, reset_hook_diag, hook_fire_count
+from backend.inference.ablation import (
+  apply_ablation_in_place, apply_classic_in_place,
+  compute_classic_directions, compare_directions,
+  restore_model_weights, bake_and_save,
+)
 from backend.inference.verify import looks_like_refusal, projection_strength
 from backend.inference.generator import run_prompt
 
@@ -62,6 +66,21 @@ class VerifyRequest(BaseModel):
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
+
+
+class VerifyClassicRequest(BaseModel):
+  run_id: str
+  model_id: str
+  gen_mode: str
+  factor: float = 0.6
+  categories: list[str] | None = None
+  samples_per_category: int = 2
+
+
+class CompareDirectionsRequest(BaseModel):
+  run_id: str
+  model_id: str
+  gen_mode: str
 
 
 @app.get("/status")
@@ -165,28 +184,6 @@ def compute(req: ComputeRequest):
   return direction_results
 
 
-@app.post("/ablate")
-def ablate(req: AblateRequest):
-  if get_loaded_model_id() is None:
-    raise HTTPException(status_code=400, detail="No model loaded")
-  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
-  if not recipe_path.exists():
-    raise HTTPException(status_code=404, detail="Recipe not found — build it first")
-  set_ablation(json.loads(recipe_path.read_text()), get_model())
-  return ablation_status()
-
-
-@app.post("/ablate/clear")
-def ablate_clear():
-  clear_ablation()
-  return ablation_status()
-
-
-@app.get("/ablate/status")
-def ablate_status_endpoint():
-  return ablation_status()
-
-
 _verify_cancel: asyncio.Event | None = None
 
 
@@ -208,9 +205,6 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   if not recipe_path.exists():
     raise HTTPException(status_code=404, detail="Recipe not found")
   recipe = json.loads(recipe_path.read_text())
-  reset_hook_diag()
-  set_ablation(recipe, get_model())
-  print(f"[ablation] verify start: handles registered, fa={recipe.get('factor_a')} fb={recipe.get('factor_b')}", flush=True)
 
   run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
@@ -235,12 +229,13 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
+    snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
     try:
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
         yield chunk
     finally:
-      clear_ablation()
+      await asyncio.to_thread(restore_model_weights, snapshots)
 
   async def _verify_loop():
     for category, items in by_category.items():
@@ -267,10 +262,145 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
           f"verify__{key}", RUNS_DIR,
         )
-        print(f"[ablation] post-prompt hook_fire_count={hook_fire_count()}", flush=True)
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
           after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+        prompt_refused_after = looks_like_refusal(response_after)
+        if prompt_refused_after:
+          refused_after += 1
+
+        yield json.dumps({
+          "type": "prompt",
+          "category": category,
+          "prompt_id": item["prompt"].get("prompt_id") or key,
+          "prompt_text": item["prompt"]["text"],
+          "response_before": (item["result"].get("response") or "")[:1000],
+          "response_after": response_after[:1000],
+          "refused_before": prompt_refused_before,
+          "refused_after": prompt_refused_after,
+        }) + "\n"
+
+      count = max(len(items), 1)
+      yield json.dumps({
+        "type": "category_result",
+        "category": category,
+        "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
+        "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
+        "refusal_rate_before": refused_before / count,
+        "refusal_rate_after": refused_after / count,
+      }) + "\n"
+
+  return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
+@app.post("/ablate/directions/compare")
+async def ablate_directions_compare(req: CompareDirectionsRequest):
+  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+  if not recipe_path.exists():
+    raise HTTPException(status_code=404, detail="Recipe not found — build it first")
+  recipe    = json.loads(recipe_path.read_text())
+  run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  state_dir = RUNS_DIR / req.run_id
+  try:
+    classic_dirs = await asyncio.to_thread(
+      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode
+    )
+  except ValueError as err:
+    raise HTTPException(status_code=422, detail=str(err))
+  return compare_directions(recipe, classic_dirs)
+
+
+_classic_verify_cancel: asyncio.Event | None = None
+
+
+def _claim_classic_verify_slot() -> asyncio.Event:
+  global _classic_verify_cancel
+  if _classic_verify_cancel is not None:
+    _classic_verify_cancel.set()
+  event = asyncio.Event()
+  _classic_verify_cancel = event
+  return event
+
+
+@app.post("/ablate/verify/classic")
+async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
+  if get_loaded_model_id() is None:
+    raise HTTPException(status_code=400, detail="No model loaded")
+
+  run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  state_dir = RUNS_DIR / req.run_id
+
+  try:
+    directions = await asyncio.to_thread(
+      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode
+    )
+  except ValueError as err:
+    raise HTTPException(status_code=422, detail=str(err))
+
+  phase_b_range: tuple[int, int] | None = None
+  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+  if recipe_path.exists():
+    recipe = json.loads(recipe_path.read_text())
+    phase_b_range = tuple(next(iter(recipe["modes"].values()))["phase_b"]["layers"])
+
+  by_category: dict[str, list[dict]] = {}
+  for prompt in run_data["prompts"]:
+    if req.categories and prompt["category"] not in req.categories:
+      continue
+    result = prompt.get("model_results", {}).get(req.model_id, {}).get(req.gen_mode)
+    if result:
+      by_category.setdefault(prompt["category"], []).append({"prompt": prompt, "result": result})
+
+  if req.samples_per_category > 0:
+    by_category = { cat: items[:req.samples_per_category] for cat, items in by_category.items() }
+
+  total_prompts = sum(len(items) for items in by_category.values())
+  cancel_event  = _claim_classic_verify_slot()
+
+  def is_cancelled() -> bool:
+    return cancel_event.is_set()
+
+  async def events():
+    snapshots = await asyncio.to_thread(apply_classic_in_place, directions, req.factor, get_model())
+    try:
+      yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
+      async for chunk in _classic_verify_loop():
+        yield chunk
+    finally:
+      await asyncio.to_thread(restore_model_weights, snapshots)
+
+  async def _classic_verify_loop():
+    for category, items in by_category.items():
+      if is_cancelled() or await request.is_disconnected():
+        return
+      yield json.dumps({ "type": "category_start", "category": category }) + "\n"
+
+      before_proj, after_proj, refused_before, refused_after = [], [], 0, 0
+      for item in items:
+        if is_cancelled() or await request.is_disconnected():
+          return
+        key = item["result"]["hidden_states_key"]
+        before_npy = state_dir / f"{key}.npy"
+        prompt_refused_before = bool(item["result"].get("refused"))
+        refused_before += 1 if prompt_refused_before else 0
+
+        if phase_b_range and before_npy.exists():
+          layer_idx = phase_b_range[0]
+          direction = directions.get(layer_idx)
+          if direction is not None:
+            before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
+
+        response_after = await asyncio.to_thread(
+          run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
+          f"verify_classic__{key}", RUNS_DIR,
+        )
+        after_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
+        if phase_b_range and after_npy.exists():
+          layer_idx = phase_b_range[0]
+          direction = directions.get(layer_idx)
+          if direction is not None:
+            after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+
         prompt_refused_after = looks_like_refusal(response_after)
         if prompt_refused_after:
           refused_after += 1
