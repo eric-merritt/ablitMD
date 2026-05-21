@@ -18,9 +18,11 @@ from backend.inference.direction import compute_run_directions
 from backend.inference.generator import stream_prompt
 from backend.inference.model_loader import (
   get_loaded_model_id,
+  get_model,
   load_model,
   unload_model,
 )
+from backend.inference.ablation import set_ablation, clear_ablation, ablation_status
 
 app = FastAPI(title="ablitMD inference service")
 
@@ -44,6 +46,10 @@ class ComputeRequest(BaseModel):
   run_id: str
   model_id: str
   mode: str
+
+
+class AblateRequest(BaseModel):
+  run_id: str
 
 
 @app.get("/status")
@@ -145,6 +151,28 @@ def compute(req: ComputeRequest):
       mode_data.pop("direction_per_layer", None)
 
   return direction_results
+
+
+@app.post("/ablate")
+def ablate(req: AblateRequest):
+  if get_loaded_model_id() is None:
+    raise HTTPException(status_code=400, detail="No model loaded")
+  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+  if not recipe_path.exists():
+    raise HTTPException(status_code=404, detail="Recipe not found — build it first")
+  set_ablation(json.loads(recipe_path.read_text()), get_model())
+  return ablation_status()
+
+
+@app.post("/ablate/clear")
+def ablate_clear():
+  clear_ablation()
+  return ablation_status()
+
+
+@app.get("/ablate/status")
+def ablate_status_endpoint():
+  return ablation_status()
 
 
 if __name__ == "__main__":
