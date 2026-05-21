@@ -3,7 +3,7 @@ import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
 import { VerifyResults } from '../molecules/VerifyResults'
-import { getDivergence, buildRecipe, applyAblation, clearAblation, verifyAblation } from '../../api/ablation'
+import { getDivergence, buildRecipe, applyAblation, clearAblation, verifyAblation, bakeModel } from '../../api/ablation'
 import type { ModeDivergence, SlimRecipe, VerifyCategoryResult } from '../../types/ablation'
 
 interface AblationPanelProps {
@@ -34,6 +34,8 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
   const [error, setError]       = useState<string>()
   const [verifyResults, setVerifyResults] = useState<VerifyCategoryResult[]>([])
   const [verifying, setVerifying] = useState(false)
+  const [bakedPath, setBakedPath] = useState<string>()
+  const [baking, setBaking]       = useState(false)
 
   useEffect(() => {
     getDivergence(runId)
@@ -69,6 +71,15 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
       result => setVerifyResults(prev => [...prev, result]))
       .catch(err => setError(String(err.message)))
       .finally(() => setVerifying(false))
+  }
+
+  const runBake = () => {
+    setBaking(true)
+    setError(undefined)
+    bakeModel(runId)
+      .then(result => setBakedPath(result.saved_to))
+      .catch(err => setError(String(err.message)))
+      .finally(() => setBaking(false))
   }
 
   const lastLayer = (hard ?? redirect)?.clumping.length
@@ -115,9 +126,18 @@ export const AblationPanel = ({ runId }: AblationPanelProps) => {
               style={{ padding: '6px 14px', cursor: 'pointer' }}>
               {verifying ? 'Verifying…' : 'Verify'}
             </button>
+            <button onClick={runBake} disabled={baking}
+              style={{ padding: '6px 14px', cursor: 'pointer' }}>
+              {baking ? 'Baking…' : 'Bake & save model'}
+            </button>
             {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}
           </div>
           <VerifyResults results={verifyResults} />
+          {bakedPath && (
+            <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
+              Saved abliterated model to <code>{bakedPath}</code>
+            </div>
+          )}
         </>
       )}
     </div>
