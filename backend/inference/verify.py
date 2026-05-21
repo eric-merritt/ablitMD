@@ -14,10 +14,10 @@ _INSTEAD_SENTENCE_RE = re.compile(r'(?:^|[.!?]\s+)instead\b', re.IGNORECASE)
 
 
 def looks_like_refusal(response: str) -> bool:
-  head = response.strip().lower()[:400]
-  if any(phrase in head for phrase in REFUSAL_PHRASES):
+  text = response.strip().lower()
+  if any(phrase in text for phrase in REFUSAL_PHRASES):
     return True
-  return bool(_INSTEAD_SENTENCE_RE.search(head))
+  return bool(_INSTEAD_SENTENCE_RE.search(text))
 
 
 def projection_strength(hidden_state: np.ndarray, direction: np.ndarray,
