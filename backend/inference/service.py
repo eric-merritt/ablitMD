@@ -208,6 +208,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   if not recipe_path.exists():
     raise HTTPException(status_code=404, detail="Recipe not found")
   recipe = json.loads(recipe_path.read_text())
+  set_ablation(recipe, get_model())
 
   run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
@@ -232,7 +233,14 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
+    try:
+      yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
+      async for chunk in _verify_loop():
+        yield chunk
+    finally:
+      clear_ablation()
+
+  async def _verify_loop():
     for category, items in by_category.items():
       if is_cancelled() or await request.is_disconnected():
         return
