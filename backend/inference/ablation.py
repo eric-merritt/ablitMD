@@ -178,9 +178,11 @@ def compare_directions(
     for layer_idx in range(onset, split + 1):
       ablitmd_by_layer.setdefault(layer_idx, []).append(phase_a_dir)
     for cat_dir in mode_data["phase_b"]["per_category"].values():
-      phase_b_dir = np.array(cat_dir, dtype=np.float32)
+      phase_b_arr = np.array(cat_dir, dtype=np.float32)  # (n_slice_layers, dim) or (dim,)
       for layer_idx in range(split + 1, last + 1):
-        ablitmd_by_layer.setdefault(layer_idx, []).append(phase_b_dir)
+        offset = layer_idx - split - 1
+        vec = phase_b_arr[offset] if phase_b_arr.ndim == 2 else phase_b_arr
+        ablitmd_by_layer.setdefault(layer_idx, []).append(vec)
 
   all_layers = sorted(set(ablitmd_by_layer.keys()) | set(classic_directions.keys()))
   rows = []
