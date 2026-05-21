@@ -1,0 +1,52 @@
+export interface ModeDivergence {
+  clumping: number[]
+  magnitude: number[]
+  category_ids: string[]
+  suggested_onset: number
+  suggested_divergence: number
+}
+
+// { [model_id]: { [gen_mode]: { hard?: ModeDivergence; redirect?: ModeDivergence } } }
+export interface DivergencePayload {
+  computed_at: string
+  [modelId: string]: string | Record<string, Record<string, ModeDivergence>>
+}
+
+export interface SlimRecipeMode {
+  phase_a: { layers: [number, number] }
+  phase_b: { layers: [number, number]; category_ids: string[] }
+}
+
+export interface SlimRecipe {
+  run_id: string
+  model_id: string
+  gen_mode: string
+  onset: number
+  split: number
+  last_layer: number
+  factor_a: number
+  factor_b: number
+  built_at: string
+  modes: Record<string, SlimRecipeMode>
+}
+
+export interface RecipeParams {
+  onset: number
+  split: number
+  factorA: number
+  factorB: number
+}
+
+export interface AblationStatus {
+  active: boolean
+  run_id: string | null
+}
+
+export interface VerifyCategoryResult {
+  category: string
+  projection_before: number
+  projection_after: number
+  refusal_rate_before: number
+  refusal_rate_after: number
+  sample_response: string
+}
