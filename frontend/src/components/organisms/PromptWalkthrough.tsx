@@ -92,9 +92,10 @@ export const PromptWalkthrough = ({ initialRun, models, onReadyForReview, onBack
   const response = currentPrompt ? responses[currentPrompt.prompt_id] ?? null : null
   const genError = currentPrompt ? genErrors[currentPrompt.prompt_id] ?? null : null
 
-  // Effect 1 — load model whenever the active model changes
+  // Effect 1 — load model whenever the active model changes, but only if this step has pending work
   useEffect(() => {
     if (!currentModel) return
+    if (pendingPrompts.length === 0) return
     setModelReady(false)
     setLoadError(null)
     ensureModelLoaded(currentModel.modelId, currentModel.apiModelId)

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { Prompt } from '../../models/prompt.js'
 import {
-  createRun, readRun, writePromptResult, updateRunField, listRuns
+  createRun, readRun, writePromptResult, updateRunField, listRuns, stripDirectionVectors
 } from '../../lib/runs.js'
 
 const router = Router()
@@ -46,6 +46,8 @@ router.post('/', async (req, res) => {
 router.get('/:runId', async (req, res) => {
   try {
     const run = await readRun(req.params.runId)
+    // drop the heavy raw direction vectors — charts never read them
+    stripDirectionVectors(run.direction_results)
     res.json(run)
   } catch {
     res.status(404).json({ error: 'Run not found' })

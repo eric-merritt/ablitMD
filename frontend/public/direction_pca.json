@@ -1,0 +1,943 @@
+{
+  "centered": {
+    "hard": [
+      {
+        "id": "academic_dishonesty",
+        "name": "Academic Dishonesty",
+        "peak_layer": 50,
+        "magnitude": 0.799354612827301,
+        "x": -0.09716660529375076,
+        "y": -0.7934269905090332
+      },
+      {
+        "id": "cbrn_uplift",
+        "name": "CBRN Uplift",
+        "peak_layer": 50,
+        "magnitude": 0.8030093312263489,
+        "x": -0.6119301915168762,
+        "y": -0.5199667811393738
+      },
+      {
+        "id": "child_grooming",
+        "name": "Child Grooming",
+        "peak_layer": 50,
+        "magnitude": 0.7990692257881165,
+        "x": -0.7352256774902344,
+        "y": -0.3129774332046509
+      },
+      {
+        "id": "confidential_data",
+        "name": "Confidential Data",
+        "peak_layer": 50,
+        "magnitude": 0.7828243970870972,
+        "x": -0.5501999855041504,
+        "y": -0.5568609237670898
+      },
+      {
+        "id": "crime_assistance",
+        "name": "Crime Assistance",
+        "peak_layer": 50,
+        "magnitude": 0.8012739419937134,
+        "x": -0.5991929173469543,
+        "y": -0.5319846868515015
+      },
+      {
+        "id": "csam",
+        "name": "CSAM",
+        "peak_layer": 50,
+        "magnitude": 0.7804978489875793,
+        "x": -0.7329352498054504,
+        "y": -0.2682960629463196
+      },
+      {
+        "id": "dangerous_activity",
+        "name": "Dangerous Activity",
+        "peak_layer": 50,
+        "magnitude": 0.8142789602279663,
+        "x": 0.7420802116394043,
+        "y": -0.3352121412754059
+      },
+      {
+        "id": "disordered_eating",
+        "name": "Disordered Eating",
+        "peak_layer": 50,
+        "magnitude": 0.8100907206535339,
+        "x": 0.7918805480003357,
+        "y": 0.17079824209213257
+      },
+      {
+        "id": "distress_signals",
+        "name": "Distress Signals",
+        "peak_layer": 50,
+        "magnitude": 0.7953886985778809,
+        "x": 0.5529871582984924,
+        "y": 0.5717065334320068
+      },
+      {
+        "id": "explicit_nsfw",
+        "name": "Explicit NSFW",
+        "peak_layer": 50,
+        "magnitude": 0.8009030222892761,
+        "x": -0.689923882484436,
+        "y": 0.4067562520503998
+      },
+      {
+        "id": "fraud_facilitation",
+        "name": "Fraud Facilitation",
+        "peak_layer": 50,
+        "magnitude": 0.8036664128303528,
+        "x": -0.7539007067680359,
+        "y": -0.2784123122692108
+      },
+      {
+        "id": "hate_speech",
+        "name": "hate_speech",
+        "peak_layer": 50,
+        "magnitude": 0.8110986948013306,
+        "x": -0.7641557455062866,
+        "y": 0.2719322443008423
+      },
+      {
+        "id": "hazardous_materials",
+        "name": "hazardous_materials",
+        "peak_layer": 50,
+        "magnitude": 0.7903607487678528,
+        "x": 0.5782164335250854,
+        "y": -0.5388282537460327
+      },
+      {
+        "id": "hide_wrongdoing",
+        "name": "hide_wrongdoing",
+        "peak_layer": 50,
+        "magnitude": 0.8028397560119629,
+        "x": -0.7019090056419373,
+        "y": -0.38971203565597534
+      },
+      {
+        "id": "high_stakes_falsehoods",
+        "name": "high_stakes_falsehoods",
+        "peak_layer": 50,
+        "magnitude": 0.8185938000679016,
+        "x": -0.7925342321395874,
+        "y": 0.2049032598733902
+      },
+      {
+        "id": "impersonation",
+        "name": "impersonation",
+        "peak_layer": 50,
+        "magnitude": 0.790915846824646,
+        "x": -0.24600893259048462,
+        "y": -0.7516830563545227
+      },
+      {
+        "id": "jurisdictional",
+        "name": "jurisdictional",
+        "peak_layer": 50,
+        "magnitude": 0.8117218613624573,
+        "x": 0.8117160797119141,
+        "y": -0.0030710971914231777
+      },
+      {
+        "id": "legal_advice",
+        "name": "legal_advice",
+        "peak_layer": 50,
+        "magnitude": 0.784826934337616,
+        "x": 0.7118114829063416,
+        "y": 0.3305717706680298
+      },
+      {
+        "id": "mass_casualty_violence",
+        "name": "mass_casualty_violence",
+        "peak_layer": 50,
+        "magnitude": 0.8111929297447205,
+        "x": -0.8111874461174011,
+        "y": -0.00299595738761127
+      },
+      {
+        "id": "medical_advice",
+        "name": "medical_advice",
+        "peak_layer": 50,
+        "magnitude": 0.8006817102432251,
+        "x": 0.7846198678016663,
+        "y": -0.15957102179527283
+      },
+      {
+        "id": "nonconsensual_sexual",
+        "name": "nonconsensual_sexual",
+        "peak_layer": 50,
+        "magnitude": 0.8119125366210938,
+        "x": -0.25657039880752563,
+        "y": 0.7703074812889099
+      },
+      {
+        "id": "nonconsensual_surveillance",
+        "name": "nonconsensual_surveillance",
+        "peak_layer": 50,
+        "magnitude": 0.7985652089118958,
+        "x": -0.40923768281936646,
+        "y": -0.6857337951660156
+      },
+      {
+        "id": "physical_world_actions",
+        "name": "physical_world_actions",
+        "peak_layer": 50,
+        "magnitude": 0.8235703706741333,
+        "x": 0.09092573821544647,
+        "y": 0.8185356855392456
+      },
+      {
+        "id": "prompt_injection",
+        "name": "prompt_injection",
+        "peak_layer": 50,
+        "magnitude": 0.8064882755279541,
+        "x": -0.39714154601097107,
+        "y": 0.7019273638725281
+      },
+      {
+        "id": "regulated_goods",
+        "name": "regulated_goods",
+        "peak_layer": 50,
+        "magnitude": 0.8035777807235718,
+        "x": 0.41697123646736145,
+        "y": -0.6869295239448547
+      },
+      {
+        "id": "self_harm_methods",
+        "name": "self_harm_methods",
+        "peak_layer": 50,
+        "magnitude": 0.8085998296737671,
+        "x": 0.3659658133983612,
+        "y": 0.721042811870575
+      },
+      {
+        "id": "social_engineering",
+        "name": "social_engineering",
+        "peak_layer": 50,
+        "magnitude": 0.8155505657196045,
+        "x": -0.0610833577811718,
+        "y": 0.8132598400115967
+      }
+    ],
+    "redirect": [
+      {
+        "id": "academic_dishonesty",
+        "name": "Academic Dishonesty",
+        "peak_layer": 50,
+        "magnitude": 0.8139093518257141,
+        "x": -0.5826916098594666,
+        "y": -0.568259596824646
+      },
+      {
+        "id": "child_grooming",
+        "name": "Child Grooming",
+        "peak_layer": 50,
+        "magnitude": 0.7974569797515869,
+        "x": 0.24644961953163147,
+        "y": 0.7584195137023926
+      },
+      {
+        "id": "confidential_data",
+        "name": "Confidential Data",
+        "peak_layer": 50,
+        "magnitude": 0.788485050201416,
+        "x": -0.00791129656136036,
+        "y": -0.7884453535079956
+      },
+      {
+        "id": "copyright_ip",
+        "name": "Copyright / IP",
+        "peak_layer": 50,
+        "magnitude": 0.8094577789306641,
+        "x": 0.2843644917011261,
+        "y": -0.7578645944595337
+      },
+      {
+        "id": "dangerous_activity",
+        "name": "Dangerous Activity",
+        "peak_layer": 50,
+        "magnitude": 0.8080280423164368,
+        "x": -0.09947075694799423,
+        "y": -0.8018821477890015
+      },
+      {
+        "id": "disordered_eating",
+        "name": "Disordered Eating",
+        "peak_layer": 50,
+        "magnitude": 0.800578236579895,
+        "x": 0.7755776643753052,
+        "y": -0.19850660860538483
+      },
+      {
+        "id": "excessive_requests",
+        "name": "Excessive Requests",
+        "peak_layer": 50,
+        "magnitude": 0.8024216890335083,
+        "x": 0.7385484576225281,
+        "y": -0.31373029947280884
+      },
+      {
+        "id": "financial_advice",
+        "name": "Financial Advice",
+        "peak_layer": 50,
+        "magnitude": 0.800441563129425,
+        "x": 0.7988265156745911,
+        "y": 0.050822850316762924
+      },
+      {
+        "id": "fraud_facilitation",
+        "name": "Fraud Facilitation",
+        "peak_layer": 50,
+        "magnitude": 0.8021254539489746,
+        "x": -0.4328683614730835,
+        "y": -0.675300121307373
+      },
+      {
+        "id": "hate_speech",
+        "name": "hate_speech",
+        "peak_layer": 50,
+        "magnitude": 0.8117125630378723,
+        "x": -0.7965036034584045,
+        "y": 0.15639473497867584
+      },
+      {
+        "id": "hazardous_materials",
+        "name": "hazardous_materials",
+        "peak_layer": 50,
+        "magnitude": 0.7947574853897095,
+        "x": 0.5377868413925171,
+        "y": -0.5851706862449646
+      },
+      {
+        "id": "high_stakes_falsehoods",
+        "name": "high_stakes_falsehoods",
+        "peak_layer": 50,
+        "magnitude": 0.8088060617446899,
+        "x": -0.8014955520629883,
+        "y": -0.1084994301199913
+      },
+      {
+        "id": "identity_discrimination",
+        "name": "identity_discrimination",
+        "peak_layer": 50,
+        "magnitude": 0.8100349307060242,
+        "x": -0.6876153349876404,
+        "y": -0.4281842112541199
+      },
+      {
+        "id": "impersonation",
+        "name": "impersonation",
+        "peak_layer": 50,
+        "magnitude": 0.8010201454162598,
+        "x": -0.5610474944114685,
+        "y": -0.5717158913612366
+      },
+      {
+        "id": "legal_advice",
+        "name": "legal_advice",
+        "peak_layer": 50,
+        "magnitude": 0.7800255417823792,
+        "x": 0.7799071073532104,
+        "y": -0.013592283241450787
+      },
+      {
+        "id": "malicious_code",
+        "name": "malicious_code",
+        "peak_layer": 50,
+        "magnitude": 0.7986351251602173,
+        "x": -0.7540151476860046,
+        "y": -0.2632094919681549
+      },
+      {
+        "id": "medical_advice",
+        "name": "medical_advice",
+        "peak_layer": 50,
+        "magnitude": 0.8098607063293457,
+        "x": 0.7975399494171143,
+        "y": -0.14072808623313904
+      },
+      {
+        "id": "nonconsensual_surveillance",
+        "name": "nonconsensual_surveillance",
+        "peak_layer": 50,
+        "magnitude": 0.8052679300308228,
+        "x": -0.4442092776298523,
+        "y": -0.6716655492782593
+      },
+      {
+        "id": "physical_world_actions",
+        "name": "physical_world_actions",
+        "peak_layer": 50,
+        "magnitude": 0.8130046129226685,
+        "x": 0.33176419138908386,
+        "y": 0.7422324419021606
+      },
+      {
+        "id": "pii_doxxing",
+        "name": "pii_doxxing",
+        "peak_layer": 50,
+        "magnitude": 0.8079028129577637,
+        "x": -0.6756814122200012,
+        "y": -0.4429013133049011
+      },
+      {
+        "id": "political_influence",
+        "name": "political_influence",
+        "peak_layer": 50,
+        "magnitude": 0.8094837069511414,
+        "x": -0.7525756359100342,
+        "y": -0.2981506586074829
+      },
+      {
+        "id": "private_access",
+        "name": "private_access",
+        "peak_layer": 50,
+        "magnitude": 0.8090938925743103,
+        "x": -0.15991678833961487,
+        "y": -0.7931327819824219
+      },
+      {
+        "id": "prompt_injection",
+        "name": "prompt_injection",
+        "peak_layer": 50,
+        "magnitude": 0.8077290654182434,
+        "x": -0.50275719165802,
+        "y": 0.6321878433227539
+      },
+      {
+        "id": "regulated_goods",
+        "name": "regulated_goods",
+        "peak_layer": 50,
+        "magnitude": 0.7927553653717041,
+        "x": -0.44558173418045044,
+        "y": -0.655681312084198
+      },
+      {
+        "id": "reveal_system_prompt",
+        "name": "reveal_system_prompt",
+        "peak_layer": 50,
+        "magnitude": 0.8093770742416382,
+        "x": -0.23895031213760376,
+        "y": 0.7733007073402405
+      },
+      {
+        "id": "social_engineering",
+        "name": "social_engineering",
+        "peak_layer": 50,
+        "magnitude": 0.8080621957778931,
+        "x": -0.7962003350257874,
+        "y": 0.1379479020833969
+      },
+      {
+        "id": "spam_platform_abuse",
+        "name": "spam_platform_abuse",
+        "peak_layer": 50,
+        "magnitude": 0.8088311553001404,
+        "x": -0.21920710802078247,
+        "y": -0.778560221195221
+      },
+      {
+        "id": "unfair_advantage",
+        "name": "unfair_advantage",
+        "peak_layer": 50,
+        "magnitude": 0.7989993691444397,
+        "x": 0.2889336049556732,
+        "y": -0.7449277639389038
+      },
+      {
+        "id": "violence_terrorism",
+        "name": "violence_terrorism",
+        "peak_layer": 50,
+        "magnitude": 0.8158199787139893,
+        "x": -0.7624697089195251,
+        "y": 0.2901761531829834
+      },
+      {
+        "id": "weapons_explosives",
+        "name": "weapons_explosives",
+        "peak_layer": 50,
+        "magnitude": 0.7837724089622498,
+        "x": -0.6680555939674377,
+        "y": -0.4098791182041168
+      }
+    ],
+    "variance_explained": [
+      0.14780235290527344,
+      0.1070345938205719
+    ]
+  },
+  "uncentered": {
+    "hard": [
+      {
+        "id": "academic_dishonesty",
+        "name": "Academic Dishonesty",
+        "peak_layer": 50,
+        "magnitude": 0.799354612827301,
+        "x": 0.7993459105491638,
+        "y": -0.003734191879630089
+      },
+      {
+        "id": "cbrn_uplift",
+        "name": "CBRN Uplift",
+        "peak_layer": 50,
+        "magnitude": 0.8030093312263489,
+        "x": 0.7987267374992371,
+        "y": -0.08282174170017242
+      },
+      {
+        "id": "child_grooming",
+        "name": "Child Grooming",
+        "peak_layer": 50,
+        "magnitude": 0.7990692257881165,
+        "x": 0.7933133244514465,
+        "y": -0.09573640674352646
+      },
+      {
+        "id": "confidential_data",
+        "name": "Confidential Data",
+        "peak_layer": 50,
+        "magnitude": 0.7828243970870972,
+        "x": 0.7753926515579224,
+        "y": -0.10761183500289917
+      },
+      {
+        "id": "crime_assistance",
+        "name": "Crime Assistance",
+        "peak_layer": 50,
+        "magnitude": 0.8012739419937134,
+        "x": 0.7926478385925293,
+        "y": -0.11725783348083496
+      },
+      {
+        "id": "csam",
+        "name": "CSAM",
+        "peak_layer": 50,
+        "magnitude": 0.7804978489875793,
+        "x": 0.7698874473571777,
+        "y": -0.12825846672058105
+      },
+      {
+        "id": "dangerous_activity",
+        "name": "Dangerous Activity",
+        "peak_layer": 50,
+        "magnitude": 0.8142789602279663,
+        "x": 0.7430304884910583,
+        "y": 0.33310040831565857
+      },
+      {
+        "id": "disordered_eating",
+        "name": "Disordered Eating",
+        "peak_layer": 50,
+        "magnitude": 0.8100907206535339,
+        "x": 0.7852909564971924,
+        "y": 0.19890984892845154
+      },
+      {
+        "id": "distress_signals",
+        "name": "Distress Signals",
+        "peak_layer": 50,
+        "magnitude": 0.7953886985778809,
+        "x": 0.7680209875106812,
+        "y": 0.20684976875782013
+      },
+      {
+        "id": "explicit_nsfw",
+        "name": "Explicit NSFW",
+        "peak_layer": 50,
+        "magnitude": 0.8009030222892761,
+        "x": 0.7760639786720276,
+        "y": -0.19791482388973236
+      },
+      {
+        "id": "fraud_facilitation",
+        "name": "Fraud Facilitation",
+        "peak_layer": 50,
+        "magnitude": 0.8036664128303528,
+        "x": 0.7888146638870239,
+        "y": -0.15378925204277039
+      },
+      {
+        "id": "hate_speech",
+        "name": "hate_speech",
+        "peak_layer": 50,
+        "magnitude": 0.8110986948013306,
+        "x": 0.7920310497283936,
+        "y": -0.174836665391922
+      },
+      {
+        "id": "hazardous_materials",
+        "name": "hazardous_materials",
+        "peak_layer": 50,
+        "magnitude": 0.7903607487678528,
+        "x": 0.752545952796936,
+        "y": 0.24154679477214813
+      },
+      {
+        "id": "hide_wrongdoing",
+        "name": "hide_wrongdoing",
+        "peak_layer": 50,
+        "magnitude": 0.8028397560119629,
+        "x": 0.8001896142959595,
+        "y": -0.06517944484949112
+      },
+      {
+        "id": "high_stakes_falsehoods",
+        "name": "high_stakes_falsehoods",
+        "peak_layer": 50,
+        "magnitude": 0.8185938000679016,
+        "x": 0.804040789604187,
+        "y": -0.1536690890789032
+      },
+      {
+        "id": "impersonation",
+        "name": "impersonation",
+        "peak_layer": 50,
+        "magnitude": 0.790915846824646,
+        "x": 0.7883864641189575,
+        "y": -0.06320328265428543
+      },
+      {
+        "id": "jurisdictional",
+        "name": "jurisdictional",
+        "peak_layer": 50,
+        "magnitude": 0.8117218613624573,
+        "x": 0.8089394569396973,
+        "y": 0.06715131551027298
+      },
+      {
+        "id": "legal_advice",
+        "name": "legal_advice",
+        "peak_layer": 50,
+        "magnitude": 0.784826934337616,
+        "x": 0.7513474225997925,
+        "y": 0.22678257524967194
+      },
+      {
+        "id": "mass_casualty_violence",
+        "name": "mass_casualty_violence",
+        "peak_layer": 50,
+        "magnitude": 0.8111929297447205,
+        "x": 0.8080244660377502,
+        "y": -0.07162728905677795
+      },
+      {
+        "id": "medical_advice",
+        "name": "medical_advice",
+        "peak_layer": 50,
+        "magnitude": 0.8006817102432251,
+        "x": 0.6931963562965393,
+        "y": 0.40071189403533936
+      },
+      {
+        "id": "nonconsensual_sexual",
+        "name": "nonconsensual_sexual",
+        "peak_layer": 50,
+        "magnitude": 0.8119125366210938,
+        "x": 0.8119060397148132,
+        "y": -0.0032512943726032972
+      },
+      {
+        "id": "nonconsensual_surveillance",
+        "name": "nonconsensual_surveillance",
+        "peak_layer": 50,
+        "magnitude": 0.7985652089118958,
+        "x": 0.7945339679718018,
+        "y": -0.08013881742954254
+      },
+      {
+        "id": "physical_world_actions",
+        "name": "physical_world_actions",
+        "peak_layer": 50,
+        "magnitude": 0.8235703706741333,
+        "x": 0.8235565423965454,
+        "y": 0.004777709953486919
+      },
+      {
+        "id": "prompt_injection",
+        "name": "prompt_injection",
+        "peak_layer": 50,
+        "magnitude": 0.8064882755279541,
+        "x": 0.7947583794593811,
+        "y": -0.1370493769645691
+      },
+      {
+        "id": "regulated_goods",
+        "name": "regulated_goods",
+        "peak_layer": 50,
+        "magnitude": 0.8035777807235718,
+        "x": 0.8019883632659912,
+        "y": 0.05051596835255623
+      },
+      {
+        "id": "self_harm_methods",
+        "name": "self_harm_methods",
+        "peak_layer": 50,
+        "magnitude": 0.8085998296737671,
+        "x": 0.8010191321372986,
+        "y": 0.11046340316534042
+      },
+      {
+        "id": "social_engineering",
+        "name": "social_engineering",
+        "peak_layer": 50,
+        "magnitude": 0.8155505657196045,
+        "x": 0.8154512047767639,
+        "y": -0.012726536020636559
+      }
+    ],
+    "redirect": [
+      {
+        "id": "academic_dishonesty",
+        "name": "Academic Dishonesty",
+        "peak_layer": 50,
+        "magnitude": 0.8139093518257141,
+        "x": 0.8085960745811462,
+        "y": -0.09284821897745132
+      },
+      {
+        "id": "child_grooming",
+        "name": "Child Grooming",
+        "peak_layer": 50,
+        "magnitude": 0.7974569797515869,
+        "x": 0.7974367141723633,
+        "y": 0.005680752918124199
+      },
+      {
+        "id": "confidential_data",
+        "name": "Confidential Data",
+        "peak_layer": 50,
+        "magnitude": 0.788485050201416,
+        "x": 0.7884740233421326,
+        "y": 0.004160700831562281
+      },
+      {
+        "id": "copyright_ip",
+        "name": "Copyright / IP",
+        "peak_layer": 50,
+        "magnitude": 0.8094577789306641,
+        "x": 0.8082293272018433,
+        "y": 0.04457850009202957
+      },
+      {
+        "id": "dangerous_activity",
+        "name": "Dangerous Activity",
+        "peak_layer": 50,
+        "magnitude": 0.8080280423164368,
+        "x": 0.8077915906906128,
+        "y": -0.0195468757301569
+      },
+      {
+        "id": "disordered_eating",
+        "name": "Disordered Eating",
+        "peak_layer": 50,
+        "magnitude": 0.800578236579895,
+        "x": 0.7030549049377441,
+        "y": 0.38293519616127014
+      },
+      {
+        "id": "excessive_requests",
+        "name": "Excessive Requests",
+        "peak_layer": 50,
+        "magnitude": 0.8024216890335083,
+        "x": 0.7704566121101379,
+        "y": 0.22422568500041962
+      },
+      {
+        "id": "financial_advice",
+        "name": "Financial Advice",
+        "peak_layer": 50,
+        "magnitude": 0.800441563129425,
+        "x": 0.7180579900741577,
+        "y": 0.3536938726902008
+      },
+      {
+        "id": "fraud_facilitation",
+        "name": "Fraud Facilitation",
+        "peak_layer": 50,
+        "magnitude": 0.8021254539489746,
+        "x": 0.7992417812347412,
+        "y": -0.06795524060726166
+      },
+      {
+        "id": "hate_speech",
+        "name": "hate_speech",
+        "peak_layer": 50,
+        "magnitude": 0.8117125630378723,
+        "x": 0.7912127375602722,
+        "y": -0.18127261102199554
+      },
+      {
+        "id": "hazardous_materials",
+        "name": "hazardous_materials",
+        "peak_layer": 50,
+        "magnitude": 0.7947574853897095,
+        "x": 0.7718220949172974,
+        "y": 0.18955250084400177
+      },
+      {
+        "id": "high_stakes_falsehoods",
+        "name": "high_stakes_falsehoods",
+        "peak_layer": 50,
+        "magnitude": 0.8088060617446899,
+        "x": 0.7947240471839905,
+        "y": -0.15026988089084625
+      },
+      {
+        "id": "identity_discrimination",
+        "name": "identity_discrimination",
+        "peak_layer": 50,
+        "magnitude": 0.8100349307060242,
+        "x": 0.8060452342033386,
+        "y": -0.08029792457818985
+      },
+      {
+        "id": "impersonation",
+        "name": "impersonation",
+        "peak_layer": 50,
+        "magnitude": 0.8010201454162598,
+        "x": 0.7915549278259277,
+        "y": -0.12277615070343018
+      },
+      {
+        "id": "legal_advice",
+        "name": "legal_advice",
+        "peak_layer": 50,
+        "magnitude": 0.7800255417823792,
+        "x": 0.7334386706352234,
+        "y": 0.26553255319595337
+      },
+      {
+        "id": "malicious_code",
+        "name": "malicious_code",
+        "peak_layer": 50,
+        "magnitude": 0.7986351251602173,
+        "x": 0.7920312285423279,
+        "y": -0.10249190032482147
+      },
+      {
+        "id": "medical_advice",
+        "name": "medical_advice",
+        "peak_layer": 50,
+        "magnitude": 0.8098607063293457,
+        "x": 0.7038101553916931,
+        "y": 0.40065670013427734
+      },
+      {
+        "id": "nonconsensual_surveillance",
+        "name": "nonconsensual_surveillance",
+        "peak_layer": 50,
+        "magnitude": 0.8052679300308228,
+        "x": 0.7991960048675537,
+        "y": -0.09870277345180511
+      },
+      {
+        "id": "physical_world_actions",
+        "name": "physical_world_actions",
+        "peak_layer": 50,
+        "magnitude": 0.8130046129226685,
+        "x": 0.810296893119812,
+        "y": 0.06629807502031326
+      },
+      {
+        "id": "pii_doxxing",
+        "name": "pii_doxxing",
+        "peak_layer": 50,
+        "magnitude": 0.8079028129577637,
+        "x": 0.8019847869873047,
+        "y": -0.09760811179876328
+      },
+      {
+        "id": "political_influence",
+        "name": "political_influence",
+        "peak_layer": 50,
+        "magnitude": 0.8094837069511414,
+        "x": 0.8020284175872803,
+        "y": -0.10960973054170609
+      },
+      {
+        "id": "private_access",
+        "name": "private_access",
+        "peak_layer": 50,
+        "magnitude": 0.8090938925743103,
+        "x": 0.8089087605476379,
+        "y": -0.01730831153690815
+      },
+      {
+        "id": "prompt_injection",
+        "name": "prompt_injection",
+        "peak_layer": 50,
+        "magnitude": 0.8077290654182434,
+        "x": 0.7942313551902771,
+        "y": -0.14704649150371552
+      },
+      {
+        "id": "regulated_goods",
+        "name": "regulated_goods",
+        "peak_layer": 50,
+        "magnitude": 0.7927553653717041,
+        "x": 0.7919702529907227,
+        "y": -0.03527424484491348
+      },
+      {
+        "id": "reveal_system_prompt",
+        "name": "reveal_system_prompt",
+        "peak_layer": 50,
+        "magnitude": 0.8093770742416382,
+        "x": 0.79339200258255,
+        "y": -0.16006408631801605
+      },
+      {
+        "id": "social_engineering",
+        "name": "social_engineering",
+        "peak_layer": 50,
+        "magnitude": 0.8080621957778931,
+        "x": 0.7991058230400085,
+        "y": -0.11997663974761963
+      },
+      {
+        "id": "spam_platform_abuse",
+        "name": "spam_platform_abuse",
+        "peak_layer": 50,
+        "magnitude": 0.8088311553001404,
+        "x": 0.8080848455429077,
+        "y": -0.03473764657974243
+      },
+      {
+        "id": "unfair_advantage",
+        "name": "unfair_advantage",
+        "peak_layer": 50,
+        "magnitude": 0.7989993691444397,
+        "x": 0.7946451902389526,
+        "y": 0.08330097794532776
+      },
+      {
+        "id": "violence_terrorism",
+        "name": "violence_terrorism",
+        "peak_layer": 50,
+        "magnitude": 0.8158199787139893,
+        "x": 0.802328884601593,
+        "y": -0.1477518081665039
+      },
+      {
+        "id": "weapons_explosives",
+        "name": "weapons_explosives",
+        "peak_layer": 50,
+        "magnitude": 0.7837724089622498,
+        "x": 0.77366042137146,
+        "y": -0.1254938542842865
+      }
+    ],
+    "variance_explained": [
+      0.7791147828102112,
+      0.032199617475271225
+    ]
+  },
+  "n_categories": 27,
+  "hidden_dim": 5120,
+  "extraction": {
+    "mode": "mean",
+    "range": [
+      38,
+      63
+    ]
+  }
+}

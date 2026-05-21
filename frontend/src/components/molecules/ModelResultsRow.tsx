@@ -60,6 +60,7 @@ const ChartGrid = ({ mode, modelResults, run, modelId, visibleGroups }: ChartGri
         <CategoryDirectionChart
           key={cat.id}
           categoryName={cat.name}
+          categoryId={cat.id}
           directionResult={modeResult.per_category[cat.id]}
           prompts={run.prompts}
           modelId={modelId}

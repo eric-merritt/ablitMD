@@ -6,6 +6,7 @@ import type { CategoryDirectionResult, RunPrompt, RefusalMode } from '../../type
 
 interface CategoryDirectionChartProps {
   categoryName: string
+  categoryId: string
   directionResult: CategoryDirectionResult
   prompts: RunPrompt[]
   modelId: string
@@ -51,17 +52,27 @@ const meanOf = (vals: (number | undefined)[]) => {
 
 export const CategoryDirectionChart = ({
   categoryName,
+  categoryId,
   directionResult,
   prompts,
   modelId,
   mode,
 }: CategoryDirectionChartProps) => {
   const [maximized, setMaximized] = useState(false)
-  const hardEntry = directionResult.by_mode.hard
+  // reference direction for the chart: prefer hard, else fall back to whatever exists
+  const refMode = directionResult.by_mode.hard
+    ? 'hard'
+    : directionResult.by_mode.redirect
+      ? 'redirect'
+      : directionResult.by_mode.disclaimer
+        ? 'disclaimer'
+        : null
+  const refEntry = refMode ? directionResult.by_mode[refMode] : undefined
 
   const modeGroups = useMemo(() => {
     const groups: Record<string, string[]> = { hard: [], redirect: [], disclaimer: [], none: [] }
     for (const prompt of prompts) {
+      if (prompt.category !== categoryId) continue
       const result = prompt.model_results[modelId]?.[mode]
       if (result?.hidden_states_key) {
         const m = result.refusal_mode ?? 'none'
@@ -69,12 +80,12 @@ export const CategoryDirectionChart = ({
       }
     }
     return groups
-  }, [prompts, modelId, mode])
+  }, [prompts, categoryId, modelId, mode])
 
   const chartData = useMemo(() => {
-    if (!hardEntry) return []
-    const { similarity_per_prompt } = hardEntry
-    const nLayers = hardEntry.magnitude_per_layer.length
+    if (!refEntry) return []
+    const { similarity_per_prompt } = refEntry
+    const nLayers = refEntry.magnitude_per_layer.length
 
     return Array.from({ length: nLayers }, (_, L) => {
       const point: Record<string, number | undefined> = { layer: L }
@@ -84,13 +95,13 @@ export const CategoryDirectionChart = ({
       }
       return point
     })
-  }, [hardEntry, modeGroups])
+  }, [refEntry, modeGroups])
 
   const peakLayer = useMemo(() => {
-    if (!hardEntry) return null
-    const mag = hardEntry.magnitude_per_layer
+    if (!refEntry) return null
+    const mag = refEntry.magnitude_per_layer
     return mag.indexOf(Math.max(...mag))
-  }, [hardEntry])
+  }, [refEntry])
 
   const alignmentLabel = useMemo(() => {
     const a = directionResult.alignment['hard_vs_redirect']
@@ -100,9 +111,9 @@ export const CategoryDirectionChart = ({
   }, [directionResult.alignment])
 
   const triggerOverlap = useMemo(() => {
-    const { trigger_meta, by_mode } = directionResult
-    if (!trigger_meta || !by_mode.hard || peakLayer === null) return []
-    const { trigger_similarity_per_prompt } = by_mode.hard
+    const { trigger_meta } = directionResult
+    if (!trigger_meta || !refEntry || peakLayer === null) return []
+    const { trigger_similarity_per_prompt } = refEntry
     if (!trigger_similarity_per_prompt) return []
 
     const bySource: Record<string, number[]> = {}
@@ -122,11 +133,11 @@ export const CategoryDirectionChart = ({
     }).sort((a, b) => b.mean - a.mean)
   }, [directionResult, peakLayer])
 
-  if (!hardEntry) {
+  if (!refEntry) {
     return (
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px' }}>
         <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-dim)', marginBottom: '4px' }}>{categoryName}</div>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No hard refusal data</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>No direction data</div>
       </div>
     )
   }
@@ -194,7 +205,7 @@ export const CategoryDirectionChart = ({
       </ResponsiveContainer>
 
       <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-        mean similarity vs hard direction
+        mean similarity vs {refMode} direction
       </div>
 
       {triggerOverlap.length > 0 && (
