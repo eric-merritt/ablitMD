@@ -1,5 +1,7 @@
 import numpy as np
 
+from backend.inference.run_loader import rebuild_directions
+
 
 def clumping_curve(directions: list[np.ndarray]) -> np.ndarray:
   """directions: list of (n_layers, dim) per-category unit-direction arrays.
@@ -35,3 +37,35 @@ def detect_divergence(clumping: np.ndarray, onset: int, retain: float = 0.90) ->
     if clumping[layer] < threshold:
       return layer
   return len(clumping) - 1
+
+
+def analyze_run(run: dict, model_id: str, gen_mode: str, state_dir) -> dict:
+  """Per refusal mode (hard, redirect): clumping curve, magnitude curve, and
+  suggested onset/divergence layers. Returns {mode: {...}} for modes with data."""
+  per_category = rebuild_directions(run, model_id, gen_mode, state_dir)
+  out: dict[str, dict] = {}
+
+  for refusal_mode in ("hard", "redirect"):
+    directions, magnitudes, category_ids = [], [], []
+    for category_id, cat_result in per_category.items():
+      entry = cat_result["by_mode"].get(refusal_mode)
+      if not entry:
+        continue
+      directions.append(np.array(entry["direction_per_layer"], dtype=np.float32))
+      magnitudes.append(np.array(entry["magnitude_per_layer"], dtype=np.float32))
+      category_ids.append(category_id)
+    if not directions:
+      continue
+
+    clumping = clumping_curve(directions)
+    magnitude = mean_magnitude_curve(magnitudes)
+    onset = detect_onset(magnitude)
+    divergence = detect_divergence(clumping, onset)
+    out[refusal_mode] = {
+      "clumping": clumping.tolist(),
+      "magnitude": magnitude.tolist(),
+      "category_ids": category_ids,
+      "suggested_onset": onset,
+      "suggested_divergence": divergence,
+    }
+  return out
