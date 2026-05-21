@@ -7,7 +7,6 @@ data/runs/*.bak
 data/charts/
 data/mongo_backup/
 data/vastai_mirror/
-root@154.59.156.8
 
 # Python
 __pycache__/
