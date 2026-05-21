@@ -52,3 +52,24 @@ class TestDetectDivergence:
   def test_never_drops_returns_last_index(self):
     clump = np.array([0.5, 0.95, 1.0, 0.99], dtype=np.float32)
     assert detect_divergence(clump, onset=1, retain=0.9) == 3
+
+
+from backend.inference.divergence import analyze_run
+from backend.inference.tests._fixtures import make_mini_run, N_LAYERS
+
+
+class TestAnalyzeRun:
+  def test_returns_hard_and_redirect(self, tmp_path):
+    meta = make_mini_run(tmp_path)
+    out = analyze_run(meta["run"], meta["model_id"], meta["gen_mode"], meta["state_dir"])
+    assert set(out.keys()) == {"hard", "redirect"}
+
+  def test_mode_payload_shape(self, tmp_path):
+    meta = make_mini_run(tmp_path)
+    out = analyze_run(meta["run"], meta["model_id"], meta["gen_mode"], meta["state_dir"])
+    hard = out["hard"]
+    assert len(hard["clumping"]) == N_LAYERS
+    assert len(hard["magnitude"]) == N_LAYERS
+    assert hard["category_ids"] == ["cat_a", "cat_b"]
+    assert 0 <= hard["suggested_onset"] < N_LAYERS
+    assert hard["suggested_onset"] <= hard["suggested_divergence"] < N_LAYERS
