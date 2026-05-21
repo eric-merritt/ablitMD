@@ -271,10 +271,11 @@ export const ChartDemo = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px' }}>
-        {catResults.map(({ id, name, result, prompts }) => (
+        {catResults.map(({ id, name, result }) => (
           <CategoryDirectionChart
             key={id}
             categoryName={name}
+            categoryId={id}
             directionResult={result}
             prompts={allPrompts}
             modelId={MODEL_ID}

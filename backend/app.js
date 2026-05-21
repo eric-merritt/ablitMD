@@ -4,6 +4,7 @@ import modelsRouter from "./routes/api/model.js";
 import promptsRouter from "./routes/api/prompts.js";
 import runsRouter from "./routes/api/runs.js";
 import inferenceRouter from "./routes/api/inference.js";
+import ablationRouter from "./routes/api/ablation.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -22,12 +23,13 @@ mongoose
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '256mb' }));
 
 app.use("/api/models", modelsRouter);
 app.use("/api/prompts", promptsRouter);
 app.use("/api/runs", runsRouter);
 app.use("/api/inference", inferenceRouter);
+app.use("/api/ablation", ablationRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);

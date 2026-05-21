@@ -1,6 +1,12 @@
 # Run data — keep .gitkeep, ignore actual run files
 data/runs/*.json
 data/runs/*/
+data/runs/*.bak
+
+# Local data — backups, mirrors, generated artifacts, not for git
+data/charts/
+data/mongo_backup/
+data/vastai_mirror/
 
 # Python
 __pycache__/
@@ -14,3 +20,8 @@ frontend/.env
 
 # Node
 node_modules/
+
+# Local-only — Claude config, not for git
+CLAUDE.md
+.claude/
+docs/superpowers/
