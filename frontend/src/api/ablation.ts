@@ -1,5 +1,5 @@
 import type {
-  DivergencePayload, SlimRecipe, RecipeParams, AblationStatus, VerifyEvent,
+  DivergencePayload, SlimRecipe, RecipeParams, VerifyEvent, DirectionCompareRow,
 } from '../types/ablation'
 
 const jsonOrThrow = async (response: Response) => {
@@ -20,30 +20,32 @@ export const buildRecipe = (runId: string, params: RecipeParams): Promise<SlimRe
     body: JSON.stringify(params),
   }).then(jsonOrThrow)
 
-export const applyAblation = (runId: string): Promise<AblationStatus> =>
-  fetch(`/api/ablation/${runId}/apply`, { method: 'POST' }).then(jsonOrThrow)
-
-export const clearAblation = (runId: string): Promise<AblationStatus> =>
-  fetch(`/api/ablation/${runId}/clear`, { method: 'POST' }).then(jsonOrThrow)
-
 export const bakeModel = (runId: string): Promise<{ saved_to: string }> =>
   fetch(`/api/ablation/${runId}/bake`, { method: 'POST' }).then(jsonOrThrow)
 
-// Verify streams ndjson — onEvent fires per event (total, category_start, prompt, category_result).
-export const verifyAblation = async (
+export const compareDirections = (
   runId: string,
-  body: { model_id: string; gen_mode: string; categories?: string[]; samples_per_category?: number },
+  body: { model_id: string; gen_mode: string }
+): Promise<DirectionCompareRow[]> =>
+  fetch(`/api/ablation/${runId}/directions/compare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(jsonOrThrow)
+
+const readNdjsonStream = async (
+  url: string,
+  body: object,
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> => {
-  const response = await fetch(`/api/ablation/${runId}/verify`, {
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
   })
   if (!response.ok || !response.body) throw new Error(`verify failed (${response.status})`)
-
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
@@ -58,3 +60,17 @@ export const verifyAblation = async (
     }
   }
 }
+
+export const verifyAblation = (
+  runId: string,
+  body: { model_id: string; gen_mode: string; categories?: string[]; samples_per_category?: number },
+  onEvent: (event: VerifyEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal)
+
+export const verifyAblationClassic = (
+  runId: string,
+  body: { model_id: string; gen_mode: string; factor: number; categories?: string[]; samples_per_category?: number },
+  onEvent: (event: VerifyEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify/classic`, body, onEvent, signal)

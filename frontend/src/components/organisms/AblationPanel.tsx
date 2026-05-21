@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
-import { getDivergence, buildRecipe, bakeModel } from '../../api/ablation'
+import { DirectionCompareChart } from '../molecules/DirectionCompareChart'
+import { getDivergence, buildRecipe, bakeModel, compareDirections } from '../../api/ablation'
 import { inferenceStatus, inferenceLoad } from '../../api/inference'
-import type { ModeDivergence, SlimRecipe } from '../../types/ablation'
+import type { ModeDivergence, SlimRecipe, DirectionCompareRow } from '../../types/ablation'
+
+type AblationMode = 'ablitmd' | 'classic'
 
 interface AblationPanelProps {
   runId: string
   models: { modelId: string; apiModelId: string; name: string }[]
-  onVerify: (modelId: string, genMode: string) => void
+  onVerify: (modelId: string, genMode: string, mode: AblationMode, classicFactor: number) => void
 }
 
 type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
@@ -67,6 +70,10 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [baking, setBaking]       = useState(false)
   const [modelId, setModelId]     = useState<string>()
   const [modelLoad, setModelLoad] = useState<ModelLoadState>('idle')
+  const [mode, setMode]           = useState<AblationMode>('ablitmd')
+  const [classicFactor, setClassicFactor] = useState(0.6)
+  const [compareRows, setCompareRows]     = useState<DirectionCompareRow[]>([])
+  const [compareLoading, setCompareLoading] = useState(false)
 
   useEffect(() => {
     getDivergence(runId)
@@ -122,8 +129,20 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
   const runVerify = () => {
     if (!recipe) return
-    onVerify(recipe.model_id, recipe.gen_mode)
+    onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)
   }
+
+  const loadCompare = () => {
+    if (!recipe || !modelId) return
+    setCompareLoading(true)
+    compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode })
+      .then(rows => { setCompareRows(rows); setCompareLoading(false) })
+      .catch(err => { setError(String(err.message)); setCompareLoading(false) })
+  }
+
+  useEffect(() => {
+    if (recipe && modelId) loadCompare()
+  }, [recipe])
 
   const runBake = () => {
     setBaking(true)
@@ -165,6 +184,38 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         <>
           <RecipePanel recipe={recipe} onset={onset} split={split} factorA={factorA} factorB={factorB}
             onFactorChange={next => { setFactorA(next.factorA); setFactorB(next.factorB) }} />
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode</span>
+            {(['ablitmd', 'classic'] as AblationMode[]).map(m => (
+              <button key={m} onClick={() => setMode(m)} style={{
+                padding: '4px 14px', fontSize: '12px', cursor: 'pointer',
+                background: mode === m ? 'var(--accent)' : 'var(--surface-3)',
+                color: mode === m ? 'var(--bg)' : 'var(--text-muted)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+                fontWeight: mode === m ? 700 : 400,
+              }}>
+                {m === 'ablitmd' ? 'ablitMD' : 'Classic'}
+              </button>
+            ))}
+          </div>
+
+          {mode === 'classic' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>factor</span>
+              <input type="range" min={0.1} max={1.0} step={0.05}
+                value={classicFactor}
+                onChange={e => setClassicFactor(Number(e.target.value))}
+                style={{ flex: 1 }} />
+              <span style={{ fontSize: '12px', color: 'var(--text)', minWidth: '32px' }}>{classicFactor.toFixed(2)}</span>
+            </div>
+          )}
+
+          {compareLoading && compareRows.length === 0 && (
+            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Computing direction comparison…</div>
+          )}
+          {compareRows.length > 0 && <DirectionCompareChart rows={compareRows} />}
+
           {modelLoad === 'loading' && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
               <span className="spinner" /> Model loading: <code>{modelId}</code>
@@ -176,13 +227,13 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             </div>
           )}
           <div style={{ display: 'flex', gap: '12px' }}>
-            <GatedButton disabled={modelLoad !== 'ready'}
-              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+            <GatedButton disabled={modelLoad !== 'ready' || status === 'building'}
+              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
               onClick={runVerify}>
               Verify
             </GatedButton>
-            <GatedButton disabled={baking || modelLoad !== 'ready'}
-              tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+            <GatedButton disabled={baking || modelLoad !== 'ready' || status === 'building'}
+              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
               onClick={runBake}>
               {baking ? 'Baking…' : 'Bake & save model'}
             </GatedButton>
