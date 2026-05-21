@@ -8,11 +8,15 @@ from backend.inference.recipe import directions_for_layer
 
 def ablate_hidden(hidden: torch.Tensor, directions: list[tuple[torch.Tensor, float]]) -> torch.Tensor:
   """Subtract each direction's projection from the hidden state.
-  hidden: (..., dim); directions: list of (unit_direction (dim,), factor)."""
+  hidden: (..., dim); directions: list of (unit_direction (dim,), factor).
+  Compute in float32 to avoid bf16 rounding silently zeroing the subtraction."""
+  original_dtype = hidden.dtype
+  work = hidden.to(torch.float32)
   for direction, factor in directions:
-    coefficient = (hidden * direction).sum(dim=-1, keepdim=True)
-    hidden = hidden - factor * coefficient * direction
-  return hidden
+    dir_f32 = direction.to(torch.float32)
+    coefficient = (work * dir_f32).sum(dim=-1, keepdim=True)
+    work = work - factor * coefficient * dir_f32
+  return work.to(original_dtype)
 
 
 def orthogonalize_weight(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> torch.Tensor:
