@@ -33,6 +33,11 @@ const App = () => {
   const handleRunStart       = (run: Run) => { setActiveRun(run); setPhase('running') }
   const handleRunOpen        = (run: Run) => {
     setActiveRun(run)
+    // a run with computed direction results has its charts ready — open straight to them
+    if (run.direction_results && Object.keys(run.direction_results).length > 0) {
+      setPhase('results')
+      return
+    }
     if (run.incomplete) { setPhase('running'); return }
     setPhase(hasUnclassified(run) ? 'review' : 'results')
   }

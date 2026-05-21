@@ -2,9 +2,6 @@ import json
 import sys
 from pathlib import Path
 
-import transformers.modeling_utils as _mu
-_mu.caching_allocator_warmup = lambda *args, **kwargs: None
-
 # Ensure project root is on sys.path so `backend.*` imports resolve when the
 # script is invoked directly (e.g. `uv run python backend/inference/service.py`).
 _project_root = Path(__file__).resolve().parents[2]
@@ -140,6 +137,12 @@ def compute(req: ComputeRequest):
     if result:
       result["trigger_meta"] = trigger_meta
       direction_results[category] = result
+
+  # raw per-layer direction vectors are large (~150 MB+) and read by no chart;
+  # drop them so the response stays small enough to PATCH back into the run.
+  for cat_result in direction_results.values():
+    for mode_data in cat_result.get("by_mode", {}).values():
+      mode_data.pop("direction_per_layer", None)
 
   return direction_results
 

@@ -22,7 +22,7 @@ mongoose
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: '256mb' }));
 
 app.use("/api/models", modelsRouter);
 app.use("/api/prompts", promptsRouter);

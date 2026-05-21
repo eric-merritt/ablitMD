@@ -25,6 +25,7 @@ export const GroupDrillChart = ({ groupId, modeResult, prompts, modelId, mode }:
             <CategoryDirectionChart
               key={cat.id}
               categoryName={cat.name}
+              categoryId={cat.id}
               directionResult={dirResult}
               prompts={prompts}
               modelId={modelId}
