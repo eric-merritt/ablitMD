@@ -31,3 +31,20 @@ describe('GET /api/ablation/:runId/divergence', () => {
     expect(res.body).toEqual(payload)
   })
 })
+
+import { vi } from 'vitest'
+
+describe('POST /api/ablation/:runId/apply', () => {
+  it('proxies to the inference /ablate endpoint with the run_id', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ active: true, run_id: TEST_RUN }), { status: 200 })
+    )
+    const res = await request(app).post(`/api/ablation/${TEST_RUN}/apply`).send({})
+    expect(res.status).toBe(200)
+    expect(res.body.active).toBe(true)
+    const [calledUrl, calledInit] = fetchSpy.mock.calls[0]
+    expect(String(calledUrl)).toMatch(/\/ablate$/)
+    expect(JSON.parse(calledInit.body)).toEqual({ run_id: TEST_RUN })
+    fetchSpy.mockRestore()
+  })
+})

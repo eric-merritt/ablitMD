@@ -61,4 +61,41 @@ router.post('/:runId/recipe', async (req, res) => {
   res.json(slimRecipe(recipe))
 })
 
+const safeJson = async (response) => {
+  const text = await response.text()
+  try { return JSON.parse(text) } catch { return { detail: text } }
+}
+
+const proxyToInference = (inferencePath, buildBody) => async (req, res) => {
+  const response = await fetch(`${INFERENCE_BASE}${inferencePath}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(buildBody(req)),
+  })
+  res.status(response.status).json(await safeJson(response))
+}
+
+router.post('/:runId/apply', proxyToInference('/ablate', req => ({ run_id: req.params.runId })))
+router.post('/:runId/clear', proxyToInference('/ablate/clear', () => ({})))
+router.post('/:runId/bake',
+  proxyToInference('/ablate/bake', req => ({ run_id: req.params.runId, ...req.body })))
+
+router.post('/:runId/verify', async (req, res) => {
+  const upstream = await fetch(`${INFERENCE_BASE}/ablate/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_id: req.params.runId, ...req.body }),
+  })
+  res.status(upstream.status)
+  res.setHeader('Content-Type', 'application/x-ndjson')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no')
+  if (!upstream.body) { res.end(); return }
+  req.on('close', () => { upstream.body.destroy?.() })
+  for await (const chunk of upstream.body) {
+    if (!res.write(chunk)) await new Promise(resolve => res.once('drain', resolve))
+  }
+  res.end()
+})
+
 export default router
