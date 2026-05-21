@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
-import { VerifyResults } from '../molecules/VerifyResults'
-import { getDivergence, buildRecipe, applyAblation, clearAblation, verifyAblation, bakeModel } from '../../api/ablation'
+import { getDivergence, buildRecipe, applyAblation, clearAblation, bakeModel } from '../../api/ablation'
 import { inferenceStatus, inferenceLoad } from '../../api/inference'
-import type { ModeDivergence, SlimRecipe, VerifyCategoryResult } from '../../types/ablation'
+import type { ModeDivergence, SlimRecipe } from '../../types/ablation'
 
 interface AblationPanelProps {
   runId: string
   models: { modelId: string; apiModelId: string; name: string }[]
+  onVerify: (modelId: string, genMode: string) => void
 }
 
 type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
@@ -53,7 +53,7 @@ const pickFirstModelEntry = (payload: Record<string, unknown>) => {
   return null
 }
 
-export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
+export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) => {
   const [hard, setHard]         = useState<ModeDivergence>()
   const [redirect, setRedirect] = useState<ModeDivergence>()
   const [onset, setOnset]       = useState(38)
@@ -63,8 +63,6 @@ export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
   const [recipe, setRecipe]     = useState<SlimRecipe>()
   const [status, setStatus]     = useState<'idle' | 'loading' | 'building' | 'applied'>('loading')
   const [error, setError]       = useState<string>()
-  const [verifyResults, setVerifyResults] = useState<VerifyCategoryResult[]>([])
-  const [verifying, setVerifying] = useState(false)
   const [bakedPath, setBakedPath] = useState<string>()
   const [baking, setBaking]       = useState(false)
   const [modelId, setModelId]     = useState<string>()
@@ -113,13 +111,7 @@ export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
 
   const runVerify = () => {
     if (!recipe) return
-    setVerifying(true)
-    setVerifyResults([])
-    setError(undefined)
-    verifyAblation(runId, { model_id: recipe.model_id, gen_mode: recipe.gen_mode },
-      result => setVerifyResults(prev => [...prev, result]))
-      .catch(err => setError(String(err.message)))
-      .finally(() => setVerifying(false))
+    onVerify(recipe.model_id, recipe.gen_mode)
   }
 
   const runBake = () => {
@@ -183,10 +175,10 @@ export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
               onClick={() => clearAblation(runId).then(() => setStatus('idle')).catch(err => setError(String(err.message)))}>
               Clear hooks
             </GatedButton>
-            <GatedButton disabled={verifying || modelLoad !== 'ready'}
+            <GatedButton disabled={modelLoad !== 'ready'}
               tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
               onClick={runVerify}>
-              {verifying ? 'Verifying…' : 'Verify'}
+              Verify
             </GatedButton>
             <GatedButton disabled={baking || modelLoad !== 'ready'}
               tooltip={modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
@@ -195,7 +187,6 @@ export const AblationPanel = ({ runId, models }: AblationPanelProps) => {
             </GatedButton>
             {status === 'applied' && <span style={{ color: 'var(--accent)', fontSize: '12px', alignSelf: 'center' }}>hooks active</span>}
           </div>
-          <VerifyResults results={verifyResults} />
           {bakedPath && (
             <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
               Saved abliterated model to <code>{bakedPath}</code>

@@ -4,10 +4,13 @@ import { RunConfigPanel } from './components/organisms/RunConfigPanel'
 import { PromptWalkthrough } from './components/organisms/PromptWalkthrough'
 import { ClassifyReview } from './components/organisms/ClassifyReview'
 import { ResultsGrid } from './components/organisms/ResultsGrid'
+import { VerifyDashboard } from './components/organisms/VerifyDashboard'
 import { useModels } from './hooks/useModels'
 import type { Run } from './types/run'
 
-type Phase = 'config' | 'running' | 'review' | 'results'
+type Phase = 'config' | 'running' | 'review' | 'results' | 'verify'
+
+interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number }
 
 const hasUnclassified = (run: Run): boolean =>
   run.prompts.some(prompt =>
@@ -20,6 +23,12 @@ const App = () => {
   const { models } = useModels()
   const [phase, setPhase] = useState<Phase>('config')
   const [activeRun, setActiveRun] = useState<Run | null>(null)
+  const [verifyContext, setVerifyContext] = useState<VerifyContext | null>(null)
+
+  const handleVerifyStart = (modelId: string, genMode: string) => {
+    setVerifyContext({ modelId, genMode, samplesPerCategory: 2 })
+    setPhase('verify')
+  }
 
   const modelNames = useMemo(
     () => Object.fromEntries(models.map(model => [model.modelId, model.name])),
@@ -72,7 +81,18 @@ const App = () => {
           run={ activeRun }
           modelNames={ modelNames }
           models={ walkthroughModels }
+          onVerify={ handleVerifyStart }
           onBack={ () => setPhase('review') }
+          onHome={ () => setPhase('config') }
+        />
+      ) }
+      { phase === 'verify' && activeRun && verifyContext && (
+        <VerifyDashboard
+          runId={ activeRun.run_id }
+          modelId={ verifyContext.modelId }
+          genMode={ verifyContext.genMode }
+          samplesPerCategory={ verifyContext.samplesPerCategory }
+          onBack={ () => setPhase('results') }
           onHome={ () => setPhase('config') }
         />
       ) }

@@ -48,5 +48,20 @@ export interface VerifyCategoryResult {
   projection_after: number
   refusal_rate_before: number
   refusal_rate_after: number
-  sample_response: string
 }
+
+export interface VerifyPromptResult {
+  category: string
+  prompt_id: string
+  prompt_text: string
+  response_before: string
+  response_after: string
+  refused_before: boolean
+  refused_after: boolean
+}
+
+export type VerifyEvent =
+  | { type: 'total'; categories: number; prompts: number }
+  | { type: 'category_start'; category: string }
+  | ({ type: 'prompt' } & VerifyPromptResult)
+  | ({ type: 'category_result' } & VerifyCategoryResult)
