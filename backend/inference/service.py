@@ -60,6 +60,7 @@ class VerifyRequest(BaseModel):
   model_id: str
   gen_mode: str
   categories: list[str] | None = None
+  samples_per_category: int = 2
 
 
 @app.get("/status")
@@ -206,36 +207,57 @@ def ablate_verify(req: VerifyRequest):
     if result:
       by_category.setdefault(prompt["category"], []).append({"prompt": prompt, "result": result})
 
-  def events():
-    for category, items in by_category.items():
-      hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
-      direction = np.array(hard_phase_b.get(category, [0.0]), dtype=np.float32)
+  if req.samples_per_category > 0:
+    by_category = { category: items[:req.samples_per_category] for category, items in by_category.items() }
 
-      before_proj, after_proj, refused_before, refused_after, sample = [], [], 0, 0, ""
+  total_prompts = sum(len(items) for items in by_category.values())
+
+  def events():
+    yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
+    for category, items in by_category.items():
+      yield json.dumps({ "type": "category_start", "category": category }) + "\n"
+      hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
+      redirect_phase_b = recipe["modes"].get("redirect", {}).get("phase_b", {}).get("per_category", {})
+      vector = hard_phase_b.get(category) or redirect_phase_b.get(category) or [0.0]
+      direction = np.array(vector, dtype=np.float32)
+
+      before_proj, after_proj, refused_before, refused_after = [], [], 0, 0
       for item in items:
         key = item["result"]["hidden_states_key"]
         before_npy = state_dir / f"{key}.npy"
         if before_npy.exists() and direction.shape[0] > 1:
           before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
-        refused_before += 1 if item["result"].get("refused") else 0
+        prompt_refused_before = bool(item["result"].get("refused"))
+        refused_before += 1 if prompt_refused_before else 0
 
-        response = run_prompt(item["prompt"]["text"], req.gen_mode, req.run_id,
-                              f"verify__{key}", RUNS_DIR)
+        response_after = run_prompt(item["prompt"]["text"], req.gen_mode, req.run_id,
+                                    f"verify__{key}", RUNS_DIR)
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
           after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
-        if looks_like_refusal(response):
+        prompt_refused_after = looks_like_refusal(response_after)
+        if prompt_refused_after:
           refused_after += 1
-        sample = sample or response
+
+        yield json.dumps({
+          "type": "prompt",
+          "category": category,
+          "prompt_id": item["prompt"].get("prompt_id") or key,
+          "prompt_text": item["prompt"]["text"],
+          "response_before": (item["result"].get("response") or "")[:1000],
+          "response_after": response_after[:1000],
+          "refused_before": prompt_refused_before,
+          "refused_after": prompt_refused_after,
+        }) + "\n"
 
       count = max(len(items), 1)
       yield json.dumps({
+        "type": "category_result",
         "category": category,
         "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
         "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
         "refusal_rate_before": refused_before / count,
         "refusal_rate_after": refused_after / count,
-        "sample_response": sample[:400],
       }) + "\n"
 
   return StreamingResponse(events(), media_type="application/x-ndjson")

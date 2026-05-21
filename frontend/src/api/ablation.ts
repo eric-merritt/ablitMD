@@ -1,5 +1,5 @@
 import type {
-  DivergencePayload, SlimRecipe, RecipeParams, AblationStatus, VerifyCategoryResult,
+  DivergencePayload, SlimRecipe, RecipeParams, AblationStatus, VerifyEvent,
 } from '../types/ablation'
 
 const jsonOrThrow = async (response: Response) => {
@@ -29,11 +29,11 @@ export const clearAblation = (runId: string): Promise<AblationStatus> =>
 export const bakeModel = (runId: string): Promise<{ saved_to: string }> =>
   fetch(`/api/ablation/${runId}/bake`, { method: 'POST' }).then(jsonOrThrow)
 
-// Verify streams ndjson — onResult fires once per category as results arrive.
+// Verify streams ndjson — onEvent fires per event (total, category_start, prompt, category_result).
 export const verifyAblation = async (
   runId: string,
-  body: { model_id: string; gen_mode: string; categories?: string[] },
-  onResult: (result: VerifyCategoryResult) => void,
+  body: { model_id: string; gen_mode: string; categories?: string[]; samples_per_category?: number },
+  onEvent: (event: VerifyEvent) => void,
 ): Promise<void> => {
   const response = await fetch(`/api/ablation/${runId}/verify`, {
     method: 'POST',
@@ -52,7 +52,7 @@ export const verifyAblation = async (
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''
     for (const line of lines) {
-      if (line.trim()) onResult(JSON.parse(line))
+      if (line.trim()) onEvent(JSON.parse(line))
     }
   }
 }
