@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
@@ -63,6 +63,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [split, setSplit]       = useState(50)
   const [factorA, setFactorA]   = useState(0.15)
   const [factorB, setFactorB]   = useState(0.15)
+  const paramsRef = useRef({ onset: 38, split: 50, factorA: 0.15, factorB: 0.15 })
   const [recipe, setRecipe]     = useState<SlimRecipe>()
   const [status, setStatus]     = useState<'idle' | 'loading' | 'building' | 'applied'>('loading')
   const [error, setError]       = useState<string>()
@@ -109,10 +110,13 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
       .catch(err => { setError(String(err.message)); setStatus('idle') })
   }, [runId, models])
 
+  paramsRef.current = { onset, split, factorA, factorB }
+
   const rebuildRecipe = () => {
     setStatus('building')
     setError(undefined)
-    buildRecipe(runId, { onset, split, factorA, factorB })
+    const { onset: o, split: s, factorA: a, factorB: b } = paramsRef.current
+    buildRecipe(runId, { onset: o, split: s, factorA: a, factorB: b })
       .then(next => { setRecipe(next); setStatus('idle') })
       .catch(err => { setError(String(err.message)); setStatus('idle') })
   }
