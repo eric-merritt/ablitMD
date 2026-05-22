@@ -33,7 +33,8 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         layer,
         hardClump:        hard?.clumping[layer],
         redirectClump:    redirect?.clumping[layer],
-        magnitude:        hard?.magnitude[layer] != null ? 1 - hard!.magnitude[layer] / magMax : undefined,
+        magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
+        magnitudeTarget:  hard?.magnitude[layer] != null ? 1 - hard!.magnitude[layer] / magMax : undefined,
         hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
         redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
@@ -69,6 +70,8 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
 
           <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
+          <Line yAxisId="clump" type="monotone" dataKey="magnitudeTarget" name="target"
+            stroke="#4ade80" strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
           {hard && (factorA != null || factorB != null) && (
             <Line yAxisId="clump" type="monotone" dataKey="hardPredicted" name="hard (predicted)"
               stroke={HARD_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />
