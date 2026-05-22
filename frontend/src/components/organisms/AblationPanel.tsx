@@ -170,7 +170,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
       {(hard || redirect) && (
         <>
-          <DivergenceChart hard={hard} redirect={redirect} onset={onset} split={split} />
+          <DivergenceChart hard={hard} redirect={redirect} onset={onset} split={split}
+            lastLayer={lastLayer} factorA={factorA} factorB={factorB} />
           <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <LayerSplitControls onset={onset} split={split} lastLayer={lastLayer}
               onChange={next => { setOnset(next.onset); setSplit(next.split) }} />

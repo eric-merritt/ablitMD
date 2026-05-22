@@ -7,22 +7,40 @@ interface DivergenceChartProps {
   redirect?: ModeDivergence
   onset: number
   split: number
+  lastLayer?: number
+  factorA?: number
+  factorB?: number
 }
 
 const HARD_COLOR     = '#ef4444'
 const REDIRECT_COLOR = '#f97316'
 const MAG_COLOR      = 'var(--text-muted)'
 
-export const DivergenceChart = ({ hard, redirect, onset, split }: DivergenceChartProps) => {
+export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, factorA, factorB }: DivergenceChartProps) => {
   const nLayers = Math.max(hard?.clumping.length ?? 0, redirect?.clumping.length ?? 0)
 
-  const chartData = useMemo(() =>
-    Array.from({ length: nLayers }, (_, layer) => ({
-      layer,
-      hardClump:     hard?.clumping[layer],
-      redirectClump: redirect?.clumping[layer],
-      magnitude:     hard?.magnitude[layer],
-    })), [nLayers, hard, redirect])
+  const chartData = useMemo(() => {
+    const last = lastLayer ?? nLayers - 1
+    const fA = factorA ?? 0
+    const fB = factorB ?? 0
+    return Array.from({ length: nLayers }, (_, layer) => {
+      const mag = hard?.magnitude[layer]
+      let postAblation: number | undefined
+      if (mag != null) {
+        const factor = layer >= onset && layer <= split ? fA
+          : layer > split && layer <= last ? fB
+          : 0
+        postAblation = mag * Math.abs(1 - factor)
+      }
+      return {
+        layer,
+        hardClump:     hard?.clumping[layer],
+        redirectClump: redirect?.clumping[layer],
+        magnitude:     mag,
+        postAblation,
+      }
+    })
+  }, [nLayers, hard, redirect, onset, split, lastLayer, factorA, factorB])
 
   if (nLayers === 0) return null
 
@@ -56,6 +74,10 @@ export const DivergenceChart = ({ hard, redirect, onset, split }: DivergenceChar
 
           <Line yAxisId="mag" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
+          { (factorA != null || factorB != null) && (
+            <Line yAxisId="mag" type="monotone" dataKey="postAblation" name="post-ablation"
+              stroke="#60a5fa" strokeWidth={1.5} strokeDasharray="3 2" dot={false} connectNulls />
+          ) }
           {hard && <Line yAxisId="clump" type="monotone" dataKey="hardClump" name="hard"
             stroke={HARD_COLOR} strokeWidth={1.8} dot={false} connectNulls />}
           {redirect && <Line yAxisId="clump" type="monotone" dataKey="redirectClump" name="redirect"
