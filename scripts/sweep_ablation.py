@@ -4,6 +4,7 @@ Usage:
   uv run python scripts/sweep_ablation.py <run_id> --onset 30 --split 39
 
 Finds optimal factors for each category independently.
+Logs all responses to <run_id>.sweep_log.jsonl
 """
 
 import argparse
@@ -13,6 +14,7 @@ import re
 import subprocess
 import sys
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -24,6 +26,16 @@ from backend.inference.verify import looks_like_refusal
 
 RUNS_DIR = _root / "data" / "runs"
 INFERENCE_URL = "http://localhost:8238"
+
+_log_file = None
+
+
+def log_entry(entry: dict):
+  global _log_file
+  if _log_file:
+    entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    _log_file.write(json.dumps(entry) + "\n")
+    _log_file.flush()
 
 DEGRADATION_WORDS = {"inage", "dubious", "enforcement", "sizzle", "sin"}
 DEGRADATION_CJK_RE = re.compile(r'[一-鿿㐀-䶿]{3,}')
@@ -74,6 +86,8 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
     }
     resp = client.post("/ablate/verify", json=body)
     if resp.status_code != 200:
+      log_entry({"category": category, "factor_a": factor_a, "factor_b": factor_b,
+                 "status": "error", "error": f"http {resp.status_code}"})
       return {"status": "error", "response": ""}
 
     for line in resp.text.strip().split("\n"):
@@ -81,15 +95,29 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
         continue
       event = json.loads(line)
       if event.get("type") == "prompt":
+        prompt_text = event.get("prompt_text", "")
+        before_text = event.get("response_before", "")
         after_text = event.get("response_after", "")
         degraded, reason = is_degraded(after_text)
 
         if degraded:
-          return {"status": f"degraded:{reason}", "response": after_text[:200]}
+          status = f"degraded:{reason}"
         elif looks_like_refusal(after_text):
-          return {"status": "refused", "response": after_text[:200]}
+          status = "refused"
         else:
-          return {"status": "complied", "response": after_text[:200]}
+          status = "complied"
+
+        log_entry({
+          "category": category,
+          "factor_a": factor_a,
+          "factor_b": factor_b,
+          "status": status,
+          "prompt": prompt_text,
+          "response_before": before_text,
+          "response_after": after_text,
+        })
+
+        return {"status": status, "response": after_text[:200]}
 
   return {"status": "error", "response": ""}
 
@@ -134,6 +162,8 @@ def find_optimal_factors(run_id: str, model_id: str, gen_mode: str, category: st
 
 
 def main():
+  global _log_file
+
   parser = argparse.ArgumentParser()
   parser.add_argument("run_id")
   parser.add_argument("--onset", type=int, default=30)
@@ -145,6 +175,11 @@ def main():
   parser.add_argument("--step", type=float, default=0.25)
   parser.add_argument("--categories", type=str, default="", help="comma-separated list, or empty for all")
   args = parser.parse_args()
+
+  log_path = RUNS_DIR / f"{args.run_id}.sweep_log.jsonl"
+  _log_file = open(log_path, "a")
+  log_entry({"event": "sweep_start", "args": vars(args)})
+  print(f"Logging to {log_path}")
 
   run = json.loads((RUNS_DIR / f"{args.run_id}.json").read_text())
   step_data = run["sequence"][0]
@@ -180,6 +215,9 @@ def main():
   out_path = RUNS_DIR / f"{args.run_id}.category_factors.json"
   out_path.write_text(json.dumps(results, indent=2))
   print(f"\nSaved to {out_path}")
+
+  log_entry({"event": "sweep_end", "results": results})
+  _log_file.close()
 
 
 if __name__ == "__main__":
