@@ -71,10 +71,12 @@ def analyze_run(run: dict, model_id: str, gen_mode: str, state_dir) -> dict:
     magnitude = mean_magnitude_curve(magnitudes)
     onset = detect_onset(magnitude)
     divergence = detect_divergence(clumping, onset)
-    all_rounded = np.round(np.concatenate(magnitudes)).astype(int)
-    values, counts = np.unique(all_rounded, return_counts=True)
-    mode_val = int(values[np.argmax(counts)])
-    per_cat_splits = [detect_split_by_mode(m, onset, mode_val) for m in magnitudes]
+    per_cat_splits = []
+    for m in magnitudes:
+      rounded = np.round(m[onset:]).astype(int)
+      values, counts = np.unique(rounded, return_counts=True)
+      mode_val = int(values[np.argmax(counts)])
+      per_cat_splits.append(detect_split_by_mode(m, onset, mode_val))
     split = int(round(sum(per_cat_splits) / len(per_cat_splits)))
     out[refusal_mode] = {
       "clumping": clumping.tolist(),
