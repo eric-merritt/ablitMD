@@ -35,7 +35,6 @@ def load_model(model_id: str, api_model_id: str) -> None:
     try:
       _model = AutoModelForCausalLM.from_pretrained(
         model_path,
-        dtype=torch.bfloat16,
         device_map=DEVICE,
         trust_remote_code=True,
         attn_implementation="flash_attention_2",
