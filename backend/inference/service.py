@@ -66,6 +66,7 @@ class VerifyRequest(BaseModel):
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
+  fast: bool = False
 
 
 class VerifyClassicRequest(BaseModel):
@@ -264,7 +265,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
         response_after = await asyncio.to_thread(
           run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
-          f"verify__{key}", RUNS_DIR,
+          f"verify__{key}", RUNS_DIR, skip_hidden_states=req.fast,
         )
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
