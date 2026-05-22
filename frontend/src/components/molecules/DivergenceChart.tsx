@@ -34,7 +34,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         hardClump:        hard?.clumping[layer],
         redirectClump:    redirect?.clumping[layer],
         magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
-        magnitudeTarget:  hard?.magnitude[layer] != null ? 1 - hard!.magnitude[layer] / magMax : undefined,
+        magnitudeTarget:  hard?.magnitude[layer] != null ? -(hard!.magnitude[layer] / magMax) : undefined,
         hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
         redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
@@ -55,7 +55,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
           <XAxis dataKey="layer" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
-          <YAxis yAxisId="clump" domain={[0, 1]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
+          <YAxis yAxisId="clump" domain={[-1, 1]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
 
           <ReferenceLine x={onset} yAxisId="clump" stroke="var(--accent)" strokeDasharray="3 2"
             label={{ value: 'onset', fontSize: 9, fill: 'var(--accent)', position: 'top' }} />
