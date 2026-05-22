@@ -23,6 +23,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
     const last = lastLayer ?? nLayers - 1
     const fA = factorA ?? 0
     const fB = factorB ?? 0
+    const magMax = Math.max(...(hard?.magnitude ?? [1]), 1)
     return Array.from({ length: nLayers }, (_, layer) => {
       const mag = hard?.magnitude[layer]
       let postAblation: number | undefined
@@ -30,7 +31,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         const factor = layer >= onset && layer <= split ? fA
           : layer > split && layer <= last ? fB
           : 0
-        postAblation = mag * Math.abs(1 - factor)
+        postAblation = (mag * Math.abs(1 - factor)) / magMax
       }
       return {
         layer,
@@ -75,7 +76,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
           <Line yAxisId="mag" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
           { (factorA != null || factorB != null) && (
-            <Line yAxisId="mag" type="monotone" dataKey="postAblation" name="post-ablation"
+            <Line yAxisId="clump" type="monotone" dataKey="postAblation" name="post-ablation"
               stroke="#60a5fa" strokeWidth={1.5} strokeDasharray="3 2" dot={false} connectNulls />
           ) }
           {hard && <Line yAxisId="clump" type="monotone" dataKey="hardClump" name="hard"
