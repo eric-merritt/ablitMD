@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5400,
+    hmr: { host: "localhost" },
     proxy: {
       "/api": "http://localhost:8237",
     },
