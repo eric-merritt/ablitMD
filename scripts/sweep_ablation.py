@@ -83,6 +83,7 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
       "gen_mode": gen_mode,
       "categories": [category],
       "samples_per_category": 1,
+      "fast": True,
     }
     resp = client.post("/ablate/verify", json=body)
     if resp.status_code != 200:

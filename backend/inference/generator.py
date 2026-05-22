@@ -78,6 +78,7 @@ def stream_prompt(
   run_id: str,
   hidden_states_key: str,
   runs_dir: Path,
+  skip_hidden_states: bool = False,
 ):
   """Yields dict events: {'type': 'ready'|'token'|'done'|'aborted', ...}."""
   model = get_model()
@@ -85,7 +86,8 @@ def stream_prompt(
   enable_thinking = mode == 'thinking'
 
   input_ids, attention_mask = _tokenize_input(prompt_text, enable_thinking)
-  _capture_and_save_hidden_states(input_ids, hidden_states_key, runs_dir, run_id, attention_mask)
+  if not skip_hidden_states:
+    _capture_and_save_hidden_states(input_ids, hidden_states_key, runs_dir, run_id, attention_mask)
   yield {"type": "ready", "hidden_states_key": hidden_states_key}
 
   abort_event = _claim_abort_event()
@@ -131,9 +133,10 @@ def run_prompt(
   run_id: str,
   hidden_states_key: str,
   runs_dir: Path,
+  skip_hidden_states: bool = False,
 ) -> str:
   full = ""
-  for event in stream_prompt(prompt_text, mode, run_id, hidden_states_key, runs_dir):
+  for event in stream_prompt(prompt_text, mode, run_id, hidden_states_key, runs_dir, skip_hidden_states):
     if event["type"] == "token":
       full += event["text"]
     elif event["type"] in ("done", "aborted"):
