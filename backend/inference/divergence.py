@@ -26,13 +26,14 @@ def detect_onset(magnitude: np.ndarray, frac: float = 0.10) -> int:
   return int(above[0]) if len(above) else 0
 
 
-def detect_peak_window_center(magnitude: np.ndarray, window: int = 10) -> int:
-  """Center layer of the sliding window of `window` layers with highest summed magnitude."""
-  if len(magnitude) < window:
-    return len(magnitude) // 2
-  sums = np.convolve(magnitude, np.ones(window), mode='valid')
-  best_start = int(np.argmax(sums))
-  return best_start + window // 2
+def detect_split_by_mode(magnitude: np.ndarray, onset: int, mode_val: int) -> int:
+  """First layer after onset+1 where rounded magnitude equals mode_val.
+  Falls back to argmax if mode_val never appears."""
+  tail = np.round(magnitude[onset:]).astype(int)
+  matches = np.where(tail == mode_val)[0]
+  if len(matches):
+    return onset + int(matches[0]) + 1
+  return onset + int(np.argmax(magnitude[onset:])) + 1
 
 
 def detect_divergence(clumping: np.ndarray, onset: int, retain: float = 0.90) -> int:
@@ -70,7 +71,10 @@ def analyze_run(run: dict, model_id: str, gen_mode: str, state_dir) -> dict:
     magnitude = mean_magnitude_curve(magnitudes)
     onset = detect_onset(magnitude)
     divergence = detect_divergence(clumping, onset)
-    per_cat_splits = [detect_peak_window_center(m) for m in magnitudes]
+    all_rounded = np.round(np.concatenate(magnitudes)).astype(int)
+    values, counts = np.unique(all_rounded, return_counts=True)
+    mode_val = int(values[np.argmax(counts)])
+    per_cat_splits = [detect_split_by_mode(m, onset, mode_val) for m in magnitudes]
     split = int(round(sum(per_cat_splits) / len(per_cat_splits)))
     out[refusal_mode] = {
       "clumping": clumping.tolist(),
