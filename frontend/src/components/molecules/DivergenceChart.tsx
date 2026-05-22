@@ -33,7 +33,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         layer,
         hardClump:        hard?.clumping[layer],
         redirectClump:    redirect?.clumping[layer],
-        magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
+        magnitude:        hard?.magnitude[layer] != null ? 1 - hard!.magnitude[layer] / magMax : undefined,
         hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
         redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
