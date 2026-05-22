@@ -5,6 +5,7 @@ import type { ModeDivergence } from '../../types/ablation'
 interface DivergenceChartProps {
   hard?: ModeDivergence
   redirect?: ModeDivergence
+  none?: ModeDivergence
   onset: number
   split: number
   lastLayer?: number
@@ -15,8 +16,9 @@ interface DivergenceChartProps {
 const HARD_COLOR     = '#ef4444'
 const REDIRECT_COLOR = '#f97316'
 const MAG_COLOR      = 'var(--text-muted)'
+const NONE_COLOR     = '#4ade80'
 
-export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, factorA, factorB }: DivergenceChartProps) => {
+export const DivergenceChart = ({ hard, redirect, none, onset, split, lastLayer, factorA, factorB }: DivergenceChartProps) => {
   const nLayers = Math.max(hard?.clumping.length ?? 0, redirect?.clumping.length ?? 0)
 
   const chartData = useMemo(() => {
@@ -24,6 +26,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
     const fA = factorA ?? 0
     const fB = factorB ?? 0
     const magMax = Math.max(...(hard?.magnitude ?? [1]), 1)
+    const noneMagMax = Math.max(...(none?.magnitude ?? [1]), 1)
     return Array.from({ length: nLayers }, (_, layer) => {
       const factor = layer >= onset && layer <= split ? fA
         : layer > split && layer <= last ? fB
@@ -34,12 +37,12 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         hardClump:        hard?.clumping[layer],
         redirectClump:    redirect?.clumping[layer],
         magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
-        magnitudeTarget:  hard?.magnitude[layer] != null ? -(hard!.magnitude[layer] / magMax) : undefined,
+        noneMagnitude:    none?.magnitude[layer] != null ? none!.magnitude[layer] / noneMagMax : undefined,
         hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
         redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
     })
-  }, [nLayers, hard, redirect, onset, split, lastLayer, factorA, factorB])
+  }, [nLayers, hard, redirect, none, onset, split, factorA, factorB])
 
   if (nLayers === 0) return null
 
@@ -55,7 +58,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
           <XAxis dataKey="layer" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
-          <YAxis yAxisId="clump" domain={[-1, 1]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
+          <YAxis yAxisId="clump" domain={[0, 1]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
 
           <ReferenceLine x={onset} yAxisId="clump" stroke="var(--accent)" strokeDasharray="3 2"
             label={{ value: 'onset', fontSize: 9, fill: 'var(--accent)', position: 'top' }} />
@@ -70,8 +73,8 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
 
           <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
-          <Line yAxisId="clump" type="monotone" dataKey="magnitudeTarget" name="target"
-            stroke="#4ade80" strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
+          {none && <Line yAxisId="clump" type="monotone" dataKey="noneMagnitude" name="non-refusal"
+            stroke={NONE_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />}
           {hard && (factorA != null || factorB != null) && (
             <Line yAxisId="clump" type="monotone" dataKey="hardPredicted" name="hard (predicted)"
               stroke={HARD_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />

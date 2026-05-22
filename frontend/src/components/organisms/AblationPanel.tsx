@@ -60,6 +60,7 @@ const DEFAULT_PARAMS: RecipeParams = { onset: 38, split: 50, factorA: 0.15, fact
 export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) => {
   const [hard, setHard]         = useState<ModeDivergence>()
   const [redirect, setRedirect] = useState<ModeDivergence>()
+  const [none, setNone]         = useState<ModeDivergence>()
   const [params, setParams]     = useState<RecipeParams>(DEFAULT_PARAMS)
   const [recipe, setRecipe]     = useState<SlimRecipe>()
   const [status, setStatus]     = useState<'idle' | 'loading' | 'building' | 'applied'>('loading')
@@ -83,6 +84,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         setModelId(foundModelId)
         setHard(modeMap.hard)
         setRedirect(modeMap.redirect)
+        setNone(modeMap.none)
         const reference = modeMap.hard ?? modeMap.redirect
         const initialParams = reference
           ? { ...DEFAULT_PARAMS, onset: reference.suggested_onset, split: reference.suggested_split ?? reference.suggested_divergence }
@@ -154,7 +156,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
       {(hard || redirect) && (
         <>
-          <DivergenceChart hard={hard} redirect={redirect}
+          <DivergenceChart hard={hard} redirect={redirect} none={none}
             onset={params.onset} split={params.split} lastLayer={lastLayer}
             factorA={params.factorA} factorB={params.factorB} />
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
