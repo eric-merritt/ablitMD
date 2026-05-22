@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
 import { DirectionCompareChart } from '../molecules/DirectionCompareChart'
 import { getDivergence, buildRecipe, bakeModel, compareDirections } from '../../api/ablation'
 import { inferenceStatus, inferenceLoad } from '../../api/inference'
-import type { ModeDivergence, SlimRecipe, DirectionCompareRow } from '../../types/ablation'
+import type { ModeDivergence, SlimRecipe, DirectionCompareRow, RecipeParams } from '../../types/ablation'
 
 type AblationMode = 'ablitmd' | 'classic'
 
@@ -45,7 +45,6 @@ const GatedButton = ({ disabled, tooltip, onClick, children }: {
 }
 
 const pickFirstModelEntry = (payload: Record<string, unknown>) => {
-  // payload = { computed_at, [model]: { [gen_mode]: { hard?, redirect? } } }
   for (const [key, value] of Object.entries(payload)) {
     if (key !== 'computed_at' && value && typeof value === 'object') {
       const genModes = value as Record<string, Record<string, ModeDivergence>>
@@ -56,14 +55,12 @@ const pickFirstModelEntry = (payload: Record<string, unknown>) => {
   return null
 }
 
+const DEFAULT_PARAMS: RecipeParams = { onset: 38, split: 50, factorA: 0.15, factorB: 0.15 }
+
 export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) => {
   const [hard, setHard]         = useState<ModeDivergence>()
   const [redirect, setRedirect] = useState<ModeDivergence>()
-  const [onset, setOnset]       = useState(38)
-  const [split, setSplit]       = useState(50)
-  const [factorA, setFactorA]   = useState(0.15)
-  const [factorB, setFactorB]   = useState(0.15)
-  const paramsRef = useRef({ onset: 38, split: 50, factorA: 0.15, factorB: 0.15 })
+  const [params, setParams]     = useState<RecipeParams>(DEFAULT_PARAMS)
   const [recipe, setRecipe]     = useState<SlimRecipe>()
   const [status, setStatus]     = useState<'idle' | 'loading' | 'building' | 'applied'>('loading')
   const [error, setError]       = useState<string>()
@@ -88,8 +85,11 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         setRedirect(modeMap.redirect)
         const reference = modeMap.hard ?? modeMap.redirect
         if (reference) {
-          setOnset(reference.suggested_onset)
-          setSplit(reference.suggested_split ?? reference.suggested_divergence)
+          setParams(prev => ({
+            ...prev,
+            onset: reference.suggested_onset,
+            split: reference.suggested_split ?? reference.suggested_divergence,
+          }))
         }
         setStatus('idle')
 
@@ -110,32 +110,16 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
       .catch(err => { setError(String(err.message)); setStatus('idle') })
   }, [runId, models])
 
-  paramsRef.current = { onset, split, factorA, factorB }
-
-  const rebuildRecipe = () => {
-    setStatus('building')
-    setError(undefined)
-    const { onset: o, split: s, factorA: a, factorB: b } = paramsRef.current
-    buildRecipe(runId, { onset: o, split: s, factorA: a, factorB: b })
-      .then(next => { setRecipe(next); setStatus('idle') })
-      .catch(err => { setError(String(err.message)); setStatus('idle') })
-  }
-
   useEffect(() => {
-    if (!recipe) return
+    if (!hard && !redirect) return
     const timer = setTimeout(() => {
       setStatus('building')
-      buildRecipe(runId, { onset, split, factorA, factorB })
+      buildRecipe(runId, params)
         .then(next => { setRecipe(next); setStatus('idle') })
         .catch(err => { setError(String(err.message)); setStatus('idle') })
     }, 400)
     return () => clearTimeout(timer)
-  }, [onset, split, factorA, factorB])
-
-  const runVerify = () => {
-    if (!recipe) return
-    onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)
-  }
+  }, [params, hard, redirect])
 
   useEffect(() => {
     if (!recipe || !modelId) return
@@ -157,7 +141,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
   const lastLayer = (hard ?? redirect)?.clumping.length
     ? ((hard ?? redirect)!.clumping.length - 1)
-    : split
+    : params.split
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -170,23 +154,17 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
       {(hard || redirect) && (
         <>
-          <DivergenceChart hard={hard} redirect={redirect} onset={onset} split={split}
-            lastLayer={lastLayer} factorA={factorA} factorB={factorB} />
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <LayerSplitControls onset={onset} split={split} lastLayer={lastLayer}
-              onChange={next => { setOnset(next.onset); setSplit(next.split) }} />
-            <button onClick={rebuildRecipe} disabled={status === 'building'}
-              style={{ padding: '6px 14px', cursor: 'pointer' }}>
-              {status === 'building' ? 'Building…' : 'Build recipe'}
-            </button>
-          </div>
+          <DivergenceChart hard={hard} redirect={redirect}
+            onset={params.onset} split={params.split} lastLayer={lastLayer}
+            factorA={params.factorA} factorB={params.factorB} />
+          <LayerSplitControls params={params} lastLayer={lastLayer} onChange={setParams} />
+          {status === 'building' && <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Building recipe…</div>}
         </>
       )}
 
       {recipe && (
         <>
-          <RecipePanel recipe={recipe} onset={onset} split={split} factorA={factorA} factorB={factorB}
-            onFactorChange={next => { setFactorA(next.factorA); setFactorB(next.factorB) }} />
+          <RecipePanel recipe={recipe} onset={params.onset} split={params.split} />
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode</span>
@@ -235,7 +213,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           <div style={{ display: 'flex', gap: '12px' }}>
             <GatedButton disabled={modelLoad !== 'ready' || status === 'building'}
               tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={runVerify}>
+              onClick={() => recipe && onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)}>
               Verify
             </GatedButton>
             <GatedButton disabled={baking || modelLoad !== 'ready' || status === 'building'}
