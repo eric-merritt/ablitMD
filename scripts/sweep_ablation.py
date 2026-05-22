@@ -187,6 +187,13 @@ def main():
   step_data = run["sequence"][0]
   model_id, gen_mode = step_data["model"], step_data["mode"]
 
+  with httpx.Client(base_url=INFERENCE_URL, timeout=300.0) as client:
+    status = client.get("/status").json()
+    if status.get("loaded_model") != model_id:
+      print(f"Loading model {model_id}...")
+      client.post("/load", json={"model_id": model_id, "api_model_id": model_id})
+      print("Model loaded.")
+
   if args.categories:
     categories = [c.strip() for c in args.categories.split(",")]
   else:
