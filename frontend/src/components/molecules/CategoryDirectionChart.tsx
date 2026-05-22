@@ -91,7 +91,10 @@ export const CategoryDirectionChart = ({
       const point: Record<string, number | undefined> = { layer: L }
       for (const m of ['hard', 'redirect', 'disclaimer', 'none'] as RefusalMode[]) {
         const keys = modeGroups[m] ?? []
-        if (keys.length) point[m] = meanOf(keys.map(k => similarity_per_prompt[k]?.[L]))
+        if (keys.length) {
+          const val = meanOf(keys.map(k => similarity_per_prompt[k]?.[L]))
+          point[m] = (m === 'none' || m === 'disclaimer') && val !== undefined ? -val : val
+        }
       }
       return point
     })
