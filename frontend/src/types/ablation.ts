@@ -4,6 +4,7 @@ export interface ModeDivergence {
   category_ids: string[]
   suggested_onset: number
   suggested_divergence: number
+  suggested_split: number
 }
 
 // { [model_id]: { [gen_mode]: { hard?: ModeDivergence; redirect?: ModeDivergence } } }

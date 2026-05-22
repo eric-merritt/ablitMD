@@ -26,6 +26,15 @@ def detect_onset(magnitude: np.ndarray, frac: float = 0.25) -> int:
   return int(above[0]) if len(above) else 0
 
 
+def detect_peak_window_center(magnitude: np.ndarray, window: int = 10) -> int:
+  """Center layer of the sliding window of `window` layers with highest summed magnitude."""
+  if len(magnitude) < window:
+    return len(magnitude) // 2
+  sums = np.convolve(magnitude, np.ones(window), mode='valid')
+  best_start = int(np.argmax(sums))
+  return best_start + window // 2
+
+
 def detect_divergence(clumping: np.ndarray, onset: int, retain: float = 0.90) -> int:
   """First layer >= onset where clumping drops below retain * (post-onset peak).
   Falls back to the last layer index if the curve never drops that far."""
@@ -61,11 +70,14 @@ def analyze_run(run: dict, model_id: str, gen_mode: str, state_dir) -> dict:
     magnitude = mean_magnitude_curve(magnitudes)
     onset = detect_onset(magnitude)
     divergence = detect_divergence(clumping, onset)
+    per_cat_splits = [detect_peak_window_center(m) for m in magnitudes]
+    split = int(round(sum(per_cat_splits) / len(per_cat_splits)))
     out[refusal_mode] = {
       "clumping": clumping.tolist(),
       "magnitude": magnitude.tolist(),
       "category_ids": category_ids,
       "suggested_onset": onset,
       "suggested_divergence": divergence,
+      "suggested_split": split,
     }
   return out

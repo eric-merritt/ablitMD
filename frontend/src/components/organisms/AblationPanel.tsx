@@ -88,7 +88,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         const reference = modeMap.hard ?? modeMap.redirect
         if (reference) {
           setOnset(reference.suggested_onset)
-          setSplit(reference.suggested_divergence)
+          setSplit(reference.suggested_split ?? reference.suggested_divergence)
         }
         setStatus('idle')
 
