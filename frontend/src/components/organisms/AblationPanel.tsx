@@ -157,7 +157,23 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           <DivergenceChart hard={hard} redirect={redirect}
             onset={params.onset} split={params.split} lastLayer={lastLayer}
             factorA={params.factorA} factorB={params.factorB} />
-          <LayerSplitControls params={params} lastLayer={lastLayer} onChange={setParams} />
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <LayerSplitControls params={params} lastLayer={lastLayer} onChange={setParams} />
+            {recipe && (
+              <>
+                <GatedButton disabled={modelLoad !== 'ready' || status === 'building'}
+                  tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+                  onClick={() => onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)}>
+                  Verify
+                </GatedButton>
+                <GatedButton disabled={baking || modelLoad !== 'ready' || status === 'building'}
+                  tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+                  onClick={runBake}>
+                  {baking ? 'Baking…' : 'Bake & save model'}
+                </GatedButton>
+              </>
+            )}
+          </div>
           {status === 'building' && <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Building recipe…</div>}
         </>
       )}
@@ -210,18 +226,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
               Model loaded: <code>{modelId}</code>
             </div>
           )}
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <GatedButton disabled={modelLoad !== 'ready' || status === 'building'}
-              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={() => recipe && onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)}>
-              Verify
-            </GatedButton>
-            <GatedButton disabled={baking || modelLoad !== 'ready' || status === 'building'}
-              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={runBake}>
-              {baking ? 'Baking…' : 'Bake & save model'}
-            </GatedButton>
-          </div>
           {bakedPath && (
             <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
               Saved abliterated model to <code>{bakedPath}</code>
