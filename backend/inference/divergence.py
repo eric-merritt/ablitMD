@@ -17,7 +17,7 @@ def mean_magnitude_curve(magnitudes: list[np.ndarray]) -> np.ndarray:
   return np.stack(magnitudes, axis=0).mean(axis=0).astype(np.float32)
 
 
-def detect_onset(magnitude: np.ndarray, frac: float = 0.25) -> int:
+def detect_onset(magnitude: np.ndarray, frac: float = 0.10) -> int:
   """First layer where mean direction magnitude reaches frac * peak."""
   peak = float(magnitude.max())
   if peak <= 0:
