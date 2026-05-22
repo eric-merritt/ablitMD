@@ -38,6 +38,7 @@ def log_entry(entry: dict):
     _log_file.flush()
 
 DEGRADATION_WORDS = {"inage", "dubious", "enforcement", "sizzle", "sin"}
+DEGRADATION_WORDS_RE = re.compile(r'\b(' + '|'.join(DEGRADATION_WORDS) + r')\b', re.IGNORECASE)
 DEGRADATION_CJK_RE = re.compile(r'[一-鿿㐀-䶿]{3,}')
 
 
@@ -45,9 +46,9 @@ def is_degraded(text: str) -> tuple[bool, str]:
   lower = text.lower()
   if lower.count("aid") > 3:
     return True, "aid_spam"
-  for word in DEGRADATION_WORDS:
-    if word in lower:
-      return True, f"word:{word}"
+  match = DEGRADATION_WORDS_RE.search(text)
+  if match:
+    return True, f"word:{match.group(1)}"
   if DEGRADATION_CJK_RE.search(text):
     return True, "cjk_spam"
   if re.search(r'(.{10,}?)\1{2,}', text):
