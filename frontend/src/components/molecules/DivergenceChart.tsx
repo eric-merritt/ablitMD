@@ -25,20 +25,17 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
     const fB = factorB ?? 0
     const magMax = Math.max(...(hard?.magnitude ?? [1]), 1)
     return Array.from({ length: nLayers }, (_, layer) => {
-      const mag = hard?.magnitude[layer]
-      let postAblation: number | undefined
-      if (mag != null) {
-        const factor = layer >= onset && layer <= split ? fA
-          : layer > split && layer <= last ? fB
-          : 0
-        postAblation = (mag * Math.abs(1 - factor)) / magMax
-      }
+      const factor = layer >= onset && layer <= split ? fA
+        : layer > split && layer <= last ? fB
+        : 0
+      const scale = (1 - factor) ** 2
       return {
         layer,
-        hardClump:     hard?.clumping[layer],
-        redirectClump: redirect?.clumping[layer],
-        magnitude:     mag != null ? mag / magMax : undefined,
-        postAblation,
+        hardClump:        hard?.clumping[layer],
+        redirectClump:    redirect?.clumping[layer],
+        magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
+        hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
+        redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
     })
   }, [nLayers, hard, redirect, onset, split, lastLayer, factorA, factorB])
@@ -72,10 +69,14 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
 
           <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
-          { (factorA != null || factorB != null) && (
-            <Line yAxisId="clump" type="monotone" dataKey="postAblation" name="post-ablation"
-              stroke="#60a5fa" strokeWidth={1.5} strokeDasharray="3 2" dot={false} connectNulls />
-          ) }
+          {hard && (factorA != null || factorB != null) && (
+            <Line yAxisId="clump" type="monotone" dataKey="hardPredicted" name="hard (predicted)"
+              stroke={HARD_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />
+          )}
+          {redirect && (factorA != null || factorB != null) && (
+            <Line yAxisId="clump" type="monotone" dataKey="redirectPredicted" name="redirect (predicted)"
+              stroke={REDIRECT_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />
+          )}
           {hard && <Line yAxisId="clump" type="monotone" dataKey="hardClump" name="hard"
             stroke={HARD_COLOR} strokeWidth={1.8} dot={false} connectNulls />}
           {redirect && <Line yAxisId="clump" type="monotone" dataKey="redirectClump" name="redirect"
