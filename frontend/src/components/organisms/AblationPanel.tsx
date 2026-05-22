@@ -84,14 +84,14 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         setHard(modeMap.hard)
         setRedirect(modeMap.redirect)
         const reference = modeMap.hard ?? modeMap.redirect
-        if (reference) {
-          setParams(prev => ({
-            ...prev,
-            onset: reference.suggested_onset,
-            split: reference.suggested_split ?? reference.suggested_divergence,
-          }))
-        }
-        setStatus('idle')
+        const initialParams = reference
+          ? { ...DEFAULT_PARAMS, onset: reference.suggested_onset, split: reference.suggested_split ?? reference.suggested_divergence }
+          : DEFAULT_PARAMS
+        setParams(initialParams)
+        setStatus('building')
+        buildRecipe(runId, initialParams)
+          .then(r => { setRecipe(r); setStatus('idle') })
+          .catch(err => { setError(String(err.message)); setStatus('idle') })
 
         const modelInfo = models.find(model => model.modelId === foundModelId)
         if (!modelInfo) { setModelLoad('error'); setError(`Model ${foundModelId} not in registry`); return }
@@ -111,7 +111,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   }, [runId, models])
 
   useEffect(() => {
-    if (!hard && !redirect) return
+    if (!recipe) return
     const timer = setTimeout(() => {
       setStatus('building')
       buildRecipe(runId, params)
@@ -119,7 +119,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         .catch(err => { setError(String(err.message)); setStatus('idle') })
     }, 400)
     return () => clearTimeout(timer)
-  }, [params, hard, redirect])
+  }, [params])
 
   useEffect(() => {
     if (!recipe || !modelId) return
