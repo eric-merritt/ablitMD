@@ -26,7 +26,6 @@ export const DivergenceChart = ({ hard, redirect, none, onset, split, lastLayer,
     const fA = factorA ?? 0
     const fB = factorB ?? 0
     const magMax = Math.max(...(hard?.magnitude ?? [1]), 1)
-    const noneMagMax = Math.max(...(none?.magnitude ?? [1]), 1)
     return Array.from({ length: nLayers }, (_, layer) => {
       const factor = layer >= onset && layer <= split ? fA
         : layer > split && layer <= last ? fB
@@ -34,11 +33,11 @@ export const DivergenceChart = ({ hard, redirect, none, onset, split, lastLayer,
       const scale = (1 - factor) ** 2
       return {
         layer,
-        hardClump:        hard?.clumping[layer],
-        redirectClump:    redirect?.clumping[layer],
-        magnitude:        hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
-        noneMagnitude:    none?.magnitude[layer] != null ? none!.magnitude[layer] / noneMagMax : undefined,
-        hardPredicted:    hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
+        hardClump:         hard?.clumping[layer],
+        redirectClump:     redirect?.clumping[layer],
+        noneClumping:      none?.clumping[layer],
+        magnitude:         hard?.magnitude[layer] != null ? hard!.magnitude[layer] / magMax : undefined,
+        hardPredicted:     hard?.clumping[layer]     != null ? scale * hard!.clumping[layer]     : undefined,
         redirectPredicted: redirect?.clumping[layer] != null ? scale * redirect!.clumping[layer] : undefined,
       }
     })
@@ -73,8 +72,8 @@ export const DivergenceChart = ({ hard, redirect, none, onset, split, lastLayer,
 
           <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
-          {none && <Line yAxisId="clump" type="monotone" dataKey="noneMagnitude" name="non-refusal"
-            stroke={NONE_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />}
+          {none && <Line yAxisId="clump" type="monotone" dataKey="noneClumping" name="non-refusal"
+            stroke={NONE_COLOR} strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />}
           {hard && (factorA != null || factorB != null) && (
             <Line yAxisId="clump" type="monotone" dataKey="hardPredicted" name="hard (predicted)"
               stroke={HARD_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />
