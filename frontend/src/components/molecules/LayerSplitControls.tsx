@@ -56,9 +56,9 @@ const FactorField = ({ label, value, onCommit }: {
 
 export const LayerSplitControls = ({ params, lastLayer, onChange }: LayerSplitControlsProps) => (
   <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-    <NumberField label="onset layer" value={params.onset} min={0} max={params.split}
+    <NumberField label="onset layer" value={params.onset} min={0} max={lastLayer}
       onCommit={next => onChange({ ...params, onset: next })} />
-    <NumberField label="split layer" value={params.split} min={params.onset} max={lastLayer}
+    <NumberField label="split layer" value={params.split} min={0} max={lastLayer}
       onCommit={next => onChange({ ...params, split: next })} />
     <FactorField label="factor A" value={params.factorA}
       onCommit={next => onChange({ ...params, factorA: next })} />
