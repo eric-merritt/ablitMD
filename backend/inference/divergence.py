@@ -55,7 +55,7 @@ def analyze_run(run: dict, model_id: str, gen_mode: str, state_dir) -> dict:
   per_category = rebuild_directions(run, model_id, gen_mode, state_dir)
   out: dict[str, dict] = {}
 
-  for refusal_mode in ("hard", "redirect"):
+  for refusal_mode in ("hard", "redirect", "none"):
     directions, magnitudes, category_ids = [], [], []
     for category_id, cat_result in per_category.items():
       entry = cat_result["by_mode"].get(refusal_mode)

@@ -7,7 +7,7 @@ export interface ModeDivergence {
   suggested_split: number
 }
 
-// { [model_id]: { [gen_mode]: { hard?: ModeDivergence; redirect?: ModeDivergence } } }
+// { [model_id]: { [gen_mode]: { hard?: ModeDivergence; redirect?: ModeDivergence; none?: ModeDivergence } } }
 export interface DivergencePayload {
   computed_at: string
   [modelId: string]: string | Record<string, Record<string, ModeDivergence>>
