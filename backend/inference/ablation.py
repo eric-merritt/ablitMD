@@ -28,6 +28,12 @@ def orthogonalize_weight(weight: torch.Tensor, direction: torch.Tensor, factor: 
   return weight - factor * torch.outer(direction, direction @ weight)
 
 
+def orthogonalize_input(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> torch.Tensor:
+  """Remove a direction from a weight matrix's input space.
+  weight: (dim_out, dim_in) where dim_in == len(direction). Use for lm_head."""
+  return weight - factor * torch.outer(weight @ direction, direction)
+
+
 def _decoder_layers(model):
   """Resolve the list of decoder layers, handling multimodal wrappers where
   the language tower lives under model.language_model rather than model directly."""
@@ -78,6 +84,21 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
           delta = float((proj.weight.data.to(torch.float32) - original.to(torch.float32)).norm())
           print(f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
                 f"proj={type(proj).__name__} shape={tuple(proj.weight.shape)}", flush=True)
+    lm_head = getattr(model, "lm_head", None)
+    if lm_head is not None and hasattr(lm_head, "weight"):
+      all_directions = [
+        (torch.tensor(v, device=device, dtype=torch.float32), float(f))
+        for layer_dirs in (directions_for_layer(recipe, hidden_index=i + 1) for i in range(len(layers)))
+        for v, f in layer_dirs
+      ]
+      if all_directions:
+        if id(lm_head) not in snapshots:
+          snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
+        W = lm_head.weight.data.to(torch.float32)
+        for direction, factor in all_directions:
+          W = orthogonalize_input(W, direction, factor)
+        lm_head.weight.copy_(W.to(dtype))
+
     torch.cuda.synchronize(device)
 
   print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
@@ -167,6 +188,16 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
         continue
       for proj in _projection_modules(layers[decoder_idx]):
         _snap_and_edit(proj, direction_t)
+
+  lm_head = getattr(model, "lm_head", None)
+  if lm_head is not None and hasattr(lm_head, "weight"):
+    if id(lm_head) not in snapshots:
+      snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
+    W = lm_head.weight.data.to(torch.float32)
+    for direction in directions.values():
+      direction_t = torch.tensor(direction, device=device, dtype=torch.float32)
+      W = orthogonalize_input(W, direction_t, factor)
+    lm_head.weight.copy_(W.to(dtype))
 
   return snapshots
 

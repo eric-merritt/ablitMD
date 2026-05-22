@@ -33,10 +33,10 @@ def _tokenize_input(prompt_text: str, enable_thinking: bool):
       conversation=messages,
       add_generation_prompt=True,
       return_tensors="pt",
+      return_dict=True,
       **extra_kwargs,
     )
-    ids = result["input_ids"] if hasattr(result, "__getitem__") and not isinstance(result, torch.Tensor) else result
-    return ids.to(DEVICE)
+    return result["input_ids"].to(DEVICE), result["attention_mask"].to(DEVICE)
 
   try:
     return _apply({"enable_thinking": enable_thinking})
@@ -44,10 +44,10 @@ def _tokenize_input(prompt_text: str, enable_thinking: bool):
     return _apply({})
 
 
-def _capture_and_save_hidden_states(input_ids, hidden_states_key: str, runs_dir: Path, run_id: str) -> None:
+def _capture_and_save_hidden_states(input_ids, hidden_states_key: str, runs_dir: Path, run_id: str, attention_mask=None) -> None:
   model = get_model()
   with torch.inference_mode():
-    output = model(input_ids, output_hidden_states=True, use_cache=False)
+    output = model(input_ids, attention_mask=attention_mask, output_hidden_states=True, use_cache=False)
   n_layers = model.config.num_hidden_layers
   hidden_states = np.array([
     output.hidden_states[layer_idx][0, -1, :].cpu().float().numpy()
@@ -84,8 +84,8 @@ def stream_prompt(
   tokenizer = get_tokenizer()
   enable_thinking = mode == 'thinking'
 
-  input_ids = _tokenize_input(prompt_text, enable_thinking)
-  _capture_and_save_hidden_states(input_ids, hidden_states_key, runs_dir, run_id)
+  input_ids, attention_mask = _tokenize_input(prompt_text, enable_thinking)
+  _capture_and_save_hidden_states(input_ids, hidden_states_key, runs_dir, run_id, attention_mask)
   yield {"type": "ready", "hidden_states_key": hidden_states_key}
 
   abort_event = _claim_abort_event()
@@ -95,6 +95,7 @@ def stream_prompt(
     with torch.inference_mode():
       model.generate(
         input_ids,
+        attention_mask=attention_mask,
         max_new_tokens=512,
         do_sample=False,
         streamer=streamer,
