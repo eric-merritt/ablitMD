@@ -37,15 +37,13 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         layer,
         hardClump:     hard?.clumping[layer],
         redirectClump: redirect?.clumping[layer],
-        magnitude:     mag,
+        magnitude:     mag != null ? mag / magMax : undefined,
         postAblation,
       }
     })
   }, [nLayers, hard, redirect, onset, split, lastLayer, factorA, factorB])
 
   if (nLayers === 0) return null
-
-  const magMax = Math.max(...(hard?.magnitude ?? [0]), 1)
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px' }}>
@@ -60,7 +58,6 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
         <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: -20 }}>
           <XAxis dataKey="layer" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
           <YAxis yAxisId="clump" domain={[0, 1]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
-          <YAxis yAxisId="mag" orientation="right" domain={[0, magMax]} tick={{ fontSize: 9, fill: 'var(--text-muted)' }} />
 
           <ReferenceLine x={onset} yAxisId="clump" stroke="var(--accent)" strokeDasharray="3 2"
             label={{ value: 'onset', fontSize: 9, fill: 'var(--accent)', position: 'top' }} />
@@ -73,7 +70,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
             formatter={(val, name) => [val != null ? (+val).toFixed(3) : '—', String(name)]}
           />
 
-          <Line yAxisId="mag" type="monotone" dataKey="magnitude" name="magnitude"
+          <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
           { (factorA != null || factorB != null) && (
             <Line yAxisId="clump" type="monotone" dataKey="postAblation" name="post-ablation"
