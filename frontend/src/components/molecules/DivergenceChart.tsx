@@ -20,7 +20,7 @@ export const DivergenceChart = ({ hard, redirect, onset, split, lastLayer, facto
   const nLayers = Math.max(hard?.clumping.length ?? 0, redirect?.clumping.length ?? 0)
 
   const chartData = useMemo(() => {
-    const last = lastLayer ?? nLayers - 1
+    const last = nLayers - 1
     const fA = factorA ?? 0
     const fB = factorB ?? 0
     const magMax = Math.max(...(hard?.magnitude ?? [1]), 1)
