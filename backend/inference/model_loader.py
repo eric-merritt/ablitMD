@@ -38,6 +38,7 @@ def load_model(model_id: str, api_model_id: str) -> None:
         torch_dtype=torch.bfloat16,
         device_map=DEVICE,
         trust_remote_code=True,
+        attn_implementation="flash_attention_2",
       )
       _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
       if _tokenizer.pad_token_id is None:
