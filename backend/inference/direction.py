@@ -77,6 +77,23 @@ def compute_run_directions(
   if not by_mode:
     return None
 
+  none_mean = none_stack.mean(axis=0)
+  none_norms = np.linalg.norm(none_mean, axis=1, keepdims=True)
+  safe_none_norms = np.where(none_norms < 1e-8, 1.0, none_norms)
+  none_direction = np.where(none_norms < 1e-8, np.zeros_like(none_mean), none_mean / safe_none_norms).astype(np.float32)
+  by_mode['none'] = {
+    'direction_per_layer': none_direction.tolist(),
+    'magnitude_per_layer': none_norms.squeeze(axis=1).astype(np.float32).tolist(),
+    'sample_count': len(none_keys),
+    'similarity_per_prompt': {
+      c['hidden_states_key']: compute_similarity(
+        hidden_states[c['hidden_states_key']], none_direction
+      ).tolist()
+      for c in classifications
+      if c['hidden_states_key'] in hidden_states
+    },
+  }
+
   alignment: dict[str, list] = {}
   computed = list(by_mode.keys())
   for i, m1 in enumerate(computed):
