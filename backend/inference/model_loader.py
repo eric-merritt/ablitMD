@@ -40,6 +40,8 @@ def load_model(model_id: str, api_model_id: str) -> None:
         trust_remote_code=True,
       )
       _tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+      if _tokenizer.pad_token_id is None:
+        _tokenizer.pad_token_id = _tokenizer.eos_token_id
       _loaded_model_id = model_id
       print(f"Model loaded: {model_id}")
     except Exception:

@@ -65,8 +65,8 @@ export const DirectionCompareChart = ({ rows }: DirectionCompareChartProps) => {
         gap: '8px', padding: '0 0 6px 0',
       }}>
         <span />
-        <span style={{ fontSize: '10px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ablitMD magnitude</span>
-        <span style={{ fontSize: '10px', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>classic magnitude</span>
+        <span style={{ fontSize: '10px', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>ablitMD · L2 norm</span>
+        <span style={{ fontSize: '10px', color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>classic · L2 norm</span>
         <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>cosine</span>
       </div>
       <div style={{ maxHeight: '320px', overflow: 'auto' }}>
