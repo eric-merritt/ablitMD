@@ -14,6 +14,18 @@ THINKING_STRIP_RE = re.compile(r'<think>.*?</think>', re.DOTALL)
 
 _active_abort: threading.Event | None = None
 _abort_lock = threading.Lock()
+_active_worker: threading.Thread | None = None
+_worker_lock = threading.Lock()
+
+
+def abort_and_join_generation(timeout: float = 5.0) -> None:
+  with _abort_lock:
+    if _active_abort is not None:
+      _active_abort.set()
+  with _worker_lock:
+    worker = _active_worker
+  if worker is not None and worker.is_alive():
+    worker.join(timeout=timeout)
 
 
 class _EventStop(StoppingCriteria):
@@ -104,7 +116,10 @@ def stream_prompt(
         stopping_criteria=StoppingCriteriaList([_EventStop(abort_event)]),
       )
 
+  global _active_worker
   worker = threading.Thread(target=_run_generate, daemon=True)
+  with _worker_lock:
+    _active_worker = worker
   worker.start()
 
   collected = ""
@@ -116,6 +131,9 @@ def stream_prompt(
     yield {"type": "error", "error": str(err)}
   finally:
     worker.join(timeout=5)
+    with _worker_lock:
+      if _active_worker is worker:
+        _active_worker = None
     torch.cuda.empty_cache()
     gc.collect()
 
