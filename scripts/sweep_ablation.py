@@ -98,20 +98,18 @@ def classify_response(prompt: str, response: str) -> str:
 
 
 def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
-                     layer_start: int, layer_end: int, factor: float) -> dict:
-  """v2 mode: single factor across all layers (abliterate_v2.py style)."""
-  build_recipe(run_id, layer_start, layer_end, factor, factor)
-
+                     factor: float) -> dict:
+  """v2 mode: single factor classic ablation (abliterate_v2.py style)."""
   with httpx.Client(base_url=INFERENCE_URL, timeout=180.0) as client:
     body = {
       "run_id": run_id,
       "model_id": model_id,
       "gen_mode": gen_mode,
+      "factor": factor,
       "categories": [category],
       "samples_per_category": 1,
-      "fast": True,
     }
-    resp = client.post("/ablate/verify", json=body)
+    resp = client.post("/ablate/verify/classic", json=body)
     if resp.status_code != 200:
       log_entry({"category": category, "factor": factor, "status": "error", "error": f"http {resp.status_code}"})
       return {"status": "error", "response": ""}
@@ -142,8 +140,6 @@ def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
         log_entry({
           "category": category,
           "factor": factor,
-          "layer_start": layer_start,
-          "layer_end": layer_end,
           "status": status,
           "prompt": prompt_text,
           "response_before": before_text,
@@ -207,16 +203,15 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
 
 
 def find_optimal_factor_v2(run_id: str, model_id: str, gen_mode: str, category: str,
-                           layer_start: int, layer_end: int,
                            min_factor: float, max_factor: float, step: float) -> dict:
-  """v2 mode: sweep single factor (abliterate_v2.py style)."""
+  """v2 mode: sweep single factor classic ablation (abliterate_v2.py style)."""
   print(f"\n{'='*60}")
-  print(f"Category: {category} (v2 mode: layers {layer_start}-{layer_end})")
+  print(f"Category: {category} (v2 classic mode)")
   print(f"{'='*60}")
 
   factor = min_factor
   while factor <= max_factor + 1e-6:
-    result = test_category_v2(run_id, model_id, gen_mode, category, layer_start, layer_end, factor)
+    result = test_category_v2(run_id, model_id, gen_mode, category, factor)
     status = result["status"]
     icon = "✓" if status == "complied" else "✗" if "degraded" in status else "○"
     print(f"  {icon} factor={factor:.2f} → {status}")
@@ -316,19 +311,17 @@ def main():
   results = {}
 
   if args.v2:
-    # v2 mode: auto-detect layer range, single factor
+    # v2 mode: classic single-factor ablation (abliterate_v2.py style)
     defaults = get_qwen35_defaults(model_id)
-    layer_start = defaults["layer_start"]
-    layer_end = defaults["layer_end"] or 64  # fallback
     factor_min = defaults["factor_min"]
     factor_max = defaults["factor_max"]
     step = defaults["step"]
-    print(f"v2 mode: layers {layer_start}-{layer_end}, factor [{factor_min}, {factor_max}] step={step}")
+    print(f"v2 classic mode: factor [{factor_min}, {factor_max}] step={step}")
 
     for category in sorted(categories):
       optimal = find_optimal_factor_v2(
         args.run_id, model_id, gen_mode, category,
-        layer_start, layer_end, factor_min, factor_max, step
+        factor_min, factor_max, step
       )
       results[category] = optimal
   else:
