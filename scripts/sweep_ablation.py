@@ -67,14 +67,14 @@ def sample_prompt(run: dict, category: str) -> dict:
 
 
 def get_qwen35_defaults(model_name: str) -> dict:
-  """Return optimized defaults for Qwen3.5 variants (from abliterate_v2.py)."""
+  """Return optimized defaults for Qwen3.5 variants."""
   name_lower = model_name.lower()
   if "9b" in name_lower or "8b" in name_lower or "7b" in name_lower:
-    return {"layer_start": 2, "layer_end": 24, "factor_min": 0.4, "factor_max": 0.8, "step": 0.1}
+    return {"layer_start": 2, "layer_end": 24, "factor_min": 0.4, "factor_max": 2.5, "step": 0.1}
   elif "27b" in name_lower or "32b" in name_lower or "30b" in name_lower:
-    return {"layer_start": 8, "layer_end": 42, "factor_min": 0.5, "factor_max": 0.9, "step": 0.1}
+    return {"layer_start": 8, "layer_end": 42, "factor_min": 0.5, "factor_max": 2.5, "step": 0.1}
   else:
-    return {"layer_start": 2, "layer_end": None, "factor_min": 0.5, "factor_max": 1.0, "step": 0.1}
+    return {"layer_start": 2, "layer_end": None, "factor_min": 0.5, "factor_max": 2.5, "step": 0.1}
 
 
 def build_recipe(run_id: str, onset: int, split: int, factor_a: float, factor_b: float):
