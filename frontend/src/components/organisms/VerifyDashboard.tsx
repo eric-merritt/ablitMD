@@ -174,11 +174,11 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
               </span>
             </div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button onClick={ runBake } disabled={ !finished || baking }
+              <button onClick={ runBake } disabled={ baking }
                 style={{
-                  padding: '6px 14px', fontSize: '12px', cursor: !finished || baking ? 'not-allowed' : 'pointer',
+                  padding: '6px 14px', fontSize: '12px', cursor: baking ? 'not-allowed' : 'pointer',
                   background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)',
-                  fontWeight: 600, opacity: !finished || baking ? 0.5 : 1,
+                  fontWeight: 600, opacity: baking ? 0.5 : 1,
                 }}>
                 {baking ? 'Baking…' : 'Bake & Save'}
               </button>
