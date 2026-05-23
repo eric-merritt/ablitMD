@@ -113,6 +113,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
 
   const runBake = async () => {
     setBaking(true)
+    setPrompts([])
     try {
       const result = await bakeModel(
         runId,
