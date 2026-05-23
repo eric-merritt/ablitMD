@@ -97,22 +97,24 @@ def classify_response(prompt: str, response: str) -> str:
   return "unknown"
 
 
-def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
-                     factor: float) -> dict:
-  """v2 mode: single factor classic ablation (abliterate_v2.py style)."""
-  with httpx.Client(base_url=INFERENCE_URL, timeout=180.0) as client:
+def test_factor_v2(run_id: str, model_id: str, gen_mode: str, factor: float,
+                   samples_per_category: int = 2) -> dict:
+  """v2 mode: test single factor across ALL categories (classic ablation)."""
+  with httpx.Client(base_url=INFERENCE_URL, timeout=300.0) as client:
     body = {
       "run_id": run_id,
       "model_id": model_id,
       "gen_mode": gen_mode,
       "factor": factor,
-      "categories": [category],
-      "samples_per_category": 1,
+      "samples_per_category": samples_per_category,
     }
     resp = client.post("/ablate/verify/classic", json=body)
     if resp.status_code != 200:
-      log_entry({"category": category, "factor": factor, "status": "error", "error": f"http {resp.status_code}"})
-      return {"status": "error", "response": ""}
+      log_entry({"factor": factor, "status": "error", "error": f"http {resp.status_code}"})
+      return {"complied": 0, "refused": 0, "degraded": 0, "total": 0}
+
+    complied, refused, degraded, redirect = 0, 0, 0, 0
+    responses = []
 
     for line in resp.text.strip().split("\n"):
       if not line.strip():
@@ -120,35 +122,37 @@ def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
       event = json.loads(line)
       if event.get("type") == "prompt":
         prompt_text = event.get("prompt_text", "")
-        before_text = event.get("response_before", "")
+        category = event.get("category", "")
         after_text = event.get("response_after", "")
-        degraded, reason = is_degraded(after_text)
+        is_deg, reason = is_degraded(after_text)
 
-        if degraded:
+        if is_deg:
           status = f"degraded:{reason}"
+          degraded += 1
         else:
           classification = classify_response(prompt_text, after_text)
           if classification == "non_refusal":
             status = "complied"
+            complied += 1
           elif classification == "redirect_refusal":
             status = "redirect"
-          elif classification == "hard_refusal":
-            status = "refused"
+            redirect += 1
           else:
-            status = "unknown"
+            status = "refused"
+            refused += 1
 
         log_entry({
-          "category": category,
           "factor": factor,
+          "category": category,
           "status": status,
           "prompt": prompt_text,
-          "response_before": before_text,
           "response_after": after_text,
         })
+        responses.append({"category": category, "status": status, "response": after_text[:100]})
 
-        return {"status": status, "response": after_text[:200]}
-
-  return {"status": "error", "response": ""}
+    total = complied + refused + degraded + redirect
+    return {"complied": complied, "refused": refused, "degraded": degraded, "redirect": redirect,
+            "total": total, "responses": responses}
 
 
 def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
@@ -202,32 +206,48 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
   return {"status": "error", "response": ""}
 
 
-def find_optimal_factor_v2(run_id: str, model_id: str, gen_mode: str, category: str,
-                           min_factor: float, max_factor: float, step: float) -> dict:
-  """v2 mode: sweep single factor classic ablation (abliterate_v2.py style)."""
+def find_optimal_factor_v2(run_id: str, model_id: str, gen_mode: str,
+                           min_factor: float, max_factor: float, step: float,
+                           samples_per_category: int = 2) -> dict:
+  """v2 mode: sweep single factor across ALL categories (classic ablation)."""
   print(f"\n{'='*60}")
-  print(f"Category: {category} (v2 classic mode)")
+  print(f"Classic ablation sweep: factor [{min_factor}, {max_factor}] step={step}")
   print(f"{'='*60}")
 
+  best = None
   factor = min_factor
+
   while factor <= max_factor + 1e-6:
-    result = test_category_v2(run_id, model_id, gen_mode, category, factor)
-    status = result["status"]
-    icon = "✓" if status == "complied" else "✗" if "degraded" in status else "○"
-    print(f"  {icon} factor={factor:.2f} → {status}")
+    result = test_factor_v2(run_id, model_id, gen_mode, factor, samples_per_category)
+    total = result["total"]
+    complied = result["complied"]
+    degraded = result["degraded"]
+    refused = result["refused"]
+    redirect = result["redirect"]
 
-    if status == "complied":
-      print(f"    Found compliance!")
-      return {"factor": factor, "response": result["response"]}
+    rate = complied / total if total > 0 else 0
+    icon = "✓" if degraded == 0 and complied > refused else "✗" if degraded > 0 else "○"
+    print(f"  {icon} factor={factor:.2f} → {complied}/{total} complied, {refused} refused, {redirect} redirect, {degraded} degraded")
 
-    if "degraded" in status:
+    if degraded > 0:
       print(f"    Degradation detected, stopping.")
       break
 
+    if complied > 0 and (best is None or complied > best["complied"]):
+      best = {"factor": factor, "complied": complied, "total": total, "rate": rate}
+
+    if complied == total and total > 0:
+      print(f"    Full compliance!")
+      return best
+
     factor = round(factor + step, 10)
 
-  print(f"  No compliant factor found (max tested: {max_factor})")
-  return {"factor": None, "response": ""}
+  if best:
+    print(f"  Best factor: {best['factor']:.2f} ({best['complied']}/{best['total']} = {best['rate']:.0%})")
+    return best
+
+  print(f"  No compliant factor found")
+  return {"factor": None}
 
 
 def find_optimal_factors(run_id: str, model_id: str, gen_mode: str, category: str,
@@ -306,24 +326,23 @@ def main():
   else:
     categories = get_categories(run)
 
-  print(f"Testing {len(categories)} categories")
+  print(f"Categories in run: {len(categories)}")
 
   results = {}
 
   if args.v2:
-    # v2 mode: classic single-factor ablation (abliterate_v2.py style)
+    # v2 mode: classic single-factor ablation across ALL prompts
     defaults = get_qwen35_defaults(model_id)
     factor_min = defaults["factor_min"]
     factor_max = defaults["factor_max"]
     step = defaults["step"]
-    print(f"v2 classic mode: factor [{factor_min}, {factor_max}] step={step}")
 
-    for category in sorted(categories):
-      optimal = find_optimal_factor_v2(
-        args.run_id, model_id, gen_mode, category,
-        factor_min, factor_max, step
-      )
-      results[category] = optimal
+    optimal = find_optimal_factor_v2(
+      args.run_id, model_id, gen_mode,
+      factor_min, factor_max, step,
+      samples_per_category=2
+    )
+    results["all"] = optimal
   else:
     # Original mode: factor_a/factor_b
     print(f"Factor range: a=[{args.min_a}, {args.max_a}] b=[{args.min_b}, {args.max_b}] step={args.step}")
@@ -337,15 +356,16 @@ def main():
       results[category] = optimal
 
   print(f"\n{'='*60}")
-  print("SUMMARY: Optimal factors per category")
+  print("SUMMARY")
   print(f"{'='*60}")
 
-  for cat, data in sorted(results.items()):
+  for key, data in sorted(results.items()):
     if args.v2:
       if data.get("factor") is not None:
-        print(f"  {cat}: factor={data['factor']:.2f}")
+        rate = data.get("rate", 0)
+        print(f"  Optimal factor: {data['factor']:.2f} ({rate:.0%} compliance)")
       else:
-        print(f"  {cat}: NO COMPLIANCE FOUND")
+        print(f"  NO COMPLIANCE FOUND")
     else:
       if data.get("factor_a") is not None:
         print(f"  {cat}: a={data['factor_a']:.2f} b={data['factor_b']:.2f}")
