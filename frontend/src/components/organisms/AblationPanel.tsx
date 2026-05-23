@@ -161,6 +161,26 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             factorA={params.factorA} factorB={params.factorB} />
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <LayerSplitControls params={params} lastLayer={lastLayer} onChange={setParams} />
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              {(['ablitmd', 'classic'] as AblationMode[]).map(m => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
+                  background: mode === m ? (m === 'classic' ? '#1e40af' : 'var(--accent)') : 'var(--surface-3)',
+                  color: mode === m ? '#fff' : 'var(--text-muted)',
+                  border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+                  fontWeight: mode === m ? 700 : 400,
+                }}>
+                  {m === 'ablitmd' ? 'ablitMD' : 'Classic'}
+                </button>
+              ))}
+            </div>
+            {mode === 'classic' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="range" min={0.1} max={3.0} step={0.05} value={classicFactor}
+                  onChange={e => setClassicFactor(Number(e.target.value))} style={{ width: '80px' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text)', minWidth: '28px' }}>×{classicFactor.toFixed(2)}</span>
+              </div>
+            )}
             <GatedButton disabled={!recipe || modelLoad !== 'ready' || status === 'building'}
               tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
               onClick={() => recipe && onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)}>
@@ -179,32 +199,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
       {recipe && (
         <>
           <RecipePanel recipe={recipe} onset={params.onset} split={params.split} />
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode</span>
-            {(['ablitmd', 'classic'] as AblationMode[]).map(m => (
-              <button key={m} onClick={() => setMode(m)} style={{
-                padding: '4px 14px', fontSize: '12px', cursor: 'pointer',
-                background: mode === m ? 'var(--accent)' : 'var(--surface-3)',
-                color: mode === m ? 'var(--bg)' : 'var(--text-muted)',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-                fontWeight: mode === m ? 700 : 400,
-              }}>
-                {m === 'ablitmd' ? 'ablitMD' : 'Classic'}
-              </button>
-            ))}
-          </div>
-
-          {mode === 'classic' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>factor</span>
-              <input type="range" min={0.1} max={3.0} step={0.05}
-                value={classicFactor}
-                onChange={e => setClassicFactor(Number(e.target.value))}
-                style={{ flex: 1 }} />
-              <span style={{ fontSize: '12px', color: 'var(--text)', minWidth: '32px' }}>{classicFactor.toFixed(2)}</span>
-            </div>
-          )}
 
           {compareLoading && compareRows.length === 0 && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Computing direction comparison…</div>
