@@ -62,6 +62,8 @@ class AblateRequest(BaseModel):
   run_id: str
   mode: str = "ablitmd"  # "ablitmd" or "classic"
   factor: float | None = None  # required if mode="classic"
+  disclaimer_ablate: bool = False
+  disclaimer_factor: float = 0.3
 
 
 class VerifyRequest(BaseModel):
@@ -78,6 +80,8 @@ class VerifyClassicRequest(BaseModel):
   model_id: str
   gen_mode: str
   factor: float = 0.6
+  disclaimer_ablate: bool = False
+  disclaimer_factor: float = 0.3
   categories: list[str] | None = None
   samples_per_category: int = 2
 
@@ -367,8 +371,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
       f.write(json.dumps(entry) + "\n")
 
   try:
-    directions = await asyncio.to_thread(
-      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode
+    directions, disclaimer_directions = await asyncio.to_thread(
+      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode, req.disclaimer_ablate
     )
   except ValueError as err:
     raise HTTPException(status_code=422, detail=str(err))
@@ -397,7 +401,10 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    snapshots = await asyncio.to_thread(apply_classic_in_place, directions, req.factor, get_model())
+    snapshots = await asyncio.to_thread(
+      apply_classic_in_place, directions, req.factor, get_model(),
+      disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+    )
     try:
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
@@ -484,8 +491,11 @@ def ablate_bake(req: AblateRequest):
       raise HTTPException(status_code=400, detail="factor required for classic mode")
     step_data = run_data["sequence"][0]
     gen_mode = step_data["mode"]
-    directions = compute_classic_directions(run_data, state_dir, model_id, gen_mode)
-    apply_classic_in_place(directions, req.factor, get_model())
+    directions, disclaimer_directions = compute_classic_directions(run_data, state_dir, model_id, gen_mode, req.disclaimer_ablate)
+    apply_classic_in_place(
+      directions, req.factor, get_model(),
+      disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+    )
     base_name = model_id.split("/")[-1]
     out_path = f"/workspace/models/{base_name}-classic-{req.factor:.2f}-{req.run_id}"
   else:

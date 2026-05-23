@@ -11,7 +11,7 @@ import type { Run } from './types/run'
 type Phase = 'config' | 'running' | 'review' | 'results' | 'verify'
 
 type AblationMode = 'ablitmd' | 'classic'
-interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number }
+interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
 
 const hasUnclassified = (run: Run): boolean =>
   run.prompts.some(prompt =>
@@ -26,8 +26,8 @@ const App = () => {
   const [activeRun, setActiveRun] = useState<Run | null>(null)
   const [verifyContext, setVerifyContext] = useState<VerifyContext | null>(null)
 
-  const handleVerifyStart = (modelId: string, genMode: string, mode: AblationMode, classicFactor: number) => {
-    setVerifyContext({ modelId, genMode, samplesPerCategory: 2, mode, classicFactor })
+  const handleVerifyStart = (modelId: string, genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => {
+    setVerifyContext({ modelId, genMode, samplesPerCategory: 2, mode, classicFactor, disclaimerAblate, disclaimerFactor })
     setPhase('verify')
   }
 
@@ -94,6 +94,8 @@ const App = () => {
           genMode={ verifyContext.genMode }
           mode={ verifyContext.mode }
           classicFactor={ verifyContext.classicFactor }
+          disclaimerAblate={ verifyContext.disclaimerAblate }
+          disclaimerFactor={ verifyContext.disclaimerFactor }
           samplesPerCategory={ verifyContext.samplesPerCategory }
           onBack={ () => setPhase('results') }
           onHome={ () => setPhase('config') }

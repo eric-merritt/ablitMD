@@ -132,13 +132,13 @@ def restore_model_weights(snapshots: dict) -> None:
 
 
 def compute_classic_directions(
-  run_data: dict, state_dir: Path, model_id: str, gen_mode: str
-) -> dict[int, np.ndarray]:
-  """Compute per-layer refusal directions via the classic harmful−harmless mean diff.
-  Loads stored hidden states from state_dir, splits prompts by refused/complied,
-  returns {layer_index: unit_direction_vector}."""
+  run_data: dict, state_dir: Path, model_id: str, gen_mode: str, include_disclaimer: bool = False
+) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+  """Compute refusal + optionally disclaimer directions.
+  Returns (refusal_directions, disclaimer_directions) dicts."""
   refused_states: list[np.ndarray] = []
   complied_states: list[np.ndarray] = []
+  disclaimer_states: list[np.ndarray] = []
 
   for prompt in run_data["prompts"]:
     result = prompt.get("model_results", {}).get(model_id, {}).get(gen_mode)
@@ -148,8 +148,13 @@ def compute_classic_directions(
     npy_path = state_dir / f"{key}.npy"
     if not npy_path.exists():
       continue
-    hidden = np.load(str(npy_path))  # (n_layers, dim)
-    if result.get("refused"):
+    hidden = np.load(str(npy_path))
+    refusal_mode = result.get("refusal_mode", "none")
+
+    if refusal_mode == "disclaimer":
+      if include_disclaimer:
+        disclaimer_states.append(hidden)
+    elif result.get("refused"):
       refused_states.append(hidden)
     else:
       complied_states.append(hidden)
@@ -157,8 +162,8 @@ def compute_classic_directions(
   if not refused_states or not complied_states:
     raise ValueError("need both refused and complied hidden states to compute classic directions")
 
-  refused_arr  = np.stack(refused_states,  axis=0)  # (n_refused, n_layers, dim)
-  complied_arr = np.stack(complied_states, axis=0)  # (n_complied, n_layers, dim)
+  refused_arr  = np.stack(refused_states,  axis=0)
+  complied_arr = np.stack(complied_states, axis=0)
 
   n_layers = refused_arr.shape[1]
   directions: dict[int, np.ndarray] = {}
@@ -169,10 +174,22 @@ def compute_classic_directions(
       continue
     directions[layer_idx] = (diff / norm).astype(np.float32)
 
-  return directions
+  disclaimer_directions: dict[int, np.ndarray] = {}
+  if include_disclaimer and disclaimer_states:
+    disc_arr = np.stack(disclaimer_states, axis=0)
+    for layer_idx in range(n_layers):
+      diff = disc_arr[:, layer_idx, :].mean(axis=0) - complied_arr[:, layer_idx, :].mean(axis=0)
+      norm = float(np.linalg.norm(diff))
+      if norm < 1e-8:
+        continue
+      disclaimer_directions[layer_idx] = (diff / norm).astype(np.float32)
+
+  return directions, disclaimer_directions
 
 
-def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, model) -> dict:
+def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, model,
+                           disclaimer_directions: dict[int, np.ndarray] | None = None,
+                           disclaimer_factor: float = 0.3) -> dict:
   """Apply classic (flat, per-layer) abliteration to model weights in memory.
   directions: {layer_index: unit_direction}. layer_index 0 = embedding, 1..N = decoder layers.
   Returns weight snapshots for restore_model_weights."""
@@ -204,6 +221,30 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
         continue
       for proj in _projection_modules(layers[decoder_idx]):
         _snap_and_edit(proj, direction_t)
+
+    # Apply disclaimer directions with separate factor
+    if disclaimer_directions:
+      def _snap_and_edit_disc(proj, direction_t):
+        if id(proj) not in snapshots:
+          snapshots[id(proj)] = (proj, proj.weight.data.clone())
+        W = proj.weight.data.to(torch.float32)
+        proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), disclaimer_factor).to(dtype))
+
+      for layer_idx, direction in disclaimer_directions.items():
+        direction_t = torch.tensor(direction, device=device, dtype=dtype)
+        if layer_idx == 0:
+          emb = model.model.embed_tokens
+          if id(emb) not in snapshots:
+            snapshots[id(emb)] = (emb, emb.weight.data.clone())
+          W = emb.weight.data
+          proj_out = direction_t.unsqueeze(1) * (direction_t @ W.T).unsqueeze(0)
+          emb.weight.copy_(W - disclaimer_factor * proj_out.T)
+          continue
+        decoder_idx = layer_idx - 1
+        if decoder_idx >= len(layers):
+          continue
+        for proj in _projection_modules(layers[decoder_idx]):
+          _snap_and_edit_disc(proj, direction_t)
 
     lm_head = getattr(model, "lm_head", None)
     if lm_head is not None and hasattr(lm_head, "weight"):
