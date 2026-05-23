@@ -135,8 +135,17 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
       <div style={{ flex: 1, overflow: 'auto' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
-              Verify · { finished ? 'done' : 'running…' }
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
+                Verify · { finished ? 'done' : 'running…' }
+              </span>
+              <span style={{
+                padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+                background: mode === 'classic' ? '#1e40af' : 'var(--accent)',
+                color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>
+                { mode === 'classic' ? `classic ×${classicFactor.toFixed(2)}` : 'ablitMD' }
+              </span>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <span onClick={ onBack } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>← Back</span>
