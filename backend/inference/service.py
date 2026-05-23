@@ -402,6 +402,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         yield chunk
     finally:
       await asyncio.to_thread(restore_model_weights, snapshots)
+      await asyncio.to_thread(torch.cuda.empty_cache)
 
   async def _classic_verify_loop():
     for category, items in by_category.items():
