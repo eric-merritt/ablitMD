@@ -149,7 +149,11 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
       .then(() => { if (!cancelled) setFinished(true) })
       .catch(err => { if (!cancelled && err.name !== 'AbortError') setError(String(err.message)) })
 
-    return () => { cancelled = true; controller.abort() }
+    return () => {
+      cancelled = true
+      controller.abort()
+      fetch('/api/inference/reset', { method: 'POST' }).catch(() => {})
+    }
   }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
 
   return (
