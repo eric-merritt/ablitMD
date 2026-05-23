@@ -60,6 +60,8 @@ class ComputeRequest(BaseModel):
 
 class AblateRequest(BaseModel):
   run_id: str
+  mode: str = "ablitmd"  # "ablitmd" or "classic"
+  factor: float | None = None  # required if mode="classic"
 
 
 class VerifyRequest(BaseModel):
@@ -472,16 +474,35 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 def ablate_bake(req: AblateRequest):
   if get_loaded_model_id() is None:
     raise HTTPException(status_code=400, detail="No model loaded")
-  recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
-  if not recipe_path.exists():
-    raise HTTPException(status_code=404, detail="Recipe not found")
-  recipe = json.loads(recipe_path.read_text())
 
-  base_name = recipe["model_id"].split("/")[-1]
-  out_path = f"/workspace/models/{base_name}-ablit-{req.run_id}"
-  bake_and_save(recipe, get_model(), get_tokenizer(), out_path)
+  run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  state_dir = RUNS_DIR / req.run_id
+  model_id = get_loaded_model_id()
 
-  # baking mutated the in-memory weights — drop them so the next /load is clean
+  if req.mode == "classic":
+    if req.factor is None:
+      raise HTTPException(status_code=400, detail="factor required for classic mode")
+    step_data = run_data["sequence"][0]
+    gen_mode = step_data["mode"]
+    directions = compute_classic_directions(run_data, state_dir, model_id, gen_mode)
+    apply_classic_in_place(directions, req.factor, get_model())
+    base_name = model_id.split("/")[-1]
+    out_path = f"/workspace/models/{base_name}-classic-{req.factor:.2f}-{req.run_id}"
+  else:
+    recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
+    if not recipe_path.exists():
+      raise HTTPException(status_code=404, detail="Recipe not found")
+    recipe = json.loads(recipe_path.read_text())
+    base_name = recipe["model_id"].split("/")[-1]
+    out_path = f"/workspace/models/{base_name}-ablit-{req.run_id}"
+    bake_and_save(recipe, get_model(), get_tokenizer(), out_path)
+
+  # Save even for classic (bake_and_save does it for ablitmd)
+  if req.mode == "classic":
+    get_model().save_pretrained(out_path)
+    get_tokenizer().save_pretrained(out_path)
+
+  # baking mutated weights — drop them so next /load is clean
   unload_model()
   return {"saved_to": out_path}
 

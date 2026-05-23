@@ -20,8 +20,12 @@ export const buildRecipe = (runId: string, params: RecipeParams): Promise<SlimRe
     body: JSON.stringify(params),
   }).then(jsonOrThrow)
 
-export const bakeModel = (runId: string): Promise<{ saved_to: string }> =>
-  fetch(`/api/ablation/${runId}/bake`, { method: 'POST' }).then(jsonOrThrow)
+export const bakeModel = (runId: string, mode: 'ablitmd' | 'classic' = 'ablitmd', factor?: number): Promise<{ saved_to: string }> =>
+  fetch(`/api/ablation/${runId}/bake`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode, ...(factor !== undefined && { factor }) }),
+  }).then(jsonOrThrow)
 
 export const compareDirections = (
   runId: string,
