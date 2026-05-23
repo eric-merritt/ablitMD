@@ -2,6 +2,7 @@
 
 Usage:
   uv run python scripts/sweep_ablation.py <run_id> --onset 30 --split 39
+  uv run python scripts/sweep_ablation.py <run_id> --v2  # abliterate_v2 style
 
 Finds optimal factors for each category independently.
 Logs all responses to <run_id>.sweep_log.jsonl
@@ -65,12 +66,75 @@ def sample_prompt(run: dict, category: str) -> dict:
   return random.choice(prompts)
 
 
+def get_qwen35_defaults(model_name: str) -> dict:
+  """Return optimized defaults for Qwen3.5 variants (from abliterate_v2.py)."""
+  name_lower = model_name.lower()
+  if "9b" in name_lower or "8b" in name_lower or "7b" in name_lower:
+    return {"layer_start": 2, "layer_end": 24, "factor_min": 0.4, "factor_max": 0.8, "step": 0.1}
+  elif "27b" in name_lower or "32b" in name_lower or "30b" in name_lower:
+    return {"layer_start": 8, "layer_end": 42, "factor_min": 0.5, "factor_max": 0.9, "step": 0.1}
+  else:
+    return {"layer_start": 2, "layer_end": None, "factor_min": 0.5, "factor_max": 1.0, "step": 0.1}
+
+
 def build_recipe(run_id: str, onset: int, split: int, factor_a: float, factor_b: float):
   subprocess.run([
     "uv", "run", "python", "scripts/build_recipe.py", run_id,
     "--onset", str(onset), "--split", str(split),
     "--factor-a", str(factor_a), "--factor-b", str(factor_b),
   ], cwd=_root, check=True, capture_output=True)
+
+
+def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
+                     layer_start: int, layer_end: int, factor: float) -> dict:
+  """v2 mode: single factor across all layers (abliterate_v2.py style)."""
+  build_recipe(run_id, layer_start, layer_end, factor, factor)
+
+  with httpx.Client(base_url=INFERENCE_URL, timeout=180.0) as client:
+    body = {
+      "run_id": run_id,
+      "model_id": model_id,
+      "gen_mode": gen_mode,
+      "categories": [category],
+      "samples_per_category": 1,
+      "fast": True,
+    }
+    resp = client.post("/ablate/verify", json=body)
+    if resp.status_code != 200:
+      log_entry({"category": category, "factor": factor, "status": "error", "error": f"http {resp.status_code}"})
+      return {"status": "error", "response": ""}
+
+    for line in resp.text.strip().split("\n"):
+      if not line.strip():
+        continue
+      event = json.loads(line)
+      if event.get("type") == "prompt":
+        prompt_text = event.get("prompt_text", "")
+        before_text = event.get("response_before", "")
+        after_text = event.get("response_after", "")
+        degraded, reason = is_degraded(after_text)
+
+        if degraded:
+          status = f"degraded:{reason}"
+        elif looks_like_refusal(after_text):
+          status = "refused"
+        else:
+          status = "complied"
+
+        log_entry({
+          "category": category,
+          "factor": factor,
+          "layer_start": layer_start,
+          "layer_end": layer_end,
+          "status": status,
+          "prompt": prompt_text,
+          "response_before": before_text,
+          "response_after": after_text,
+        })
+
+        return {"status": status, "response": after_text[:200]}
+
+  return {"status": "error", "response": ""}
 
 
 def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
@@ -124,6 +188,35 @@ def test_category(run_id: str, model_id: str, gen_mode: str, category: str,
   return {"status": "error", "response": ""}
 
 
+def find_optimal_factor_v2(run_id: str, model_id: str, gen_mode: str, category: str,
+                           layer_start: int, layer_end: int,
+                           min_factor: float, max_factor: float, step: float) -> dict:
+  """v2 mode: sweep single factor (abliterate_v2.py style)."""
+  print(f"\n{'='*60}")
+  print(f"Category: {category} (v2 mode: layers {layer_start}-{layer_end})")
+  print(f"{'='*60}")
+
+  factor = min_factor
+  while factor <= max_factor + 1e-6:
+    result = test_category_v2(run_id, model_id, gen_mode, category, layer_start, layer_end, factor)
+    status = result["status"]
+    icon = "✓" if status == "complied" else "✗" if "degraded" in status else "○"
+    print(f"  {icon} factor={factor:.2f} → {status}")
+
+    if status == "complied":
+      print(f"    Found compliance!")
+      return {"factor": factor, "response": result["response"]}
+
+    if "degraded" in status:
+      print(f"    Degradation detected, stopping.")
+      break
+
+    factor = round(factor + step, 10)
+
+  print(f"  No compliant factor found (max tested: {max_factor})")
+  return {"factor": None, "response": ""}
+
+
 def find_optimal_factors(run_id: str, model_id: str, gen_mode: str, category: str,
                          onset: int, split: int, min_a: float, max_a: float,
                          min_b: float, max_b: float, step: float) -> dict:
@@ -168,6 +261,7 @@ def main():
 
   parser = argparse.ArgumentParser()
   parser.add_argument("run_id")
+  parser.add_argument("--v2", action="store_true", help="Use abliterate_v2.py method (single factor, auto layer range)")
   parser.add_argument("--onset", type=int, default=30)
   parser.add_argument("--split", type=int, default=39)
   parser.add_argument("--min-a", type=float, default=0.5)
@@ -200,26 +294,52 @@ def main():
     categories = get_categories(run)
 
   print(f"Testing {len(categories)} categories")
-  print(f"Factor range: a=[{args.min_a}, {args.max_a}] b=[{args.min_b}, {args.max_b}] step={args.step}")
 
   results = {}
-  for category in sorted(categories):
-    optimal = find_optimal_factors(
-      args.run_id, model_id, gen_mode, category,
-      args.onset, args.split,
-      args.min_a, args.max_a, args.min_b, args.max_b, args.step
-    )
-    results[category] = optimal
+
+  if args.v2:
+    # v2 mode: auto-detect layer range, single factor
+    defaults = get_qwen35_defaults(model_id)
+    layer_start = defaults["layer_start"]
+    layer_end = defaults["layer_end"] or 64  # fallback
+    factor_min = defaults["factor_min"]
+    factor_max = defaults["factor_max"]
+    step = defaults["step"]
+    print(f"v2 mode: layers {layer_start}-{layer_end}, factor [{factor_min}, {factor_max}] step={step}")
+
+    for category in sorted(categories):
+      optimal = find_optimal_factor_v2(
+        args.run_id, model_id, gen_mode, category,
+        layer_start, layer_end, factor_min, factor_max, step
+      )
+      results[category] = optimal
+  else:
+    # Original mode: factor_a/factor_b
+    print(f"Factor range: a=[{args.min_a}, {args.max_a}] b=[{args.min_b}, {args.max_b}] step={args.step}")
+
+    for category in sorted(categories):
+      optimal = find_optimal_factors(
+        args.run_id, model_id, gen_mode, category,
+        args.onset, args.split,
+        args.min_a, args.max_a, args.min_b, args.max_b, args.step
+      )
+      results[category] = optimal
 
   print(f"\n{'='*60}")
   print("SUMMARY: Optimal factors per category")
   print(f"{'='*60}")
 
   for cat, data in sorted(results.items()):
-    if data["factor_a"] is not None:
-      print(f"  {cat}: a={data['factor_a']:.2f} b={data['factor_b']:.2f}")
+    if args.v2:
+      if data.get("factor") is not None:
+        print(f"  {cat}: factor={data['factor']:.2f}")
+      else:
+        print(f"  {cat}: NO COMPLIANCE FOUND")
     else:
-      print(f"  {cat}: NO COMPLIANCE FOUND")
+      if data.get("factor_a") is not None:
+        print(f"  {cat}: a={data['factor_a']:.2f} b={data['factor_b']:.2f}")
+      else:
+        print(f"  {cat}: NO COMPLIANCE FOUND")
 
   out_path = RUNS_DIR / f"{args.run_id}.category_factors.json"
   out_path.write_text(json.dumps(results, indent=2))
