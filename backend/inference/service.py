@@ -361,7 +361,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     from datetime import datetime, timezone
     entry["timestamp"] = datetime.now(timezone.utc).isoformat()
     entry["factor"] = req.factor
-    with open(log_path, "a") as f:
+    with open(str(log_path), "a") as f:
       f.write(json.dumps(entry) + "\n")
 
   try:
