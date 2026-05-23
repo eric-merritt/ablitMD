@@ -22,16 +22,13 @@ def ablate_hidden(hidden: torch.Tensor, directions: list[tuple[torch.Tensor, flo
 
 
 def orthogonalize_weight(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> torch.Tensor:
-  """Remove a direction from a weight matrix's output space.
-  weight: (dim_out, dim_in) where dim_out == len(direction). Returns the edited matrix.
-  Equivalent to ablate_hidden applied to every output the matrix produces."""
-  return weight - factor * torch.outer(direction, direction @ weight)
+  weight.addr_(direction, direction @ weight, alpha=-factor)
+  return weight
 
 
 def orthogonalize_input(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> torch.Tensor:
-  """Remove a direction from a weight matrix's input space.
-  weight: (dim_out, dim_in) where dim_in == len(direction). Use for lm_head."""
-  return weight - factor * torch.outer(weight @ direction, direction)
+  weight.addr_(weight @ direction, direction, alpha=-factor)
+  return weight
 
 
 def _decoder_layers(model):
@@ -212,9 +209,7 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
         emb = model.model.embed_tokens
         if id(emb) not in snapshots:
           snapshots[id(emb)] = (emb, emb.weight.data.clone())
-        W = emb.weight.data
-        proj_out = direction_t.unsqueeze(1) * (direction_t @ W.T).unsqueeze(0)
-        emb.weight.copy_(W - factor * proj_out.T)
+        emb.weight.data.addr_(direction_t @ emb.weight.data.T, direction_t, alpha=-factor)
         continue
       decoder_idx = layer_idx - 1
       if decoder_idx >= len(layers):
@@ -239,8 +234,8 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
             snapshots[id(emb)] = (emb, emb.weight.data.clone())
           original = snapshots[id(emb)][1]
           W = original.to(torch.float32)
-          proj_out = direction_t.unsqueeze(1) * (direction_t @ W.T).unsqueeze(0)
-          emb.weight.copy_((W - disclaimer_factor * proj_out.T).to(dtype))
+          W.addr_(direction_t.to(torch.float32) @ W.T, direction_t.to(torch.float32), alpha=-disclaimer_factor)
+          emb.weight.copy_(W.to(dtype))
           continue
         decoder_idx = layer_idx - 1
         if decoder_idx >= len(layers):
