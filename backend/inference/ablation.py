@@ -55,7 +55,7 @@ def _projection_modules(layer):
 
 
 def apply_ablation_in_place(recipe: dict, model) -> dict:
-  """Orthogonalize o_proj + down_proj in memory per the recipe.
+  """Orthogonalize embedding + o_proj + down_proj in memory per the recipe.
   Returns a snapshot dict mapping each projection to its original weight clone
   so restore_model_weights can undo the edit without reloading from disk."""
   device = next(model.parameters()).device
@@ -65,6 +65,22 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
 
   _first_logged = False
   with torch.no_grad():
+    # Ablate embedding layer (layer 0) - following abliterate_v2.py method
+    raw_emb = directions_for_layer(recipe, hidden_index=0)
+    if raw_emb:
+      inner = model.model
+      if hasattr(inner, "language_model"):
+        inner = inner.language_model
+      emb = inner.embed_tokens
+      if id(emb) not in snapshots:
+        snapshots[id(emb)] = (emb, emb.weight.data.clone())
+      W = emb.weight.data.to(torch.float32)
+      for vector, factor in raw_emb:
+        d = torch.tensor(vector, device=device, dtype=torch.float32)
+        proj_out = torch.outer(W @ d, d)
+        W = W - float(factor) * proj_out
+      emb.weight.copy_(W.to(dtype))
+
     for decoder_idx in range(len(layers)):
       raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
       if not raw:
