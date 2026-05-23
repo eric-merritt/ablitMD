@@ -71,6 +71,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [modelLoad, setModelLoad] = useState<ModelLoadState>('idle')
   const [mode, setMode]           = useState<AblationMode>('ablitmd')
   const [classicFactor, setClassicFactor] = useState(0.6)
+  const [disclaimerAblate, setDisclaimerAblate] = useState(false)
+  const [disclaimerFactor, setDisclaimerFactor] = useState(0.3)
   const [compareRows, setCompareRows]       = useState<DirectionCompareRow[]>([])
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError]     = useState<string>()
@@ -193,6 +195,21 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             </GatedButton>
           </div>
           {status === 'building' && <div style={{ color: 'var(--text-muted)', fontSize: '11px' }}>Building recipe…</div>}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={disclaimerAblate} onChange={e => setDisclaimerAblate(e.target.checked)}
+                style={{ cursor: 'pointer' }} />
+              <span style={{ fontSize: '11px', color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Disclaimer ablation</span>
+            </label>
+            {disclaimerAblate && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input type="range" min={0.05} max={1.0} step={0.05} value={disclaimerFactor}
+                  onChange={e => setDisclaimerFactor(Number(e.target.value))} style={{ width: '80px' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text)', minWidth: '28px' }}>×{disclaimerFactor.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
         </>
       )}
 
