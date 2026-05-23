@@ -56,6 +56,11 @@ def load_model(model_id: str, api_model_id: str) -> None:
 def unload_model() -> None:
   global _loaded_model_id, _model, _tokenizer
   if _model is not None:
+    try:
+      from backend.inference.generator import abort_and_join_generation
+      abort_and_join_generation(timeout=5.0)
+    except Exception:
+      pass
     del _model
     del _tokenizer
     gc.collect()
