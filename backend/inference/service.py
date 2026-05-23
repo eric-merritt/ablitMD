@@ -123,6 +123,12 @@ def load(req: LoadRequest):
   return {"loaded_model": req.model_id}
 
 
+@app.post("/reset")
+def reset():
+  unload_model()
+  return {"status": "model unloaded"}
+
+
 @app.post("/generate")
 def generate(req: GenerateRequest):
   if get_loaded_model_id() != req.model_id:
@@ -335,12 +341,12 @@ async def ablate_directions_compare(req: CompareDirectionsRequest):
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
   try:
-    classic_dirs = await asyncio.to_thread(
+    directions, _ = await asyncio.to_thread(
       compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode
     )
   except ValueError as err:
     raise HTTPException(status_code=422, detail=str(err))
-  return compare_directions(recipe, classic_dirs)
+  return compare_directions(recipe, directions)
 
 
 _classic_verify_cancel: asyncio.Event | None = None
