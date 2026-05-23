@@ -355,6 +355,14 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
+  log_path = RUNS_DIR / f"{req.run_id}.classic_verify.jsonl"
+
+  def log_entry(entry: dict):
+    from datetime import datetime, timezone
+    entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    entry["factor"] = req.factor
+    with open(log_path, "a") as f:
+      f.write(json.dumps(entry) + "\n")
 
   try:
     directions = await asyncio.to_thread(
@@ -431,7 +439,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         if prompt_refused_after:
           refused_after += 1
 
-        yield json.dumps({
+        prompt_event = {
           "type": "prompt",
           "category": category,
           "prompt_id": item["prompt"].get("prompt_id") or key,
@@ -440,17 +448,21 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           "response_after": response_after[:1000],
           "refused_before": prompt_refused_before,
           "refused_after": prompt_refused_after,
-        }) + "\n"
+        }
+        log_entry(prompt_event)
+        yield json.dumps(prompt_event) + "\n"
 
       count = max(len(items), 1)
-      yield json.dumps({
+      category_result = {
         "type": "category_result",
         "category": category,
         "projection_before": float(np.mean(before_proj)) if before_proj else 0.0,
         "projection_after": float(np.mean(after_proj)) if after_proj else 0.0,
         "refusal_rate_before": refused_before / count,
         "refusal_rate_after": refused_after / count,
-      }) + "\n"
+      }
+      log_entry(category_result)
+      yield json.dumps(category_result) + "\n"
 
   return StreamingResponse(events(), media_type="application/x-ndjson")
 
