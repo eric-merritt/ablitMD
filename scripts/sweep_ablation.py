@@ -85,6 +85,18 @@ def build_recipe(run_id: str, onset: int, split: int, factor_a: float, factor_b:
   ], cwd=_root, check=True, capture_output=True)
 
 
+def classify_response(prompt: str, response: str) -> str:
+  """Call local classifier to get hard_refusal/redirect_refusal/non_refusal."""
+  try:
+    with httpx.Client(base_url=INFERENCE_URL, timeout=60.0) as client:
+      resp = client.post("/classify", json={"prompt": prompt, "response": response})
+      if resp.status_code == 200:
+        return resp.json().get("classification", "unknown")
+  except Exception:
+    pass
+  return "unknown"
+
+
 def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
                      layer_start: int, layer_end: int, factor: float) -> dict:
   """v2 mode: single factor across all layers (abliterate_v2.py style)."""
@@ -116,10 +128,16 @@ def test_category_v2(run_id: str, model_id: str, gen_mode: str, category: str,
 
         if degraded:
           status = f"degraded:{reason}"
-        elif looks_like_refusal(after_text):
-          status = "refused"
         else:
-          status = "complied"
+          classification = classify_response(prompt_text, after_text)
+          if classification == "non_refusal":
+            status = "complied"
+          elif classification == "redirect_refusal":
+            status = "redirect"
+          elif classification == "hard_refusal":
+            status = "refused"
+          else:
+            status = "unknown"
 
         log_entry({
           "category": category,
