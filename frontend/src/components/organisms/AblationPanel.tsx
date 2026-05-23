@@ -12,7 +12,7 @@ type AblationMode = 'ablitmd' | 'classic'
 interface AblationPanelProps {
   runId: string
   models: { modelId: string; apiModelId: string; name: string }[]
-  onVerify: (modelId: string, genMode: string, mode: AblationMode, classicFactor: number) => void
+  onVerify: (modelId: string, genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
 }
 
 type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
@@ -185,7 +185,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             )}
             <GatedButton disabled={!recipe || modelLoad !== 'ready' || status === 'building'}
               tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
-              onClick={() => recipe && onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor)}>
+              onClick={() => recipe && onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor, disclaimerAblate, disclaimerFactor)}>
               Verify
             </GatedButton>
             <GatedButton disabled={!recipe || baking || modelLoad !== 'ready' || status === 'building'}

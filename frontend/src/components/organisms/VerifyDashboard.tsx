@@ -8,6 +8,8 @@ interface VerifyDashboardProps {
   genMode: string
   mode: 'ablitmd' | 'classic'
   classicFactor: number
+  disclaimerAblate: boolean
+  disclaimerFactor: number
   samplesPerCategory: number
   onBack: () => void
   onHome: () => void
@@ -98,7 +100,7 @@ const CategorySummary = ({ rows }: { rows: VerifyCategoryResult[] }) => {
   )
 }
 
-export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
+export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, disclaimerAblate, disclaimerFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
   const [total, setTotal]                 = useState(0)
   const [done, setDone]                   = useState(0)
   const [currentCategory, setCurrentCategory] = useState('')
@@ -112,7 +114,13 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
   const runBake = async () => {
     setBaking(true)
     try {
-      const result = await bakeModel(runId, mode, mode === 'classic' ? classicFactor : undefined)
+      const result = await bakeModel(
+        runId,
+        mode,
+        mode === 'classic' ? classicFactor : undefined,
+        mode === 'classic' ? disclaimerAblate : undefined,
+        mode === 'classic' ? disclaimerFactor : undefined
+      )
       setBakedPath(result.saved_to)
     } catch (err) {
       setError(`Bake failed: ${String((err as Error).message)}`)
@@ -126,7 +134,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     let cancelled = false
 
     const stream = mode === 'classic'
-      ? verifyAblationClassic(runId, { model_id: modelId, gen_mode: genMode, factor: classicFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+      ? verifyAblationClassic(runId, { model_id: modelId, gen_mode: genMode, factor: classicFactor, disclaimer_ablate: disclaimerAblate, disclaimer_factor: disclaimerFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
       : verifyAblation(runId, { model_id: modelId, gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
