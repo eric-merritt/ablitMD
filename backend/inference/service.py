@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import json
 import sys
 from pathlib import Path
@@ -270,6 +271,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
       async for chunk in _verify_loop():
         yield chunk
     finally:
+      del snapshots
       unload_model()
 
   async def _verify_loop():
@@ -417,6 +419,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
       async for chunk in _classic_verify_loop():
         yield chunk
     finally:
+      del snapshots
       unload_model()
 
   async def _classic_verify_loop():
@@ -498,6 +501,8 @@ def ablate_bake(req: AblateRequest):
     step_data = run_data["sequence"][0]
     gen_mode = step_data["mode"]
     directions, disclaimer_directions = compute_classic_directions(run_data, state_dir, model_id, gen_mode, req.disclaimer_ablate)
+    gc.collect()
+    torch.cuda.empty_cache()
     apply_classic_in_place(
       directions, req.factor, get_model(),
       disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
