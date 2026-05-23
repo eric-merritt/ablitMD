@@ -56,8 +56,11 @@ def load_model(model_id: str, api_model_id: str) -> None:
 def unload_model() -> None:
   global _loaded_model_id, _model, _tokenizer
   if _model is not None:
+    for param in _model.parameters():
+      param.data = torch.empty(0)
     del _model
     del _tokenizer
+    gc.collect()
     torch.cuda.empty_cache()
     _model = None
     _tokenizer = None
