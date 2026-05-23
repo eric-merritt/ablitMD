@@ -205,15 +205,15 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
       for proj in _projection_modules(layers[decoder_idx]):
         _snap_and_edit(proj, direction_t)
 
-  lm_head = getattr(model, "lm_head", None)
-  if lm_head is not None and hasattr(lm_head, "weight"):
-    if id(lm_head) not in snapshots:
-      snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
-    W = lm_head.weight.data.to(torch.float32)
-    for direction in directions.values():
-      direction_t = torch.tensor(direction, device=device, dtype=torch.float32)
-      W = orthogonalize_input(W, direction_t, factor)
-    lm_head.weight.copy_(W.to(dtype))
+    lm_head = getattr(model, "lm_head", None)
+    if lm_head is not None and hasattr(lm_head, "weight"):
+      if id(lm_head) not in snapshots:
+        snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
+      W = lm_head.weight.data.to(torch.float32)
+      for direction in directions.values():
+        direction_t = torch.tensor(direction, device=device, dtype=torch.float32)
+        W = orthogonalize_input(W, direction_t, factor)
+      lm_head.weight.copy_(W.to(dtype))
 
   return snapshots
 
