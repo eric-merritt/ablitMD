@@ -112,7 +112,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
   const runBake = async () => {
     setBaking(true)
     try {
-      const result = await bakeModel(runId)
+      const result = await bakeModel(runId, mode, mode === 'classic' ? classicFactor : undefined)
       setBakedPath(result.saved_to)
     } catch (err) {
       setError(`Bake failed: ${String((err as Error).message)}`)
