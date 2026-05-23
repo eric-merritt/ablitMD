@@ -271,6 +271,8 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         yield chunk
     finally:
       await asyncio.to_thread(restore_model_weights, snapshots)
+      await asyncio.to_thread(torch.cuda.empty_cache)
+      await asyncio.to_thread(unload_model)
 
   async def _verify_loop():
     for category, items in by_category.items():
@@ -419,6 +421,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     finally:
       await asyncio.to_thread(restore_model_weights, snapshots)
       await asyncio.to_thread(torch.cuda.empty_cache)
+      await asyncio.to_thread(unload_model)
 
   async def _classic_verify_loop():
     for category, items in by_category.items():
