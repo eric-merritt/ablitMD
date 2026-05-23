@@ -92,6 +92,8 @@ const App = () => {
           runId={ activeRun.run_id }
           modelId={ verifyContext.modelId }
           genMode={ verifyContext.genMode }
+          mode={ verifyContext.mode }
+          classicFactor={ verifyContext.classicFactor }
           samplesPerCategory={ verifyContext.samplesPerCategory }
           onBack={ () => setPhase('results') }
           onHome={ () => setPhase('config') }
