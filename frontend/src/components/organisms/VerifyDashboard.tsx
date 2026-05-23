@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { verifyAblation, verifyAblationClassic } from '../../api/ablation'
+import { verifyAblation, verifyAblationClassic, bakeModel } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult } from '../../types/ablation'
 
 interface VerifyDashboardProps {
@@ -106,6 +106,20 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
   const [categories, setCategories]       = useState<VerifyCategoryResult[]>([])
   const [error, setError]                 = useState<string>()
   const [finished, setFinished]           = useState(false)
+  const [baking, setBaking]               = useState(false)
+  const [bakedPath, setBakedPath]         = useState<string>()
+
+  const runBake = async () => {
+    setBaking(true)
+    try {
+      const result = await bakeModel(runId)
+      setBakedPath(result.saved_to)
+    } catch (err) {
+      setError(`Bake failed: ${String((err as Error).message)}`)
+    } finally {
+      setBaking(false)
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -147,13 +161,22 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
                 { mode === 'classic' ? `classic ×${classicFactor.toFixed(2)}` : 'ablitMD' }
               </span>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button onClick={ runBake } disabled={ !finished || baking }
+                style={{
+                  padding: '6px 14px', fontSize: '12px', cursor: !finished || baking ? 'not-allowed' : 'pointer',
+                  background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)',
+                  fontWeight: 600, opacity: !finished || baking ? 0.5 : 1,
+                }}>
+                {baking ? 'Baking…' : 'Bake & Save'}
+              </button>
               <span onClick={ onBack } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>← Back</span>
               <span onClick={ onHome } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>Home</span>
             </div>
           </div>
 
           { error && <div style={{ color: '#ef4444', fontSize: '12px' }}>{ error }</div> }
+          { bakedPath && <div style={{ color: 'var(--accent)', fontSize: '12px' }}>Saved abliterated model to <code>{ bakedPath }</code></div> }
 
           <ProgressHeader done={ done } total={ total } currentCategory={ currentCategory } />
 
