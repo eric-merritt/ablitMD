@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import httpx
+import torch
 
 # Ensure project root is on sys.path so `backend.*` imports resolve when the
 # script is invoked directly (e.g. `uv run python backend/inference/service.py`).

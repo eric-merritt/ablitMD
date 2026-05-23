@@ -227,7 +227,8 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
       def _snap_and_edit_disc(proj, direction_t):
         if id(proj) not in snapshots:
           snapshots[id(proj)] = (proj, proj.weight.data.clone())
-        W = proj.weight.data.to(torch.float32)
+        original = snapshots[id(proj)][1]
+        W = original.to(torch.float32)
         proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), disclaimer_factor).to(dtype))
 
       for layer_idx, direction in disclaimer_directions.items():
@@ -236,9 +237,10 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
           emb = model.model.embed_tokens
           if id(emb) not in snapshots:
             snapshots[id(emb)] = (emb, emb.weight.data.clone())
-          W = emb.weight.data
+          original = snapshots[id(emb)][1]
+          W = original.to(torch.float32)
           proj_out = direction_t.unsqueeze(1) * (direction_t @ W.T).unsqueeze(0)
-          emb.weight.copy_(W - disclaimer_factor * proj_out.T)
+          emb.weight.copy_((W - disclaimer_factor * proj_out.T).to(dtype))
           continue
         decoder_idx = layer_idx - 1
         if decoder_idx >= len(layers):
@@ -250,10 +252,15 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
     if lm_head is not None and hasattr(lm_head, "weight"):
       if id(lm_head) not in snapshots:
         snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
-      W = lm_head.weight.data.to(torch.float32)
+      original = snapshots[id(lm_head)][1]
+      W = original.to(torch.float32)
       for direction in directions.values():
         direction_t = torch.tensor(direction, device=device, dtype=torch.float32)
         W = orthogonalize_input(W, direction_t, factor)
+      if disclaimer_directions:
+        for direction in disclaimer_directions.values():
+          direction_t = torch.tensor(direction, device=device, dtype=torch.float32)
+          W = orthogonalize_input(W, direction_t, disclaimer_factor)
       lm_head.weight.copy_(W.to(dtype))
 
   return snapshots
