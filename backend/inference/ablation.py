@@ -51,6 +51,24 @@ def _projection_modules(layer):
   return projections
 
 
+def _mtp_projections(model):
+  """Return o_proj modules from MTP layers, if present. MTP sits outside the main
+  decoder layers list and writes into the same hidden-dim residual space."""
+  inner = model.model
+  if hasattr(inner, "language_model"):
+    inner = inner.language_model
+  mtp = getattr(inner, "mtp", None)
+  if mtp is None:
+    return []
+  projections = []
+  for layer in (mtp.layers if hasattr(mtp, "layers") else []):
+    if hasattr(layer, "self_attn"):
+      proj = getattr(layer.self_attn, "o_proj", None) or getattr(layer.self_attn, "out_proj", None)
+      if proj is not None:
+        projections.append(proj)
+  return projections
+
+
 def apply_ablation_in_place(recipe: dict, model) -> dict:
   """Orthogonalize embedding + o_proj + down_proj in memory per the recipe.
   Returns a snapshot dict mapping each projection to its original weight clone
@@ -111,6 +129,16 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         for direction, factor in all_directions:
           W = orthogonalize_input(W, direction, factor)
         lm_head.weight.copy_(W.to(dtype))
+
+    for mtp_proj in _mtp_projections(model):
+      if id(mtp_proj) not in snapshots:
+        snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
+      W = mtp_proj.weight.data.to(torch.float32)
+      for mode_data in recipe["modes"].values():
+        for cat_vec in mode_data["phase_b"]["per_category"].values():
+          d = torch.tensor(cat_vec, device=device, dtype=torch.float32)
+          W = orthogonalize_weight(W, d, recipe["factor_b"])
+      mtp_proj.weight.copy_(W.to(dtype))
 
     torch.cuda.synchronize(device)
 
@@ -257,6 +285,17 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
           direction_t = torch.tensor(direction, dtype=torch.float32)
           W = orthogonalize_input(W, direction_t, disclaimer_factor)
       lm_head.weight.copy_(W.to(dtype).to(device))
+
+    for mtp_proj in _mtp_projections(model):
+      if id(mtp_proj) not in snapshots:
+        snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
+      W = mtp_proj.weight.data.to(torch.float32)
+      for direction in directions.values():
+        W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), factor)
+      if disclaimer_directions:
+        for direction in disclaimer_directions.values():
+          W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), disclaimer_factor)
+      mtp_proj.weight.copy_(W.to(dtype).to(device))
 
   return snapshots
 
