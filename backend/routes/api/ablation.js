@@ -27,9 +27,9 @@ const slimRecipe = (recipe) => ({
   onset: recipe.onset, split: recipe.split, last_layer: recipe.last_layer,
   factor_a: recipe.factor_a, factor_b: recipe.factor_b, built_at: recipe.built_at,
   modes: Object.fromEntries(Object.entries(recipe.modes).map(([mode, data]) => [mode, {
-    phase_a: { layers: data.phase_a.layers },
-    phase_b: { layers: data.phase_b.layers,
-               category_ids: Object.keys(data.phase_b.per_category) },
+    phase_a: { layers: data.phase_a.layers,
+               category_ids: Object.keys(data.phase_a.per_category) },
+    phase_b: { layers: data.phase_b.layers },
   }])),
 })
 

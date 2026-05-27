@@ -316,15 +316,15 @@ def compare_directions(
   # Collect ablitMD direction vectors per layer from the recipe
   ablitmd_by_layer: dict[int, list[np.ndarray]] = {}
   for mode_data in recipe["modes"].values():
-    phase_a_dir = np.array(mode_data["phase_a"]["direction"], dtype=np.float32)
-    for layer_idx in range(onset, split + 1):
-      ablitmd_by_layer.setdefault(layer_idx, []).append(phase_a_dir)
-    for cat_dir in mode_data["phase_b"]["per_category"].values():
-      phase_b_arr = np.array(cat_dir, dtype=np.float32)  # (n_slice_layers, dim) or (dim,)
-      for layer_idx in range(split + 1, last + 1):
-        offset = layer_idx - split - 1
-        vec = phase_b_arr[offset] if phase_b_arr.ndim == 2 else phase_b_arr
+    for cat_dir in mode_data["phase_a"]["per_category"].values():
+      phase_a_arr = np.array(cat_dir, dtype=np.float32)  # (n_slice_layers, dim)
+      for layer_idx in range(onset, split + 1):
+        offset = layer_idx - onset
+        vec = phase_a_arr[offset] if phase_a_arr.ndim == 2 else phase_a_arr
         ablitmd_by_layer.setdefault(layer_idx, []).append(vec)
+    phase_b_dir = np.array(mode_data["phase_b"]["direction"], dtype=np.float32)
+    for layer_idx in range(split + 1, last + 1):
+      ablitmd_by_layer.setdefault(layer_idx, []).append(phase_b_dir)
 
   all_layers = sorted(set(ablitmd_by_layer.keys()) | set(classic_directions.keys()))
   rows = []
