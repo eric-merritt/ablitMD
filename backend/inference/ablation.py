@@ -51,19 +51,20 @@ def _projection_modules(layer):
   return projections
 
 
-def _mtp_projections(model):
-  """Return o_proj modules from MTP layers, if present. MTP sits outside the main
-  decoder layers list and writes into the same hidden-dim residual space."""
-  mtp = getattr(model, "mtp", None)
-  if mtp is None:
-    return []
-  projections = []
-  for layer in (mtp.layers if hasattr(mtp, "layers") else []):
-    if hasattr(layer, "self_attn"):
-      proj = getattr(layer.self_attn, "o_proj", None) or getattr(layer.self_attn, "out_proj", None)
-      if proj is not None:
-        projections.append(proj)
-  return projections
+# _mtp_projections is commented out: hidden_index=0 (the MTP head) maps to embed_tokens in the
+# hidden-state array, and even factor=0.1 on layer 0 destroys output coherence entirely.
+# Targeting the MTP head via o_proj has the same effect. Leave layer 0 alone.
+# def _mtp_projections(model):
+#   mtp = getattr(model, "mtp", None)
+#   if mtp is None:
+#     return []
+#   projections = []
+#   for layer in (mtp.layers if hasattr(mtp, "layers") else []):
+#     if hasattr(layer, "self_attn"):
+#       proj = getattr(layer.self_attn, "o_proj", None) or getattr(layer.self_attn, "out_proj", None)
+#       if proj is not None:
+#         projections.append(proj)
+#   return projections
 
 
 def apply_ablation_in_place(recipe: dict, model) -> dict:
@@ -77,21 +78,21 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
 
   _first_logged = False
   with torch.no_grad():
-    # Ablate embedding layer (layer 0) - following abliterate_v2.py method
-    raw_emb = directions_for_layer(recipe, hidden_index=0)
-    if raw_emb:
-      inner = model.model
-      if hasattr(inner, "language_model"):
-        inner = inner.language_model
-      emb = inner.embed_tokens
-      if id(emb) not in snapshots:
-        snapshots[id(emb)] = (emb, emb.weight.data.clone())
-      W = emb.weight.data.to(torch.float32)
-      for vector, factor in raw_emb:
-        d = torch.tensor(vector, device=device, dtype=torch.float32)
-        proj_out = torch.outer(W @ d, d)
-        W = W - float(factor) * proj_out
-      emb.weight.copy_(W.to(dtype))
+    # Layer 0 (embed_tokens / MTP head) is not ablated: even factor=0.1 destroys output entirely.
+    # raw_emb = directions_for_layer(recipe, hidden_index=0)
+    # if raw_emb:
+    #   inner = model.model
+    #   if hasattr(inner, "language_model"):
+    #     inner = inner.language_model
+    #   emb = inner.embed_tokens
+    #   if id(emb) not in snapshots:
+    #     snapshots[id(emb)] = (emb, emb.weight.data.clone())
+    #   W = emb.weight.data.to(torch.float32)
+    #   for vector, factor in raw_emb:
+    #     d = torch.tensor(vector, device=device, dtype=torch.float32)
+    #     proj_out = torch.outer(W @ d, d)
+    #     W = W - float(factor) * proj_out
+    #   emb.weight.copy_(W.to(dtype))
 
     for decoder_idx in range(len(layers)):
       raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
@@ -127,23 +128,23 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
           W = orthogonalize_input(W, direction, factor)
         lm_head.weight.copy_(W.to(dtype))
 
-    mtp_projs = _mtp_projections(model)
-    for mtp_proj in mtp_projs:
-      if id(mtp_proj) not in snapshots:
-        snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
-      W = mtp_proj.weight.data.to(torch.float32)
-      for mode_data in recipe["modes"].values():
-        d = torch.tensor(mode_data["phase_b"]["direction"], device=device, dtype=torch.float32)
-        W = orthogonalize_weight(W, d, recipe["factor_b"])
-      mtp_proj.weight.copy_(W.to(dtype))
+    # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.
+    # mtp_projs = _mtp_projections(model)
+    # for mtp_proj in mtp_projs:
+    #   if id(mtp_proj) not in snapshots:
+    #     snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
+    #   W = mtp_proj.weight.data.to(torch.float32)
+    #   for mode_data in recipe["modes"].values():
+    #     d = torch.tensor(mode_data["phase_b"]["direction"], device=device, dtype=torch.float32)
+    #     W = orthogonalize_weight(W, d, recipe["factor_b"])
+    #   mtp_proj.weight.copy_(W.to(dtype))
 
     torch.cuda.synchronize(device)
 
-  mtp_str = f" mtp_o_proj={len(mtp_projs)}" if mtp_projs else " mtp=none"
   print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
         f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
         f"factor_a={recipe['factor_a']} factor_b={recipe['factor_b']} "
-        f"modes={list(recipe['modes'].keys())}{mtp_str}", flush=True)
+        f"modes={list(recipe['modes'].keys())}", flush=True)
   return snapshots
 
 
@@ -284,13 +285,14 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
           W = orthogonalize_input(W, direction_t, disclaimer_factor)
       lm_head.weight.copy_(W.to(dtype).to(device))
 
-    for mtp_proj in _mtp_projections(model):
-      if id(mtp_proj) not in snapshots:
-        snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
-      W = mtp_proj.weight.data.to(torch.float32)
-      for direction in directions.values():
-        W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), factor)
-      mtp_proj.weight.copy_(W.to(dtype).to(device))
+    # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.
+    # for mtp_proj in _mtp_projections(model):
+    #   if id(mtp_proj) not in snapshots:
+    #     snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
+    #   W = mtp_proj.weight.data.to(torch.float32)
+    #   for direction in directions.values():
+    #     W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), factor)
+    #   mtp_proj.weight.copy_(W.to(dtype).to(device))
 
   return snapshots
 
