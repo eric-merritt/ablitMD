@@ -153,7 +153,6 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     return () => {
       cancelled = true
       controller.abort()
-      fetch('/api/inference/reset', { method: 'POST' }).catch(() => {})
     }
   }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
 
