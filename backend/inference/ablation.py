@@ -54,10 +54,7 @@ def _projection_modules(layer):
 def _mtp_projections(model):
   """Return o_proj modules from MTP layers, if present. MTP sits outside the main
   decoder layers list and writes into the same hidden-dim residual space."""
-  inner = model.model
-  if hasattr(inner, "language_model"):
-    inner = inner.language_model
-  mtp = getattr(inner, "mtp", None)
+  mtp = getattr(model, "mtp", None)
   if mtp is None:
     return []
   projections = []
