@@ -14,8 +14,8 @@ export interface DivergencePayload {
 }
 
 export interface SlimRecipeMode {
-  phase_a: { layers: [number, number] }
-  phase_b: { layers: [number, number]; category_ids: string[] }
+  phase_a: { layers: [number, number]; category_ids: string[] }
+  phase_b: { layers: [number, number] }
 }
 
 export interface SlimRecipe {

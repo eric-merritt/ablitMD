@@ -282,14 +282,11 @@ async def ablate_verify(req: VerifyRequest, request: Request):
       if is_cancelled() or await request.is_disconnected():
         return
       yield json.dumps({ "type": "category_start", "category": category }) + "\n"
-      hard_phase_b = recipe["modes"].get("hard", {}).get("phase_b", {}).get("per_category", {})
-      redirect_phase_b = recipe["modes"].get("redirect", {}).get("phase_b", {}).get("per_category", {})
-      raw = hard_phase_b.get(category) or redirect_phase_b.get(category) or [0.0]
-      arr = np.array(raw, dtype=np.float32)
-      # per_category is now (n_slice_layers, dim); reduce to a single unit vector
-      vec = arr.mean(axis=0) if arr.ndim == 2 else arr
-      norm = float(np.linalg.norm(vec))
-      direction = (vec / norm) if norm > 1e-8 else vec
+      raw_dir = (recipe["modes"].get("hard", {}).get("phase_b", {}).get("direction")
+                 or recipe["modes"].get("redirect", {}).get("phase_b", {}).get("direction"))
+      arr = np.array(raw_dir, dtype=np.float32) if raw_dir else np.zeros(1, dtype=np.float32)
+      norm = float(np.linalg.norm(arr))
+      direction = (arr / norm) if norm > 1e-8 else arr
 
       before_proj, after_proj, refused_before, refused_after = [], [], 0, 0
       for item in items:
