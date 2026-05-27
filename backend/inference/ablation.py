@@ -130,7 +130,8 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
           W = orthogonalize_input(W, direction, factor)
         lm_head.weight.copy_(W.to(dtype))
 
-    for mtp_proj in _mtp_projections(model):
+    mtp_projs = _mtp_projections(model)
+    for mtp_proj in mtp_projs:
       if id(mtp_proj) not in snapshots:
         snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
       W = mtp_proj.weight.data.to(torch.float32)
@@ -142,10 +143,11 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
 
     torch.cuda.synchronize(device)
 
+  mtp_str = f" mtp_o_proj={len(mtp_projs)}" if mtp_projs else " mtp=none"
   print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
         f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
         f"factor_a={recipe['factor_a']} factor_b={recipe['factor_b']} "
-        f"modes={list(recipe['modes'].keys())}", flush=True)
+        f"modes={list(recipe['modes'].keys())}{mtp_str}", flush=True)
   return snapshots
 
 
