@@ -39,20 +39,32 @@ const NumberField = ({ label, value, min, max, onCommit }: {
 
 const FactorField = ({ label, value, onCommit }: {
   label: string; value: number; onCommit: (next: number) => void
-}) => (
-  <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-muted)', flex: 1, minWidth: '120px' }}>
-    <span>{label} <strong style={{ color: 'var(--text)' }}>{value.toFixed(2)}</strong></span>
-    <input
-      type="range"
-      min={0}
-      max={3}
-      step={0.05}
-      value={value}
-      onChange={event => onCommit(Number(event.target.value))}
-      style={{ width: '100%' }}
-    />
-  </label>
-)
+}) => {
+  const [draft, setDraft] = useState(value.toFixed(2))
+  useEffect(() => { setDraft(value.toFixed(2)) }, [value])
+
+  const commit = () => {
+    const next = Number(draft)
+    if (Number.isFinite(next) && next >= 0 && next <= 3) onCommit(next)
+    else setDraft(value.toFixed(2))
+  }
+
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-muted)', flex: 1, minWidth: '160px' }}>
+      <span>{ label }</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <input type="range" min={0} max={3} step={0.05} value={value}
+          onChange={event => onCommit(Number(event.target.value))}
+          style={{ flex: 1 }} />
+        <input type="number" min={0} max={3} step={0.05} value={draft}
+          onChange={event => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={event => { if (event.key === 'Enter') commit() }}
+          style={{ width: '58px', padding: '3px 5px', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '11px' }} />
+      </div>
+    </label>
+  )
+}
 
 export const LayerSplitControls = ({ params, lastLayer, onChange }: LayerSplitControlsProps) => (
   <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
