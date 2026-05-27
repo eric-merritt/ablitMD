@@ -33,7 +33,9 @@ app.use("/api/ablation", ablationRouter);
 
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: err.message || "Internal server error" });
+  if (!res.headersSent) {
+    res.status(500).json({ error: err.message || "Internal server error" });
+  }
 });
 
 export default app;
