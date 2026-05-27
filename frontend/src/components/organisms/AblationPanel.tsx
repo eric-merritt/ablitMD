@@ -44,6 +44,31 @@ const GatedButton = ({ disabled, tooltip, onClick, children }: {
   )
 }
 
+const SliderWithInput = ({ min, max, step, value, onChange }: {
+  min: number; max: number; step: number; value: number; onChange: (n: number) => void
+}) => {
+  const [draft, setDraft] = useState(value.toFixed(2))
+  useEffect(() => { setDraft(value.toFixed(2)) }, [value])
+
+  const commit = () => {
+    const next = Number(draft)
+    if (Number.isFinite(next) && next >= min && next <= max) onChange(next)
+    else setDraft(value.toFixed(2))
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))} style={{ width: '80px' }} />
+      <input type="number" min={min} max={max} step={step} value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit() }}
+        style={{ width: '58px', padding: '3px 5px', background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '11px' }} />
+    </div>
+  )
+}
+
 const pickFirstModelEntry = (payload: Record<string, unknown>) => {
   for (const [key, value] of Object.entries(payload)) {
     if (key !== 'computed_at' && value && typeof value === 'object') {
@@ -127,6 +152,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
 
   useEffect(() => {
     if (!recipe || !modelId) return
+    setCompareRows([])
     setCompareLoading(true)
     setCompareError(undefined)
     compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode })
@@ -178,9 +204,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             </div>
             {mode === 'classic' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <input type="range" min={0.1} max={3.0} step={0.05} value={classicFactor}
-                  onChange={e => setClassicFactor(Number(e.target.value))} style={{ width: '80px' }} />
-                <span style={{ fontSize: '11px', color: 'var(--text)', minWidth: '28px' }}>×{classicFactor.toFixed(2)}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>×</span>
+                <SliderWithInput min={0.1} max={3.0} step={0.05} value={classicFactor} onChange={setClassicFactor} />
               </div>
             )}
             <GatedButton disabled={!recipe || modelLoad !== 'ready' || status === 'building'}
@@ -204,9 +229,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
             </label>
             {disclaimerAblate && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <input type="range" min={0.05} max={1.0} step={0.05} value={disclaimerFactor}
-                  onChange={e => setDisclaimerFactor(Number(e.target.value))} style={{ width: '80px' }} />
-                <span style={{ fontSize: '11px', color: 'var(--text)', minWidth: '28px' }}>×{disclaimerFactor.toFixed(2)}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>×</span>
+                <SliderWithInput min={0.05} max={1.0} step={0.05} value={disclaimerFactor} onChange={setDisclaimerFactor} />
               </div>
             )}
           </div>
