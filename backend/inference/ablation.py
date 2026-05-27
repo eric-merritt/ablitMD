@@ -133,9 +133,8 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         snapshots[id(mtp_proj)] = (mtp_proj, mtp_proj.weight.data.clone())
       W = mtp_proj.weight.data.to(torch.float32)
       for mode_data in recipe["modes"].values():
-        for cat_vec in mode_data["phase_b"]["per_category"].values():
-          d = torch.tensor(cat_vec, device=device, dtype=torch.float32)
-          W = orthogonalize_weight(W, d, recipe["factor_b"])
+        d = torch.tensor(mode_data["phase_b"]["direction"], device=device, dtype=torch.float32)
+        W = orthogonalize_weight(W, d, recipe["factor_b"])
       mtp_proj.weight.copy_(W.to(dtype))
 
     torch.cuda.synchronize(device)
@@ -291,9 +290,6 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
       W = mtp_proj.weight.data.to(torch.float32)
       for direction in directions.values():
         W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), factor)
-      if disclaimer_directions:
-        for direction in disclaimer_directions.values():
-          W = orthogonalize_weight(W, torch.tensor(direction, dtype=torch.float32), disclaimer_factor)
       mtp_proj.weight.copy_(W.to(dtype).to(device))
 
   return snapshots
