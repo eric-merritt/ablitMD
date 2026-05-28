@@ -110,7 +110,7 @@ def stream_prompt(
       model.generate(
         input_ids,
         attention_mask=attention_mask,
-        max_new_tokens=512,
+        max_new_tokens=1024,
         do_sample=False,
         streamer=streamer,
         stopping_criteria=StoppingCriteriaList([_EventStop(abort_event)]),

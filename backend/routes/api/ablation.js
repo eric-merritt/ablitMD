@@ -106,6 +106,15 @@ const proxyNdjsonStream = (inferencePath) => async (req, res) => {
   res.end()
 }
 
+router.post('/verify/label', async (req, res) => {
+  const response = await fetch(`${INFERENCE_BASE}/ablate/verify/label`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req.body),
+  })
+  res.status(response.status).json(await safeJson(response))
+})
+
 router.post('/:runId/verify', async (req, res) => {
   const pending = buildLocks.get(req.params.runId)
   if (pending) { try { await pending } catch {} }

@@ -61,6 +61,14 @@ export interface VerifyPromptResult {
   refused_after: boolean
 }
 
+export interface VerifyLivePrompt {
+  prompt_id: string
+  prompt_text: string
+  category: string
+  response_before: string
+  refused_before: boolean
+}
+
 export interface DirectionCompareRow {
   layer: number
   ablitmd_magnitude: number | null
@@ -71,5 +79,8 @@ export interface DirectionCompareRow {
 export type VerifyEvent =
   | { type: 'total'; categories: number; prompts: number }
   | { type: 'category_start'; category: string }
+  | ({ type: 'prompt_start' } & VerifyLivePrompt)
+  | { type: 'verify_token'; text: string }
+  | { type: 'generation_done' }
   | ({ type: 'prompt' } & VerifyPromptResult)
   | ({ type: 'category_result' } & VerifyCategoryResult)
