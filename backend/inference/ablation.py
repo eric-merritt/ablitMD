@@ -228,6 +228,20 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
     W = proj.weight.data.to(torch.float32)
     proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), factor).to(dtype))
 
+  # Orthogonalize each disclaimer direction against its per-layer refusal direction so the
+  # disclaimer edit only touches subspace not already covered by the refusal ablation.
+  effective_disclaimer: dict[int, np.ndarray] = {}
+  if disclaimer_directions:
+    for layer_idx, d_disc in disclaimer_directions.items():
+      d_ref = directions.get(layer_idx)
+      if d_ref is not None:
+        d_res = d_disc - float(np.dot(d_disc, d_ref)) * d_ref
+        res_norm = float(np.linalg.norm(d_res))
+        if res_norm > 1e-4:
+          effective_disclaimer[layer_idx] = (d_res / res_norm).astype(np.float32)
+      else:
+        effective_disclaimer[layer_idx] = d_disc
+
   with torch.no_grad():
     for layer_idx, direction in directions.items():
       direction_t = torch.tensor(direction, device=device, dtype=dtype)
@@ -244,25 +258,21 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
       for proj in _projection_modules(layers[decoder_idx]):
         _snap_and_edit(proj, direction_t)
 
-    # Apply disclaimer directions with separate factor
-    if disclaimer_directions:
+    # Apply orthogonalized disclaimer directions on top of the already-edited weights.
+    if effective_disclaimer:
       def _snap_and_edit_disc(proj, direction_t):
         if id(proj) not in snapshots:
           snapshots[id(proj)] = (proj, proj.weight.data.clone())
-        original = snapshots[id(proj)][1]
-        W = original.to(torch.float32)
+        W = proj.weight.data.to(torch.float32)
         proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), disclaimer_factor).to(dtype))
 
-      for layer_idx, direction in disclaimer_directions.items():
+      for layer_idx, direction in effective_disclaimer.items():
         direction_t = torch.tensor(direction, device=device, dtype=dtype)
         if layer_idx == 0:
           emb = model.model.embed_tokens
           if id(emb) not in snapshots:
             snapshots[id(emb)] = (emb, emb.weight.data.clone())
-          original = snapshots[id(emb)][1]
-          W = original.to(torch.float32)
-          W.addr_(direction_t.to(torch.float32) @ W.T, direction_t.to(torch.float32), alpha=-disclaimer_factor)
-          emb.weight.copy_(W.to(dtype))
+          emb.weight.data.addr_(direction_t.to(torch.float32) @ emb.weight.data.to(torch.float32).T, direction_t.to(torch.float32), alpha=-disclaimer_factor)
           continue
         decoder_idx = layer_idx - 1
         if decoder_idx >= len(layers):
@@ -274,15 +284,13 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
     if lm_head is not None and hasattr(lm_head, "weight"):
       if id(lm_head) not in snapshots:
         snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
-      original = snapshots[id(lm_head)][1]
-      W = original.cpu().to(torch.float32)
+      W = lm_head.weight.data.cpu().to(torch.float32)
       for direction in directions.values():
         direction_t = torch.tensor(direction, dtype=torch.float32)
         W = orthogonalize_input(W, direction_t, factor)
-      if disclaimer_directions:
-        for direction in disclaimer_directions.values():
-          direction_t = torch.tensor(direction, dtype=torch.float32)
-          W = orthogonalize_input(W, direction_t, disclaimer_factor)
+      for direction in effective_disclaimer.values():
+        direction_t = torch.tensor(direction, dtype=torch.float32)
+        W = orthogonalize_input(W, direction_t, disclaimer_factor)
       lm_head.weight.copy_(W.to(dtype).to(device))
 
     # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.
