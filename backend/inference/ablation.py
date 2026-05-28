@@ -156,69 +156,154 @@ def restore_model_weights(snapshots: dict) -> None:
 
 
 def compute_classic_directions(
-  run_data: dict, state_dir: Path, model_id: str, gen_mode: str, include_disclaimer: bool = False
-) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
-  """Compute refusal + optionally disclaimer directions.
-  Returns (refusal_directions, disclaimer_directions) dicts."""
-  refused_states: list[np.ndarray] = []
-  complied_states: list[np.ndarray] = []
-  disclaimer_states: list[np.ndarray] = []
+  run_data: dict, state_dir: Path, model_id: str, gen_mode: str,
+  include_disclaimer: bool = False, recipe: dict | None = None
+) -> tuple[dict[int, np.ndarray], dict]:
+  """Compute refusal directions + optionally phased disclaimer directions.
+
+  Returns (refusal_dirs, disclaimer_result) where disclaimer_result is:
+  - {} when include_disclaimer=False or no disclaimer states found
+  - {"onset":int, "split":int, "phase_a":dict[int,list[ndarray]], "phase_b":dict[int,ndarray]}
+    when recipe is provided (Phase A per-category onset..split, Phase B shared split+1..last)
+  - dict[int,ndarray] flat when no recipe
+
+  Post-ablation captures (disclaimer__{key}.npy) are merged if mean cosine vs originals > 0.5;
+  otherwise discarded (direction has shifted under ablation).
+  """
+  refused_states:   list[np.ndarray]             = []
+  complied_states:  list[np.ndarray]             = []
+  orig_by_cat:      dict[str, list[np.ndarray]]  = {}
+  capt_by_cat:      dict[str, list[np.ndarray]]  = {}
 
   for prompt in run_data["prompts"]:
     result = prompt.get("model_results", {}).get(model_id, {}).get(gen_mode)
     if not result:
       continue
-    key = result["hidden_states_key"]
+    key      = result["hidden_states_key"]
+    category = prompt["category"]
     npy_path = state_dir / f"{key}.npy"
     if not npy_path.exists():
       continue
-    hidden = np.load(str(npy_path))
+    hidden       = np.load(str(npy_path))
     refusal_mode = result.get("refusal_mode", "none")
 
     if refusal_mode == "disclaimer":
       if include_disclaimer:
-        disclaimer_states.append(hidden)
+        orig_by_cat.setdefault(category, []).append(hidden)
     elif result.get("refused"):
       refused_states.append(hidden)
     else:
       complied_states.append(hidden)
+
+    if include_disclaimer:
+      disc_npy = state_dir / f"disclaimer__{key}.npy"
+      if disc_npy.exists():
+        capt_by_cat.setdefault(category, []).append(np.load(str(disc_npy)))
 
   if not refused_states or not complied_states:
     raise ValueError("need both refused and complied hidden states to compute classic directions")
 
   refused_arr  = np.stack(refused_states,  axis=0)
   complied_arr = np.stack(complied_states, axis=0)
+  n_layers     = refused_arr.shape[1]
 
-  n_layers = refused_arr.shape[1]
   directions: dict[int, np.ndarray] = {}
   for layer_idx in range(n_layers):
     diff = refused_arr[:, layer_idx, :].mean(axis=0) - complied_arr[:, layer_idx, :].mean(axis=0)
     norm = float(np.linalg.norm(diff))
-    if norm < 1e-8:
-      continue
-    directions[layer_idx] = (diff / norm).astype(np.float32)
+    if norm > 1e-8:
+      directions[layer_idx] = (diff / norm).astype(np.float32)
 
-  disclaimer_directions: dict[int, np.ndarray] = {}
-  if include_disclaimer and disclaimer_states:
-    disc_arr = np.stack(disclaimer_states, axis=0)
-    for layer_idx in range(n_layers):
-      diff = disc_arr[:, layer_idx, :].mean(axis=0) - complied_arr[:, layer_idx, :].mean(axis=0)
+  if not include_disclaimer or (not orig_by_cat and not capt_by_cat):
+    return directions, {}
+
+  # Merge post-ablation captures if they're still pointing the same direction as originals.
+  merged_by_cat: dict[str, list[np.ndarray]] = {cat: list(s) for cat, s in orig_by_cat.items()}
+  if capt_by_cat:
+    if orig_by_cat:
+      all_orig = [h for s in orig_by_cat.values() for h in s]
+      all_capt = [h for s in capt_by_cat.values() for h in s]
+      orig_arr = np.stack(all_orig, axis=0)
+      capt_arr = np.stack(all_capt, axis=0)
+      cos_sims = []
+      for layer_idx in range(n_layers):
+        comp_mean = complied_arr[:, layer_idx, :].mean(0)
+        o_diff = orig_arr[:, layer_idx, :].mean(0) - comp_mean
+        c_diff = capt_arr[:, layer_idx, :].mean(0) - comp_mean
+        o_norm = float(np.linalg.norm(o_diff))
+        c_norm = float(np.linalg.norm(c_diff))
+        if o_norm > 1e-8 and c_norm > 1e-8:
+          cos_sims.append(float(np.dot(o_diff / o_norm, c_diff / c_norm)))
+      mean_cos = float(np.mean(cos_sims)) if cos_sims else 0.0
+      if mean_cos > 0.5:
+        print(f"[ablation] merging post-ablation disclaimer captures (cosine={mean_cos:.3f})", flush=True)
+        for cat, states in capt_by_cat.items():
+          merged_by_cat.setdefault(cat, []).extend(states)
+      else:
+        print(f"[ablation] discarding post-ablation captures — direction shifted (cosine={mean_cos:.3f})", flush=True)
+    else:
+      print("[ablation] using post-ablation disclaimer captures only (no originals)", flush=True)
+      merged_by_cat = {cat: list(s) for cat, s in capt_by_cat.items()}
+
+  if not merged_by_cat:
+    return directions, {}
+
+  all_disc    = [h for s in merged_by_cat.values() for h in s]
+  disc_all_arr = np.stack(all_disc, axis=0)
+
+  if recipe:
+    onset = recipe["onset"]
+    split = recipe["split"]
+    last  = recipe["last_layer"]
+
+    phase_a: dict[int, list[np.ndarray]] = {}
+    for layer_idx in range(onset, min(split + 1, n_layers)):
+      cat_dirs = []
+      for cat, states in merged_by_cat.items():
+        disc_arr = np.stack(states, axis=0)
+        diff = disc_arr[:, layer_idx, :].mean(0) - complied_arr[:, layer_idx, :].mean(0)
+        norm = float(np.linalg.norm(diff))
+        if norm > 1e-8:
+          cat_dirs.append((diff / norm).astype(np.float32))
+      if cat_dirs:
+        phase_a[layer_idx] = cat_dirs
+
+    phase_b: dict[int, np.ndarray] = {}
+    for layer_idx in range(split + 1, min(last + 1, n_layers)):
+      diff = disc_all_arr[:, layer_idx, :].mean(0) - complied_arr[:, layer_idx, :].mean(0)
       norm = float(np.linalg.norm(diff))
-      if norm < 1e-8:
-        continue
-      disclaimer_directions[layer_idx] = (diff / norm).astype(np.float32)
+      if norm > 1e-8:
+        phase_b[layer_idx] = (diff / norm).astype(np.float32)
 
-  return directions, disclaimer_directions
+    return directions, {"onset": onset, "split": split, "phase_a": phase_a, "phase_b": phase_b}
+
+  # Flat (no recipe)
+  flat_disclaimer: dict[int, np.ndarray] = {}
+  for layer_idx in range(n_layers):
+    diff = disc_all_arr[:, layer_idx, :].mean(0) - complied_arr[:, layer_idx, :].mean(0)
+    norm = float(np.linalg.norm(diff))
+    if norm > 1e-8:
+      flat_disclaimer[layer_idx] = (diff / norm).astype(np.float32)
+  return directions, flat_disclaimer
 
 
-def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, model,
-                           disclaimer_directions: dict[int, np.ndarray] | None = None,
-                           disclaimer_factor: float = 0.3) -> dict:
+def apply_classic_in_place(
+  directions: dict[int, np.ndarray], factor: float, model,
+  disclaimer: dict | None = None, disclaimer_factor: float = 0.3
+) -> dict:
   """Apply classic (flat, per-layer) abliteration to model weights in memory.
   directions: {layer_index: unit_direction}. layer_index 0 = embedding, 1..N = decoder layers.
-  Returns weight snapshots for restore_model_weights."""
+
+  disclaimer may be:
+  - None / {} — no disclaimer ablation
+  - {"onset":int, "split":int, "phase_a":dict[int,list[ndarray]], "phase_b":dict[int,ndarray]}
+    for phased (recipe-aware) disclaimer
+  - dict[int,ndarray] for flat disclaimer
+
+  Returns weight snapshots for restore_model_weights.
+  """
   device = next(model.parameters()).device
-  dtype = next(model.parameters()).dtype
+  dtype  = next(model.parameters()).dtype
   layers = _decoder_layers(model)
   snapshots: dict = {}
 
@@ -228,25 +313,58 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
     W = proj.weight.data.to(torch.float32)
     proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), factor).to(dtype))
 
-  # Orthogonalize each disclaimer direction against its per-layer refusal direction so the
-  # disclaimer edit only touches subspace not already covered by the refusal ablation.
-  effective_disclaimer: dict[int, np.ndarray] = {}
-  if disclaimer_directions:
-    for layer_idx, d_disc in disclaimer_directions.items():
-      d_ref = directions.get(layer_idx)
-      if d_ref is not None:
-        d_res = d_disc - float(np.dot(d_disc, d_ref)) * d_ref
-        res_norm = float(np.linalg.norm(d_res))
-        if res_norm > 1e-4:
-          effective_disclaimer[layer_idx] = (d_res / res_norm).astype(np.float32)
-      else:
-        effective_disclaimer[layer_idx] = d_disc
+  # Unpack disclaimer into flat / phase_a / phase_b
+  is_phased = isinstance(disclaimer, dict) and "onset" in disclaimer
+  if is_phased:
+    raw_phase_a: dict[int, list[np.ndarray]] = disclaimer.get("phase_a", {})
+    raw_phase_b: dict[int, np.ndarray]       = disclaimer.get("phase_b", {})
+    flat_dirs:   dict[int, np.ndarray]       = {}
+  elif disclaimer:
+    flat_dirs   = disclaimer  # type: ignore[assignment]
+    raw_phase_a = {}
+    raw_phase_b = {}
+  else:
+    flat_dirs   = {}
+    raw_phase_a = {}
+    raw_phase_b = {}
+
+  # Gram-Schmidt: project out refusal component from each disclaimer direction.
+  def _gs(d_disc: np.ndarray, layer_idx: int) -> np.ndarray | None:
+    d_ref = directions.get(layer_idx)
+    if d_ref is not None:
+      d_res  = d_disc - float(np.dot(d_disc, d_ref)) * d_ref
+      res_norm = float(np.linalg.norm(d_res))
+      return (d_res / res_norm).astype(np.float32) if res_norm > 1e-4 else None
+    return d_disc.copy()
+
+  eff_flat:    dict[int, np.ndarray]       = {}
+  eff_phase_a: dict[int, list[np.ndarray]] = {}
+  eff_phase_b: dict[int, np.ndarray]       = {}
+
+  for layer_idx, d in flat_dirs.items():
+    r = _gs(d, layer_idx)
+    if r is not None:
+      eff_flat[layer_idx] = r
+
+  for layer_idx, cat_dirs in raw_phase_a.items():
+    eff = []
+    for d in cat_dirs:
+      r = _gs(d, layer_idx)
+      if r is not None:
+        eff.append(r)
+    if eff:
+      eff_phase_a[layer_idx] = eff
+
+  for layer_idx, d in raw_phase_b.items():
+    r = _gs(d, layer_idx)
+    if r is not None:
+      eff_phase_b[layer_idx] = r
 
   with torch.no_grad():
+    # Refusal directions
     for layer_idx, direction in directions.items():
       direction_t = torch.tensor(direction, device=device, dtype=dtype)
       if layer_idx == 0:
-        # embedding table: rows are output vectors written to the residual stream
         emb = model.model.embed_tokens
         if id(emb) not in snapshots:
           snapshots[id(emb)] = (emb, emb.weight.data.clone())
@@ -258,27 +376,43 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
       for proj in _projection_modules(layers[decoder_idx]):
         _snap_and_edit(proj, direction_t)
 
-    # Apply orthogonalized disclaimer directions on top of the already-edited weights.
-    if effective_disclaimer:
-      def _snap_and_edit_disc(proj, direction_t):
-        if id(proj) not in snapshots:
-          snapshots[id(proj)] = (proj, proj.weight.data.clone())
-        W = proj.weight.data.to(torch.float32)
-        proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), disclaimer_factor).to(dtype))
+    # Shared helpers for disclaimer edits (read current weight, not snapshot)
+    def _edit_disc_proj(proj, direction_t):
+      if id(proj) not in snapshots:
+        snapshots[id(proj)] = (proj, proj.weight.data.clone())
+      W = proj.weight.data.to(torch.float32)
+      proj.weight.copy_(orthogonalize_weight(W, direction_t.to(torch.float32), disclaimer_factor).to(dtype))
 
-      for layer_idx, direction in effective_disclaimer.items():
-        direction_t = torch.tensor(direction, device=device, dtype=dtype)
-        if layer_idx == 0:
-          emb = model.model.embed_tokens
-          if id(emb) not in snapshots:
-            snapshots[id(emb)] = (emb, emb.weight.data.clone())
-          emb.weight.data.addr_(direction_t.to(torch.float32) @ emb.weight.data.to(torch.float32).T, direction_t.to(torch.float32), alpha=-disclaimer_factor)
-          continue
-        decoder_idx = layer_idx - 1
-        if decoder_idx >= len(layers):
-          continue
-        for proj in _projection_modules(layers[decoder_idx]):
-          _snap_and_edit_disc(proj, direction_t)
+    def _edit_disc_emb(emb, direction_t):
+      if id(emb) not in snapshots:
+        snapshots[id(emb)] = (emb, emb.weight.data.clone())
+      emb.weight.data.addr_(
+        direction_t.to(torch.float32) @ emb.weight.data.to(torch.float32).T,
+        direction_t.to(torch.float32), alpha=-disclaimer_factor
+      )
+
+    def _apply_disc_at_layer(layer_idx: int, direction_t):
+      if layer_idx == 0:
+        _edit_disc_emb(model.model.embed_tokens, direction_t)
+        return
+      decoder_idx = layer_idx - 1
+      if decoder_idx >= len(layers):
+        return
+      for proj in _projection_modules(layers[decoder_idx]):
+        _edit_disc_proj(proj, direction_t)
+
+    # Flat disclaimer
+    for layer_idx, direction in eff_flat.items():
+      _apply_disc_at_layer(layer_idx, torch.tensor(direction, device=device, dtype=dtype))
+
+    # Phase A disclaimer (per-category directions, onset..split)
+    for layer_idx, cat_dirs in eff_phase_a.items():
+      for d in cat_dirs:
+        _apply_disc_at_layer(layer_idx, torch.tensor(d, device=device, dtype=dtype))
+
+    # Phase B disclaimer (shared direction, split+1..last)
+    for layer_idx, direction in eff_phase_b.items():
+      _apply_disc_at_layer(layer_idx, torch.tensor(direction, device=device, dtype=dtype))
 
     lm_head = getattr(model, "lm_head", None)
     if lm_head is not None and hasattr(lm_head, "weight"):
@@ -286,11 +420,14 @@ def apply_classic_in_place(directions: dict[int, np.ndarray], factor: float, mod
         snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.clone())
       W = lm_head.weight.data.cpu().to(torch.float32)
       for direction in directions.values():
-        direction_t = torch.tensor(direction, dtype=torch.float32)
-        W = orthogonalize_input(W, direction_t, factor)
-      for direction in effective_disclaimer.values():
-        direction_t = torch.tensor(direction, dtype=torch.float32)
-        W = orthogonalize_input(W, direction_t, disclaimer_factor)
+        W = orthogonalize_input(W, torch.tensor(direction, dtype=torch.float32), factor)
+      for direction in eff_flat.values():
+        W = orthogonalize_input(W, torch.tensor(direction, dtype=torch.float32), disclaimer_factor)
+      for cat_dirs in eff_phase_a.values():
+        for d in cat_dirs:
+          W = orthogonalize_input(W, torch.tensor(d, dtype=torch.float32), disclaimer_factor)
+      for direction in eff_phase_b.values():
+        W = orthogonalize_input(W, torch.tensor(direction, dtype=torch.float32), disclaimer_factor)
       lm_head.weight.copy_(W.to(dtype).to(device))
 
     # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.

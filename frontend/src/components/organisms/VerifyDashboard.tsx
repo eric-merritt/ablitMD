@@ -25,6 +25,14 @@ const RefusalBadge = ({ refused }: { refused: boolean }) => (
   </span>
 )
 
+const DisclaimerBadge = () => (
+  <span style={{
+    display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+    fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+    background: '#78350f', color: '#fde68a',
+  }}>disclaimer</span>
+)
+
 const Pct = ({ value }: { value: number }) => <>{ (value * 100).toFixed(0) }%</>
 
 const ResponseBlock = ({ label, text, refused }: { label: string; text: string; refused: boolean }) => (
@@ -74,13 +82,36 @@ const LabelButtons = ({ countdown, onLabel }: {
   </div>
 )
 
-const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, labelCountdown, onLabel }: {
+const DisclaimerButtons = ({ countdown, autoHasDisclaimer, onAnswer }: {
+  countdown: number
+  autoHasDisclaimer: boolean
+  onAnswer: (yes: boolean) => void
+}) => (
+  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Disclaimer before complying?</span>
+    <button onClick={ () => onAnswer(true) } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#78350f', color: '#fde68a', border: 'none', borderRadius: 'var(--radius)',
+    }}>Yes</button>
+    <button onClick={ () => onAnswer(false) } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#1e3a5f', color: '#93c5fd', border: 'none', borderRadius: 'var(--radius)',
+    }}>No</button>
+    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+      auto ({ autoHasDisclaimer ? 'yes' : 'no' }) in { countdown }s
+    </span>
+  </div>
+)
+
+const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, disclaimerCheck, labelCountdown, onLabel, onDisclaimer }: {
   prompt: VerifyLivePrompt
   liveText: string
   streaming: boolean
   awaitingLabel: boolean
+  disclaimerCheck: { autoHasDisclaimer: boolean } | null
   labelCountdown: number
   onLabel: (l: 'refused' | 'complied') => void
+  onDisclaimer: (yes: boolean) => void
 }) => (
   <div style={{
     background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)',
@@ -96,6 +127,13 @@ const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, labelCountd
       <LiveAfterBlock text={ liveText } streaming={ streaming } />
     </div>
     { awaitingLabel && <LabelButtons countdown={ labelCountdown } onLabel={ onLabel } /> }
+    { disclaimerCheck && (
+      <DisclaimerButtons
+        countdown={ labelCountdown }
+        autoHasDisclaimer={ disclaimerCheck.autoHasDisclaimer }
+        onAnswer={ onDisclaimer }
+      />
+    ) }
   </div>
 )
 
@@ -111,7 +149,18 @@ const PromptRow = ({ result }: { result: VerifyPromptResult }) => (
     <div style={{ fontSize: '12px', color: 'var(--text)' }}>{ result.prompt_text }</div>
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
       <ResponseBlock label="before" text={ result.response_before } refused={ result.refused_before } />
-      <ResponseBlock label="after" text={ result.response_after } refused={ result.refused_after } />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>after</span>
+          <RefusalBadge refused={ result.refused_after } />
+          { result.has_disclaimer && <DisclaimerBadge /> }
+        </div>
+        <div style={{
+          background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+          padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)', whiteSpace: 'pre-wrap',
+          maxHeight: '180px', overflow: 'auto',
+        }}>{ result.response_after || '(empty)' }</div>
+      </div>
     </div>
   </div>
 )
@@ -169,10 +218,11 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
   const [baking, setBaking]                   = useState(false)
   const [bakedPath, setBakedPath]             = useState<string>()
 
-  const [livePrompt, setLivePrompt]         = useState<VerifyLivePrompt | null>(null)
-  const [liveText, setLiveText]             = useState('')
-  const [awaitingLabel, setAwaitingLabel]   = useState(false)
-  const [labelCountdown, setLabelCountdown] = useState(5)
+  const [livePrompt, setLivePrompt]               = useState<VerifyLivePrompt | null>(null)
+  const [liveText, setLiveText]                   = useState('')
+  const [awaitingLabel, setAwaitingLabel]         = useState(false)
+  const [disclaimerCheck, setDisclaimerCheck]     = useState<{ autoHasDisclaimer: boolean } | null>(null)
+  const [labelCountdown, setLabelCountdown]       = useState(5)
 
   const labelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const labelTimeoutRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
@@ -186,6 +236,12 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     clearLabelTimers()
     setAwaitingLabel(false)
     submitVerifyLabel(label)
+  }
+
+  const handleDisclaimer = (yes: boolean) => {
+    clearLabelTimers()
+    setDisclaimerCheck(null)
+    submitVerifyLabel(yes ? 'disclaimer_yes' : 'disclaimer_no')
   }
 
   const runBake = async () => {
@@ -215,18 +271,32 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     setLivePrompt(null)
     setLiveText('')
     setAwaitingLabel(false)
+    setDisclaimerCheck(null)
 
-    function startLabelTimer() {
+    function startCountdown(onTimeout: () => void) {
       clearLabelTimers()
       setLabelCountdown(5)
       const interval = setInterval(() => setLabelCountdown(c => c - 1), 1000)
       labelIntervalRef.current = interval
       const timeout = setTimeout(() => {
         clearLabelTimers()
-        setAwaitingLabel(false)
-        submitVerifyLabel('auto')
+        onTimeout()
       }, 5000)
       labelTimeoutRef.current = timeout
+    }
+
+    function startLabelTimer() {
+      startCountdown(() => {
+        setAwaitingLabel(false)
+        submitVerifyLabel('auto')
+      })
+    }
+
+    function startDisclaimerTimer(autoHasDisclaimer: boolean) {
+      startCountdown(() => {
+        setDisclaimerCheck(null)
+        submitVerifyLabel(autoHasDisclaimer ? 'disclaimer_yes' : 'disclaimer_no')
+      })
     }
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
@@ -238,6 +308,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
         setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
         setLiveText('')
         setAwaitingLabel(false)
+        setDisclaimerCheck(null)
         clearLabelTimers()
       }
       else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
@@ -245,11 +316,18 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
         setAwaitingLabel(true)
         startLabelTimer()
       }
+      else if (event.type === 'disclaimer_check') {
+        setAwaitingLabel(false)
+        clearLabelTimers()
+        setDisclaimerCheck({ autoHasDisclaimer: event.auto_has_disclaimer })
+        startDisclaimerTimer(event.auto_has_disclaimer)
+      }
       else if (event.type === 'prompt') {
         setPrompts(prev => [...prev, event])
         setDone(prev => prev + 1)
         setLivePrompt(null)
         setLiveText('')
+        setDisclaimerCheck(null)
       }
       else if (event.type === 'category_result') setCategories(prev => [...prev, event])
     }
@@ -312,10 +390,12 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
               <LivePromptRow
                 prompt={ livePrompt }
                 liveText={ liveText }
-                streaming={ !awaitingLabel }
+                streaming={ !awaitingLabel && !disclaimerCheck }
                 awaitingLabel={ awaitingLabel }
+                disclaimerCheck={ disclaimerCheck }
                 labelCountdown={ labelCountdown }
                 onLabel={ handleLabel }
+                onDisclaimer={ handleDisclaimer }
               />
             ) }
             { prompts.slice().reverse().map(prompt => (

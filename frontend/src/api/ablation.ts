@@ -83,7 +83,7 @@ export const verifyAblation = (
   signal?: AbortSignal,
 ): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal)
 
-export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto'): Promise<void> =>
+export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto' | 'disclaimer_yes' | 'disclaimer_no'): Promise<void> =>
   fetch('/api/ablation/verify/label', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

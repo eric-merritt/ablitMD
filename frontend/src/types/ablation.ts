@@ -59,6 +59,7 @@ export interface VerifyPromptResult {
   response_after: string
   refused_before: boolean
   refused_after: boolean
+  has_disclaimer?: boolean
 }
 
 export interface VerifyLivePrompt {
@@ -82,5 +83,6 @@ export type VerifyEvent =
   | ({ type: 'prompt_start' } & VerifyLivePrompt)
   | { type: 'verify_token'; text: string }
   | { type: 'generation_done' }
+  | { type: 'disclaimer_check'; auto_has_disclaimer: boolean }
   | ({ type: 'prompt' } & VerifyPromptResult)
   | ({ type: 'category_result' } & VerifyCategoryResult)

@@ -34,7 +34,7 @@ from backend.inference.ablation import (
   compute_classic_directions, compare_directions,
   restore_model_weights, bake_and_save,
 )
-from backend.inference.verify import looks_like_refusal, projection_strength
+from backend.inference.verify import looks_like_refusal, looks_like_disclaimer, projection_strength
 
 app = FastAPI(title="ablitMD inference service")
 
@@ -321,10 +321,10 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         token_q: asyncio.Queue = asyncio.Queue()
         def _worker(
           _text=item["prompt"]["text"], _mode=req.gen_mode, _rid=req.run_id,
-          _hkey=f"verify__{key}", _rdir=RUNS_DIR, _skip=req.fast,
+          _hkey=f"verify__{key}", _rdir=RUNS_DIR,
           _loop=loop, _q=token_q,
         ):
-          for ev in stream_prompt(_text, _mode, _rid, _hkey, _rdir, skip_hidden_states=_skip):
+          for ev in stream_prompt(_text, _mode, _rid, _hkey, _rdir):
             _loop.call_soon_threadsafe(_q.put_nowait, ev)
           _loop.call_soon_threadsafe(_q.put_nowait, None)
 
@@ -349,14 +349,32 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           label = await asyncio.wait_for(label_q.get(), timeout=60.0)
         except asyncio.TimeoutError:
           label = "auto"
-        finally:
-          _verify_label_queue = None
 
         prompt_refused_after = (
           True if label == "refused"
           else False if label == "complied"
           else looks_like_refusal(response_after)
         )
+
+        has_disclaimer = False
+        verify_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
+        if not prompt_refused_after:
+          auto_disc = looks_like_disclaimer(response_after)
+          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+          try:
+            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+          except asyncio.TimeoutError:
+            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+          finally:
+            _verify_label_queue = None
+          has_disclaimer = disc_label == "disclaimer_yes"
+          if has_disclaimer and verify_npy.exists():
+            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+          else:
+            verify_npy.unlink(missing_ok=True)
+        else:
+          _verify_label_queue = None
+
         if prompt_refused_after:
           refused_after += 1
 
@@ -373,6 +391,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           "response_after": response_after,
           "refused_before": prompt_refused_before,
           "refused_after": prompt_refused_after,
+          "has_disclaimer": has_disclaimer,
         }) + "\n"
 
       count = max(len(items), 1)
@@ -433,9 +452,11 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     with open(str(log_path), "a") as f:
       f.write(json.dumps(entry) + "\n")
 
+  recipe_for_disc = json.loads(recipe_path.read_text()) if recipe_path.exists() else None
   try:
-    directions, disclaimer_directions = await asyncio.to_thread(
-      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode, req.disclaimer_ablate
+    directions, disclaimer_dirs = await asyncio.to_thread(
+      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode,
+      req.disclaimer_ablate, recipe_for_disc
     )
   except ValueError as err:
     raise HTTPException(status_code=422, detail=str(err))
@@ -466,7 +487,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
   async def events():
     snapshots = await asyncio.to_thread(
       apply_classic_in_place, directions, req.factor, get_model(),
-      disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+      disclaimer_dirs if req.disclaimer_ablate else None, req.disclaimer_factor
     )
     try:
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
@@ -545,14 +566,32 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           label = await asyncio.wait_for(label_q.get(), timeout=60.0)
         except asyncio.TimeoutError:
           label = "auto"
-        finally:
-          _verify_label_queue = None
 
         prompt_refused_after = (
           True if label == "refused"
           else False if label == "complied"
           else looks_like_refusal(response_after)
         )
+
+        has_disclaimer = False
+        verify_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
+        if not prompt_refused_after:
+          auto_disc = looks_like_disclaimer(response_after)
+          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+          try:
+            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+          except asyncio.TimeoutError:
+            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+          finally:
+            _verify_label_queue = None
+          has_disclaimer = disc_label == "disclaimer_yes"
+          if has_disclaimer and verify_npy.exists():
+            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+          else:
+            verify_npy.unlink(missing_ok=True)
+        else:
+          _verify_label_queue = None
+
         if prompt_refused_after:
           refused_after += 1
 
@@ -572,6 +611,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           "response_after": response_after,
           "refused_before": prompt_refused_before,
           "refused_after": prompt_refused_after,
+          "has_disclaimer": has_disclaimer,
         }
         log_entry(prompt_event)
         yield json.dumps(prompt_event) + "\n"
@@ -605,12 +645,15 @@ def ablate_bake(req: AblateRequest):
       raise HTTPException(status_code=400, detail="factor required for classic mode")
     step_data = run_data["sequence"][0]
     gen_mode = step_data["mode"]
-    directions, disclaimer_directions = compute_classic_directions(run_data, state_dir, model_id, gen_mode, req.disclaimer_ablate)
+    recipe_for_disc = json.loads(recipe_path.read_text()) if recipe_path.exists() else None
+    directions, disclaimer_dirs = compute_classic_directions(
+      run_data, state_dir, model_id, gen_mode, req.disclaimer_ablate, recipe_for_disc
+    )
     gc.collect()
     torch.cuda.empty_cache()
     apply_classic_in_place(
       directions, req.factor, get_model(),
-      disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+      disclaimer_dirs if req.disclaimer_ablate else None, req.disclaimer_factor
     )
     base_name = model_id.split("/")[-1]
     out_path = f"/workspace/models/{base_name}-classic-{req.factor:.2f}-{req.run_id}"
@@ -675,7 +718,8 @@ async def submit_verify_label(req: LabelRequest):
   global _verify_label_queue
   if _verify_label_queue is None:
     raise HTTPException(status_code=409, detail="No active verify session")
-  await asyncio.to_thread(abort_and_join_generation)
+  if req.label not in ("disclaimer_yes", "disclaimer_no"):
+    await asyncio.to_thread(abort_and_join_generation)
   await _verify_label_queue.put(req.label)
   return {"ok": True}
 
