@@ -316,7 +316,6 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           "prompt_text": item["prompt"]["text"],
           "response_before": item["result"].get("response") or "",
           "refused_before": prompt_refused_before,
-          "awaiting_label": True,
         }) + "\n"
 
         token_q: asyncio.Queue = asyncio.Queue()
@@ -364,21 +363,46 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         verify_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         # Always check for disclaimer, even for refused responses (more data = better direction)
         auto_disc = looks_like_disclaimer(response_after)
-        yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
-        try:
-          disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-        except asyncio.TimeoutError:
-          disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
-        finally:
-          _verify_label_queue = None
-        has_disclaimer = disc_label == "disclaimer_yes"
-        if has_disclaimer and verify_npy.exists():
-          (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+        if label in ("refused", "complied"):
+          # User clicked a button, so fire disclaimer_check immediately
+          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+          try:
+            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+          except asyncio.TimeoutError:
+            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+          finally:
+            _verify_label_queue = None
+          has_disclaimer = disc_label == "disclaimer_yes"
+          if has_disclaimer and verify_npy.exists():
+            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+          else:
+            verify_npy.unlink(missing_ok=True)
         else:
-          verify_npy.unlink(missing_ok=True)
+          # Auto-label, skip disclaimer check
+          _verify_label_queue = None
+          prompt_refused_after = looks_like_refusal(response_after)
 
         if prompt_refused_after:
           refused_after += 1
+          # Still yield the prompt result for refused responses so UI can show them
+          after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
+          if after_npy.exists() and direction.shape[0] > 1:
+            after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+
+          yield json.dumps({
+            "type": "prompt",
+            "category": category,
+            "prompt_id": item["prompt"].get("prompt_id") or key,
+            "prompt_text": item["prompt"]["text"],
+            "response_before": item["result"].get("response") or "",
+            "response_after": response_after,
+            "refused_before": prompt_refused_before,
+            "refused_after": True,
+            "has_disclaimer": has_disclaimer,
+            "projection_before": before_proj[-1] if before_proj else None,
+            "projection_after": after_proj[-1] if after_proj else None,
+          }) + "\n"
+          continue  # Skip saving .npz but already yielded the result
 
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
@@ -535,7 +559,6 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           "prompt_text": item["prompt"]["text"],
           "response_before": item["result"].get("response") or "",
           "refused_before": prompt_refused_before,
-          "awaiting_label": True,
         }) + "\n"
 
         token_q: asyncio.Queue = asyncio.Queue()
@@ -583,21 +606,49 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         verify_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
         # Always check for disclaimer, even for refused responses (more data = better direction)
         auto_disc = looks_like_disclaimer(response_after)
-        yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
-        try:
-          disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-        except asyncio.TimeoutError:
-          disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
-        finally:
-          _verify_label_queue = None
-        has_disclaimer = disc_label == "disclaimer_yes"
-        if has_disclaimer and verify_npy.exists():
-          (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+        if label in ("refused", "complied"):
+          # User clicked a button, so fire disclaimer_check immediately
+          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+          try:
+            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+          except asyncio.TimeoutError:
+            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+          finally:
+            _verify_label_queue = None
+          has_disclaimer = disc_label == "disclaimer_yes"
+          if has_disclaimer and verify_npy.exists():
+            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+          else:
+            verify_npy.unlink(missing_ok=True)
         else:
-          verify_npy.unlink(missing_ok=True)
+          # Auto-label, skip disclaimer check
+          _verify_label_queue = None
+          prompt_refused_after = looks_like_refusal(response_after)
 
         if prompt_refused_after:
           refused_after += 1
+          # Still yield the prompt result for refused responses so UI can show them
+          after_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
+          if phase_b_range and after_npy.exists():
+            layer_idx = phase_b_range[0]
+            direction = directions.get(layer_idx)
+            if direction is not None:
+              after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
+
+          yield json.dumps({
+            "type": "prompt",
+            "category": category,
+            "prompt_id": item["prompt"].get("prompt_id") or key,
+            "prompt_text": item["prompt"]["text"],
+            "response_before": item["result"].get("response") or "",
+            "response_after": response_after,
+            "refused_before": prompt_refused_before,
+            "refused_after": True,
+            "has_disclaimer": has_disclaimer,
+            "projection_before": before_proj[-1] if before_proj else None,
+            "projection_after": after_proj[-1] if after_proj else None,
+          }) + "\n"
+          continue  # Skip saving .npz but already yielded the result
 
         after_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
         if phase_b_range and after_npy.exists():

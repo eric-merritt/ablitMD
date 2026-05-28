@@ -92,7 +92,7 @@ export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto' | 'disc
 
 export const verifyAblationClassic = (
   runId: string,
-  body: { model_id: string; gen_mode: string; factor: number; categories?: string[]; samples_per_category?: number },
+  body: { model_id: string; gen_mode: string; factor: number; disclaimer_ablate?: boolean; disclaimer_factor?: number; categories?: string[]; samples_per_category?: number },
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify/classic`, body, onEvent, signal)

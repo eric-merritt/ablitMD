@@ -65,18 +65,21 @@ const LiveAfterBlock = ({ text, streaming }: { text: string; streaming: boolean 
   </div>
 )
 
-const LabelButtons = ({ countdown, onLabel }: {
+const LabelButtons = ({ disabled, countdown, onLabel }: {
+  disabled: boolean
   countdown: number
   onLabel: (l: 'refused' | 'complied') => void
 }) => (
   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-    <button onClick={ () => onLabel('refused') } style={{
-      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+    <button onClick={ () => onLabel('refused') } disabled={disabled} style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
       background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 'var(--radius)',
+      opacity: disabled ? 0.5 : 1,
     }}>Refused</button>
-    <button onClick={ () => onLabel('complied') } style={{
-      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+    <button onClick={ () => onLabel('complied') } disabled={disabled} style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
       background: '#064e3b', color: '#6ee7b7', border: 'none', borderRadius: 'var(--radius)',
+      opacity: disabled ? 0.5 : 1,
     }}>Complied</button>
     <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>auto in { countdown }s</span>
   </div>
@@ -103,11 +106,11 @@ const DisclaimerButtons = ({ countdown, autoHasDisclaimer, onAnswer }: {
   </div>
 )
 
-const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, disclaimerCheck, labelCountdown, onLabel, onDisclaimer }: {
+const LivePromptRow = ({ prompt, liveText, streaming, buttonsDisabled, disclaimerCheck, labelCountdown, onLabel, onDisclaimer }: {
   prompt: VerifyLivePrompt
   liveText: string
   streaming: boolean
-  awaitingLabel: boolean
+  buttonsDisabled: boolean
   disclaimerCheck: { autoHasDisclaimer: boolean } | null
   labelCountdown: number
   onLabel: (l: 'refused' | 'complied') => void
@@ -126,12 +129,12 @@ const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, disclaimerC
       <ResponseBlock label="before" text={ prompt.response_before } refused={ prompt.refused_before } />
       <LiveAfterBlock text={ liveText } streaming={ streaming } />
     </div>
-    { awaitingLabel && <LabelButtons countdown={ labelCountdown } onLabel={ onLabel } /> }
+    <LabelButtons disabled={buttonsDisabled} countdown={labelCountdown} onLabel={onLabel} />
     { disclaimerCheck && (
       <DisclaimerButtons
-        countdown={ labelCountdown }
-        autoHasDisclaimer={ disclaimerCheck.autoHasDisclaimer }
-        onAnswer={ onDisclaimer }
+        countdown={labelCountdown}
+        autoHasDisclaimer={disclaimerCheck.autoHasDisclaimer}
+        onAnswer={onDisclaimer}
       />
     ) }
   </div>
@@ -220,12 +223,18 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
 
   const [livePrompt, setLivePrompt]               = useState<VerifyLivePrompt | null>(null)
   const [liveText, setLiveText]                   = useState('')
-  const [awaitingLabel, setAwaitingLabel]         = useState(false)
+  const [streaming, setStreaming]                 = useState(false)
+  const [buttonsDisabled, setButtonsDisabled]     = useState(true)
   const [disclaimerCheck, setDisclaimerCheck]     = useState<{ autoHasDisclaimer: boolean } | null>(null)
   const [labelCountdown, setLabelCountdown]       = useState(5)
+  const [labelSubmitted, setLabelSubmitted]       = useState(false)
 
   const labelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const labelTimeoutRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
+  const streamingRef = useRef(false)
+  const buttonsDisabledRef = useRef(true)
+  const labelSubmittedRef = useRef(false)
+  const streamControllerRef = useRef<AbortController | null>(null)
 
   const clearLabelTimers = () => {
     if (labelIntervalRef.current) { clearInterval(labelIntervalRef.current); labelIntervalRef.current = null }
@@ -233,8 +242,17 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
   }
 
   const handleLabel = (label: 'refused' | 'complied') => {
+    if (labelSubmittedRef.current) return
+    setLabelSubmitted(true)
+    setButtonsDisabled(true)
+    labelSubmittedRef.current = true
+    buttonsDisabledRef.current = true
     clearLabelTimers()
-    setAwaitingLabel(false)
+    // Stop the generation
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort()
+    }
+    // Submit the label
     submitVerifyLabel(label)
   }
 
@@ -242,6 +260,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     clearLabelTimers()
     setDisclaimerCheck(null)
     submitVerifyLabel(yes ? 'disclaimer_yes' : 'disclaimer_no')
+    // After disclaimer is submitted, the backend will send the next prompt event
   }
 
   const runBake = async () => {
@@ -265,12 +284,18 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
 
   useEffect(() => {
     const controller = new AbortController()
+    streamControllerRef.current = controller
     let cancelled = false
 
     clearLabelTimers()
     setLivePrompt(null)
     setLiveText('')
-    setAwaitingLabel(false)
+    setStreaming(false)
+    setButtonsDisabled(true)
+    setLabelSubmitted(false)
+    streamingRef.current = false
+    buttonsDisabledRef.current = true
+    labelSubmittedRef.current = false
     setDisclaimerCheck(null)
 
     function startCountdown(onTimeout: () => void) {
@@ -285,13 +310,6 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
       labelTimeoutRef.current = timeout
     }
 
-    function startLabelTimer() {
-      startCountdown(() => {
-        setAwaitingLabel(false)
-        submitVerifyLabel('auto')
-      })
-    }
-
     function startDisclaimerTimer(autoHasDisclaimer: boolean) {
       startCountdown(() => {
         setDisclaimerCheck(null)
@@ -304,21 +322,48 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
       if (event.type === 'total') setTotal(event.prompts)
       else if (event.type === 'category_start') setCurrentCategory(event.category)
       else if (event.type === 'prompt_start') {
-        const { prompt_id, prompt_text, category, response_before, refused_before, awaiting_label } = event
+        const { prompt_id, prompt_text, category, response_before, refused_before } = event
         setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
         setLiveText('')
-        setAwaitingLabel(awaiting_label ?? false)
+        setStreaming(false)
+        setButtonsDisabled(true)
+        setLabelSubmitted(false)
+        streamingRef.current = false
+        buttonsDisabledRef.current = true
+        labelSubmittedRef.current = false
         setDisclaimerCheck(null)
         clearLabelTimers()
-        if (awaiting_label) startLabelTimer()
       }
-      else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
+      else if (event.type === 'verify_token') {
+        setLiveText(prev => prev + event.text)
+        if (!streamingRef.current) {
+          setStreaming(true)
+          streamingRef.current = true
+        }
+        // Enable buttons on first token received
+        if (buttonsDisabledRef.current && !labelSubmittedRef.current) {
+          setButtonsDisabled(false)
+          buttonsDisabledRef.current = false
+        }
+      }
       else if (event.type === 'generation_done') {
-        // No longer used - awaiting_label is now in prompt_start
+        setStreaming(false)
+        streamingRef.current = false
+        setButtonsDisabled(false)
+        buttonsDisabledRef.current = false
+        startCountdown(() => {
+          setButtonsDisabled(true)
+          setLabelSubmitted(true)
+          buttonsDisabledRef.current = true
+          labelSubmittedRef.current = true
+          submitVerifyLabel('auto')
+        })
       }
       else if (event.type === 'disclaimer_check') {
-        setAwaitingLabel(false)
-        clearLabelTimers()
+        setButtonsDisabled(true)
+        setLabelSubmitted(true)
+        buttonsDisabledRef.current = true
+        labelSubmittedRef.current = true
         setDisclaimerCheck({ autoHasDisclaimer: event.auto_has_disclaimer })
         startDisclaimerTimer(event.auto_has_disclaimer)
       }
@@ -327,6 +372,12 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
         setDone(prev => prev + 1)
         setLivePrompt(null)
         setLiveText('')
+        setStreaming(false)
+        setButtonsDisabled(true)
+        setLabelSubmitted(false)
+        streamingRef.current = false
+        buttonsDisabledRef.current = true
+        labelSubmittedRef.current = false
         setDisclaimerCheck(null)
       }
       else if (event.type === 'category_result') setCategories(prev => [...prev, event])
@@ -390,8 +441,8 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
               <LivePromptRow
                 prompt={ livePrompt }
                 liveText={ liveText }
-                streaming={ !awaitingLabel && !disclaimerCheck }
-                awaitingLabel={ awaitingLabel }
+                streaming={ streaming }
+                buttonsDisabled={ buttonsDisabled }
                 disclaimerCheck={ disclaimerCheck }
                 labelCountdown={ labelCountdown }
                 onLabel={ handleLabel }
