@@ -304,17 +304,17 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
       if (event.type === 'total') setTotal(event.prompts)
       else if (event.type === 'category_start') setCurrentCategory(event.category)
       else if (event.type === 'prompt_start') {
-        const { prompt_id, prompt_text, category, response_before, refused_before } = event
+        const { prompt_id, prompt_text, category, response_before, refused_before, awaiting_label } = event
         setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
         setLiveText('')
-        setAwaitingLabel(false)
+        setAwaitingLabel(awaiting_label ?? false)
         setDisclaimerCheck(null)
         clearLabelTimers()
+        if (awaiting_label) startLabelTimer()
       }
       else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
       else if (event.type === 'generation_done') {
-        setAwaitingLabel(true)
-        startLabelTimer()
+        // No longer used - awaiting_label is now in prompt_start
       }
       else if (event.type === 'disclaimer_check') {
         setAwaitingLabel(false)

@@ -68,6 +68,7 @@ export interface VerifyLivePrompt {
   category: string
   response_before: string
   refused_before: boolean
+  awaiting_label?: boolean
 }
 
 export interface DirectionCompareRow {
@@ -80,7 +81,7 @@ export interface DirectionCompareRow {
 export type VerifyEvent =
   | { type: 'total'; categories: number; prompts: number }
   | { type: 'category_start'; category: string }
-  | ({ type: 'prompt_start' } & VerifyLivePrompt)
+  | ({ type: 'prompt_start'; awaiting_label?: boolean } & VerifyLivePrompt)
   | { type: 'verify_token'; text: string }
   | { type: 'generation_done' }
   | { type: 'disclaimer_check'; auto_has_disclaimer: boolean }

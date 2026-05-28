@@ -316,6 +316,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
           "prompt_text": item["prompt"]["text"],
           "response_before": item["result"].get("response") or "",
           "refused_before": prompt_refused_before,
+          "awaiting_label": True,
         }) + "\n"
 
         token_q: asyncio.Queue = asyncio.Queue()
@@ -332,6 +333,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         gen_thread.start()
 
         response_after = ""
+        generation_aborted = False
         while True:
           ev = await token_q.get()
           if ev is None:
@@ -340,10 +342,12 @@ async def ablate_verify(req: VerifyRequest, request: Request):
             yield json.dumps({ "type": "verify_token", "text": ev["text"] }) + "\n"
           elif ev["type"] in ("done", "aborted"):
             response_after = ev.get("response", "")
+            generation_aborted = ev["type"] == "aborted"
             break
         gen_thread.join(timeout=5)
 
-        yield json.dumps({ "type": "generation_done" }) + "\n"
+        if not generation_aborted:
+          yield json.dumps({ "type": "generation_done" }) + "\n"
 
         try:
           label = await asyncio.wait_for(label_q.get(), timeout=60.0)
@@ -531,6 +535,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           "prompt_text": item["prompt"]["text"],
           "response_before": item["result"].get("response") or "",
           "refused_before": prompt_refused_before,
+          "awaiting_label": True,
         }) + "\n"
 
         token_q: asyncio.Queue = asyncio.Queue()
@@ -547,6 +552,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         gen_thread.start()
 
         response_after = ""
+        generation_aborted = False
         while True:
           ev = await token_q.get()
           if ev is None:
@@ -555,10 +561,12 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
             yield json.dumps({ "type": "verify_token", "text": ev["text"] }) + "\n"
           elif ev["type"] in ("done", "aborted"):
             response_after = ev.get("response", "")
+            generation_aborted = ev["type"] == "aborted"
             break
         gen_thread.join(timeout=5)
 
-        yield json.dumps({ "type": "generation_done" }) + "\n"
+        if not generation_aborted:
+          yield json.dumps({ "type": "generation_done" }) + "\n"
 
         try:
           label = await asyncio.wait_for(label_q.get(), timeout=60.0)
