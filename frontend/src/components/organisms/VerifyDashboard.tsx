@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { verifyAblation, verifyAblationClassic, bakeModel } from '../../api/ablation'
-import type { VerifyPromptResult, VerifyCategoryResult } from '../../types/ablation'
+import { useEffect, useRef, useState } from 'react'
+import { verifyAblation, verifyAblationClassic, bakeModel, submitVerifyLabel } from '../../api/ablation'
+import type { VerifyPromptResult, VerifyCategoryResult, VerifyLivePrompt } from '../../types/ablation'
 
 interface VerifyDashboardProps {
   runId: string
@@ -38,6 +38,64 @@ const ResponseBlock = ({ label, text, refused }: { label: string; text: string; 
       padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)', whiteSpace: 'pre-wrap',
       maxHeight: '180px', overflow: 'auto',
     }}>{ text || '(empty)' }</div>
+  </div>
+)
+
+const LiveAfterBlock = ({ text, streaming }: { text: string; streaming: boolean }) => (
+  <div style={{ flex: 1, minWidth: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>after</span>
+      <span style={{ fontSize: '11px', color: streaming ? 'var(--accent)' : 'var(--text-muted)' }}>
+        { streaming ? 'streaming…' : 'done' }
+      </span>
+    </div>
+    <div style={{
+      background: 'var(--surface-3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)',
+      padding: '8px 10px', fontSize: '12px', color: 'var(--text-dim)', whiteSpace: 'pre-wrap',
+      maxHeight: '180px', overflow: 'auto',
+    }}>{ text || '…' }</div>
+  </div>
+)
+
+const LabelButtons = ({ countdown, onLabel }: {
+  countdown: number
+  onLabel: (l: 'refused' | 'complied') => void
+}) => (
+  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <button onClick={ () => onLabel('refused') } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 'var(--radius)',
+    }}>Refused</button>
+    <button onClick={ () => onLabel('complied') } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#064e3b', color: '#6ee7b7', border: 'none', borderRadius: 'var(--radius)',
+    }}>Complied</button>
+    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>auto in { countdown }s</span>
+  </div>
+)
+
+const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, labelCountdown, onLabel }: {
+  prompt: VerifyLivePrompt
+  liveText: string
+  streaming: boolean
+  awaitingLabel: boolean
+  labelCountdown: number
+  onLabel: (l: 'refused' | 'complied') => void
+}) => (
+  <div style={{
+    background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)',
+    padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
+  }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
+      <span style={{ color: 'var(--accent)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{ prompt.category }</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{ prompt.prompt_id }</span>
+    </div>
+    <div style={{ fontSize: '12px', color: 'var(--text)' }}>{ prompt.prompt_text }</div>
+    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <ResponseBlock label="before" text={ prompt.response_before } refused={ prompt.refused_before } />
+      <LiveAfterBlock text={ liveText } streaming={ streaming } />
+    </div>
+    { awaitingLabel && <LabelButtons countdown={ labelCountdown } onLabel={ onLabel } /> }
   </div>
 )
 
@@ -101,15 +159,34 @@ const CategorySummary = ({ rows }: { rows: VerifyCategoryResult[] }) => {
 }
 
 export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, disclaimerAblate, disclaimerFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
-  const [total, setTotal]                 = useState(0)
-  const [done, setDone]                   = useState(0)
+  const [total, setTotal]                     = useState(0)
+  const [done, setDone]                       = useState(0)
   const [currentCategory, setCurrentCategory] = useState('')
-  const [prompts, setPrompts]             = useState<VerifyPromptResult[]>([])
-  const [categories, setCategories]       = useState<VerifyCategoryResult[]>([])
-  const [error, setError]                 = useState<string>()
-  const [finished, setFinished]           = useState(false)
-  const [baking, setBaking]               = useState(false)
-  const [bakedPath, setBakedPath]         = useState<string>()
+  const [prompts, setPrompts]                 = useState<VerifyPromptResult[]>([])
+  const [categories, setCategories]           = useState<VerifyCategoryResult[]>([])
+  const [error, setError]                     = useState<string>()
+  const [finished, setFinished]               = useState(false)
+  const [baking, setBaking]                   = useState(false)
+  const [bakedPath, setBakedPath]             = useState<string>()
+
+  const [livePrompt, setLivePrompt]         = useState<VerifyLivePrompt | null>(null)
+  const [liveText, setLiveText]             = useState('')
+  const [awaitingLabel, setAwaitingLabel]   = useState(false)
+  const [labelCountdown, setLabelCountdown] = useState(5)
+
+  const labelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const labelTimeoutRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
+
+  const clearLabelTimers = () => {
+    if (labelIntervalRef.current) { clearInterval(labelIntervalRef.current); labelIntervalRef.current = null }
+    if (labelTimeoutRef.current)  { clearTimeout(labelTimeoutRef.current);   labelTimeoutRef.current  = null }
+  }
+
+  const handleLabel = (label: 'refused' | 'complied') => {
+    clearLabelTimers()
+    setAwaitingLabel(false)
+    submitVerifyLabel(label)
+  }
 
   const runBake = async () => {
     setBaking(true)
@@ -134,17 +211,52 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     const controller = new AbortController()
     let cancelled = false
 
-    const stream = mode === 'classic'
-      ? verifyAblationClassic(runId, { model_id: modelId, gen_mode: genMode, factor: classicFactor, disclaimer_ablate: disclaimerAblate, disclaimer_factor: disclaimerFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
-      : verifyAblation(runId, { model_id: modelId, gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+    clearLabelTimers()
+    setLivePrompt(null)
+    setLiveText('')
+    setAwaitingLabel(false)
+
+    function startLabelTimer() {
+      clearLabelTimers()
+      setLabelCountdown(5)
+      const interval = setInterval(() => setLabelCountdown(c => c - 1), 1000)
+      labelIntervalRef.current = interval
+      const timeout = setTimeout(() => {
+        clearLabelTimers()
+        setAwaitingLabel(false)
+        submitVerifyLabel('auto')
+      }, 5000)
+      labelTimeoutRef.current = timeout
+    }
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
       if (event.type === 'total') setTotal(event.prompts)
       else if (event.type === 'category_start') setCurrentCategory(event.category)
-      else if (event.type === 'prompt') { setPrompts(prev => [...prev, event]); setDone(prev => prev + 1) }
+      else if (event.type === 'prompt_start') {
+        const { prompt_id, prompt_text, category, response_before, refused_before } = event
+        setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
+        setLiveText('')
+        setAwaitingLabel(false)
+        clearLabelTimers()
+      }
+      else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
+      else if (event.type === 'generation_done') {
+        setAwaitingLabel(true)
+        startLabelTimer()
+      }
+      else if (event.type === 'prompt') {
+        setPrompts(prev => [...prev, event])
+        setDone(prev => prev + 1)
+        setLivePrompt(null)
+        setLiveText('')
+      }
       else if (event.type === 'category_result') setCategories(prev => [...prev, event])
     }
+
+    const stream = mode === 'classic'
+      ? verifyAblationClassic(runId, { model_id: modelId, gen_mode: genMode, factor: classicFactor, disclaimer_ablate: disclaimerAblate, disclaimer_factor: disclaimerFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+      : verifyAblation(runId, { model_id: modelId, gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
 
     stream
       .then(() => { if (!cancelled) setFinished(true) })
@@ -153,6 +265,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     return () => {
       cancelled = true
       controller.abort()
+      clearLabelTimers()
     }
   }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
 
@@ -180,7 +293,7 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
                   background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)',
                   fontWeight: 600, opacity: baking ? 0.5 : 1,
                 }}>
-                {baking ? 'Baking…' : 'Bake & Save'}
+                { baking ? 'Baking…' : 'Bake & Save' }
               </button>
               <span onClick={ onBack } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>← Back</span>
               <span onClick={ onHome } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>Home</span>
@@ -195,6 +308,16 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
           <CategorySummary rows={ categories } />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            { livePrompt && (
+              <LivePromptRow
+                prompt={ livePrompt }
+                liveText={ liveText }
+                streaming={ !awaitingLabel }
+                awaitingLabel={ awaitingLabel }
+                labelCountdown={ labelCountdown }
+                onLabel={ handleLabel }
+              />
+            ) }
             { prompts.slice().reverse().map(prompt => (
               <PromptRow key={ `${ prompt.category }__${ prompt.prompt_id }` } result={ prompt } />
             )) }

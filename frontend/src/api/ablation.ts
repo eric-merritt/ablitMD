@@ -83,6 +83,13 @@ export const verifyAblation = (
   signal?: AbortSignal,
 ): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal)
 
+export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto'): Promise<void> =>
+  fetch('/api/ablation/verify/label', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  }).then(jsonOrThrow)
+
 export const verifyAblationClassic = (
   runId: string,
   body: { model_id: string; gen_mode: string; factor: number; categories?: string[]; samples_per_category?: number },
