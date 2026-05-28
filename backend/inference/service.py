@@ -2,6 +2,7 @@ import asyncio
 import gc
 import json
 import sys
+import threading
 from pathlib import Path
 
 import httpx
@@ -20,7 +21,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from backend.inference.direction import compute_run_directions
-from backend.inference.generator import stream_prompt
+from backend.inference.generator import stream_prompt, run_prompt, abort_and_join_generation
 from backend.inference.model_loader import (
   get_loaded_model_id,
   get_model,
@@ -34,7 +35,6 @@ from backend.inference.ablation import (
   restore_model_weights, bake_and_save,
 )
 from backend.inference.verify import looks_like_refusal, projection_strength
-from backend.inference.generator import run_prompt
 
 app = FastAPI(title="ablitMD inference service")
 
@@ -91,6 +91,10 @@ class VerifyClassicRequest(BaseModel):
 class ClassifyRequest(BaseModel):
   prompt: str
   response: str
+
+
+class LabelRequest(BaseModel):
+  label: str  # "refused" | "complied" | "auto"
 
 
 CLASSIFY_SYSTEM_PROMPT = """You are a response classification expert. Your job is to classify AI model responses into exactly one of three categories:
@@ -221,6 +225,7 @@ def compute(req: ComputeRequest):
 
 
 _verify_cancel: asyncio.Event | None = None
+_verify_label_queue: asyncio.Queue | None = None
 
 
 def _claim_verify_slot() -> asyncio.Event:
@@ -278,6 +283,8 @@ async def ablate_verify(req: VerifyRequest, request: Request):
       del snapshots
 
   async def _verify_loop():
+    global _verify_label_queue
+    loop = asyncio.get_running_loop()
     for category, items in by_category.items():
       if is_cancelled() or await request.is_disconnected():
         return
@@ -299,24 +306,71 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         prompt_refused_before = bool(item["result"].get("refused"))
         refused_before += 1 if prompt_refused_before else 0
 
-        response_after = await asyncio.to_thread(
-          run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
-          f"verify__{key}", RUNS_DIR, skip_hidden_states=req.fast,
+        label_q: asyncio.Queue = asyncio.Queue()
+        _verify_label_queue = label_q
+
+        yield json.dumps({
+          "type": "prompt_start",
+          "category": category,
+          "prompt_id": item["prompt"].get("prompt_id") or key,
+          "prompt_text": item["prompt"]["text"],
+          "response_before": item["result"].get("response") or "",
+          "refused_before": prompt_refused_before,
+        }) + "\n"
+
+        token_q: asyncio.Queue = asyncio.Queue()
+        def _worker(
+          _text=item["prompt"]["text"], _mode=req.gen_mode, _rid=req.run_id,
+          _hkey=f"verify__{key}", _rdir=RUNS_DIR, _skip=req.fast,
+          _loop=loop, _q=token_q,
+        ):
+          for ev in stream_prompt(_text, _mode, _rid, _hkey, _rdir, skip_hidden_states=_skip):
+            _loop.call_soon_threadsafe(_q.put_nowait, ev)
+          _loop.call_soon_threadsafe(_q.put_nowait, None)
+
+        gen_thread = threading.Thread(target=_worker, daemon=True)
+        gen_thread.start()
+
+        response_after = ""
+        while True:
+          ev = await token_q.get()
+          if ev is None:
+            break
+          if ev["type"] == "token":
+            yield json.dumps({ "type": "verify_token", "text": ev["text"] }) + "\n"
+          elif ev["type"] in ("done", "aborted"):
+            response_after = ev.get("response", "")
+            break
+        gen_thread.join(timeout=5)
+
+        yield json.dumps({ "type": "generation_done" }) + "\n"
+
+        try:
+          label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+        except asyncio.TimeoutError:
+          label = "auto"
+        finally:
+          _verify_label_queue = None
+
+        prompt_refused_after = (
+          True if label == "refused"
+          else False if label == "complied"
+          else looks_like_refusal(response_after)
         )
+        if prompt_refused_after:
+          refused_after += 1
+
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
           after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
-        prompt_refused_after = looks_like_refusal(response_after)
-        if prompt_refused_after:
-          refused_after += 1
 
         yield json.dumps({
           "type": "prompt",
           "category": category,
           "prompt_id": item["prompt"].get("prompt_id") or key,
           "prompt_text": item["prompt"]["text"],
-          "response_before": (item["result"].get("response") or "")[:1000],
-          "response_after": response_after[:1000],
+          "response_before": item["result"].get("response") or "",
+          "response_after": response_after,
           "refused_before": prompt_refused_before,
           "refused_after": prompt_refused_after,
         }) + "\n"
@@ -426,6 +480,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
       del snapshots
 
   async def _classic_verify_loop():
+    global _verify_label_queue
+    loop = asyncio.get_running_loop()
     for category, items in by_category.items():
       if is_cancelled() or await request.is_disconnected():
         return
@@ -446,10 +502,60 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           if direction is not None:
             before_proj.append(projection_strength(np.load(str(before_npy)), direction, phase_b_range))
 
-        response_after = await asyncio.to_thread(
-          run_prompt, item["prompt"]["text"], req.gen_mode, req.run_id,
-          f"verify_classic__{key}", RUNS_DIR,
+        label_q: asyncio.Queue = asyncio.Queue()
+        _verify_label_queue = label_q
+
+        yield json.dumps({
+          "type": "prompt_start",
+          "category": category,
+          "prompt_id": item["prompt"].get("prompt_id") or key,
+          "prompt_text": item["prompt"]["text"],
+          "response_before": item["result"].get("response") or "",
+          "refused_before": prompt_refused_before,
+        }) + "\n"
+
+        token_q: asyncio.Queue = asyncio.Queue()
+        def _worker(
+          _text=item["prompt"]["text"], _mode=req.gen_mode, _rid=req.run_id,
+          _hkey=f"verify_classic__{key}", _rdir=RUNS_DIR,
+          _loop=loop, _q=token_q,
+        ):
+          for ev in stream_prompt(_text, _mode, _rid, _hkey, _rdir):
+            _loop.call_soon_threadsafe(_q.put_nowait, ev)
+          _loop.call_soon_threadsafe(_q.put_nowait, None)
+
+        gen_thread = threading.Thread(target=_worker, daemon=True)
+        gen_thread.start()
+
+        response_after = ""
+        while True:
+          ev = await token_q.get()
+          if ev is None:
+            break
+          if ev["type"] == "token":
+            yield json.dumps({ "type": "verify_token", "text": ev["text"] }) + "\n"
+          elif ev["type"] in ("done", "aborted"):
+            response_after = ev.get("response", "")
+            break
+        gen_thread.join(timeout=5)
+
+        yield json.dumps({ "type": "generation_done" }) + "\n"
+
+        try:
+          label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+        except asyncio.TimeoutError:
+          label = "auto"
+        finally:
+          _verify_label_queue = None
+
+        prompt_refused_after = (
+          True if label == "refused"
+          else False if label == "complied"
+          else looks_like_refusal(response_after)
         )
+        if prompt_refused_after:
+          refused_after += 1
+
         after_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
         if phase_b_range and after_npy.exists():
           layer_idx = phase_b_range[0]
@@ -457,17 +563,13 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
           if direction is not None:
             after_proj.append(projection_strength(np.load(str(after_npy)), direction, phase_b_range))
 
-        prompt_refused_after = looks_like_refusal(response_after)
-        if prompt_refused_after:
-          refused_after += 1
-
         prompt_event = {
           "type": "prompt",
           "category": category,
           "prompt_id": item["prompt"].get("prompt_id") or key,
           "prompt_text": item["prompt"]["text"],
-          "response_before": (item["result"].get("response") or "")[:1000],
-          "response_after": response_after[:1000],
+          "response_before": item["result"].get("response") or "",
+          "response_after": response_after,
           "refused_before": prompt_refused_before,
           "refused_after": prompt_refused_after,
         }
@@ -566,6 +668,17 @@ async def classify_response(req: ClassifyRequest):
       classification = "unknown"
 
     return {"classification": classification, "raw": raw}
+
+
+@app.post("/ablate/verify/label")
+async def submit_verify_label(req: LabelRequest):
+  global _verify_label_queue
+  if _verify_label_queue is None:
+    raise HTTPException(status_code=409, detail="No active verify session")
+  await asyncio.to_thread(abort_and_join_generation)
+  await _verify_label_queue.put(req.label)
+  return {"ok": True}
+
 
 
 if __name__ == "__main__":
