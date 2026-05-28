@@ -358,22 +358,20 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
         has_disclaimer = False
         verify_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
-        if not prompt_refused_after:
-          auto_disc = looks_like_disclaimer(response_after)
-          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
-          try:
-            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-          except asyncio.TimeoutError:
-            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
-          finally:
-            _verify_label_queue = None
-          has_disclaimer = disc_label == "disclaimer_yes"
-          if has_disclaimer and verify_npy.exists():
-            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
-          else:
-            verify_npy.unlink(missing_ok=True)
-        else:
+        # Always check for disclaimer, even for refused responses (more data = better direction)
+        auto_disc = looks_like_disclaimer(response_after)
+        yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+        try:
+          disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+        except asyncio.TimeoutError:
+          disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+        finally:
           _verify_label_queue = None
+        has_disclaimer = disc_label == "disclaimer_yes"
+        if has_disclaimer and verify_npy.exists():
+          (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+        else:
+          verify_npy.unlink(missing_ok=True)
 
         if prompt_refused_after:
           refused_after += 1
@@ -575,22 +573,20 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
         has_disclaimer = False
         verify_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
-        if not prompt_refused_after:
-          auto_disc = looks_like_disclaimer(response_after)
-          yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
-          try:
-            disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-          except asyncio.TimeoutError:
-            disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
-          finally:
-            _verify_label_queue = None
-          has_disclaimer = disc_label == "disclaimer_yes"
-          if has_disclaimer and verify_npy.exists():
-            (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
-          else:
-            verify_npy.unlink(missing_ok=True)
-        else:
+        # Always check for disclaimer, even for refused responses (more data = better direction)
+        auto_disc = looks_like_disclaimer(response_after)
+        yield json.dumps({ "type": "disclaimer_check", "auto_has_disclaimer": auto_disc }) + "\n"
+        try:
+          disc_label = await asyncio.wait_for(label_q.get(), timeout=60.0)
+        except asyncio.TimeoutError:
+          disc_label = "disclaimer_yes" if auto_disc else "disclaimer_no"
+        finally:
           _verify_label_queue = None
+        has_disclaimer = disc_label == "disclaimer_yes"
+        if has_disclaimer and verify_npy.exists():
+          (RUNS_DIR / req.run_id / f"disclaimer__{key}.npy").write_bytes(verify_npy.read_bytes())
+        else:
+          verify_npy.unlink(missing_ok=True)
 
         if prompt_refused_after:
           refused_after += 1
@@ -718,7 +714,8 @@ async def submit_verify_label(req: LabelRequest):
   global _verify_label_queue
   if _verify_label_queue is None:
     raise HTTPException(status_code=409, detail="No active verify session")
-  if req.label not in ("disclaimer_yes", "disclaimer_no"):
+  # Only abort generation for refusal/compliance labels, not for disclaimer answers
+  if req.label in ("refused", "complied"):
     await asyncio.to_thread(abort_and_join_generation)
   await _verify_label_queue.put(req.label)
   return {"ok": True}
