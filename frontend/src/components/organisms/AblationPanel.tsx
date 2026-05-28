@@ -101,6 +101,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [compareRows, setCompareRows]       = useState<DirectionCompareRow[]>([])
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError]     = useState<string>()
+  const [builtParams, setBuiltParams]       = useState<RecipeParams | null>(null)
 
   useEffect(() => {
     getDivergence(runId)
@@ -119,7 +120,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         setParams(initialParams)
         setStatus('building')
         buildRecipe(runId, initialParams)
-          .then(r => { setRecipe(r); setStatus('idle') })
+          .then(r => { setRecipe(r); setBuiltParams(initialParams); setStatus('idle') })
           .catch(err => { setError(String(err.message)); setStatus('idle') })
 
         const modelInfo = models.find(model => model.modelId === foundModelId)
@@ -140,15 +141,16 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   }, [runId, models])
 
   useEffect(() => {
-    if (!recipe) return
+    if (!builtParams) return
+    if (params === builtParams) return
     const timer = setTimeout(() => {
       setStatus('building')
       buildRecipe(runId, params)
-        .then(next => { setRecipe(next); setStatus('idle') })
+        .then(next => { setRecipe(next); setBuiltParams(params); setStatus('idle') })
         .catch(err => { setError(String(err.message)); setStatus('idle') })
     }, 400)
     return () => clearTimeout(timer)
-  }, [params])
+  }, [params, builtParams])
 
   useEffect(() => {
     if (!recipe || !modelId) return
