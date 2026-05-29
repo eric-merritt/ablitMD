@@ -14,12 +14,15 @@ __pycache__/
 .venv/
 
 # Secrets
-.env
-backend/.env
-frontend/.env
+.env.keys
+backend/.env.keys
+frontend/.env.keys
 
 # Node
 node_modules/
+
+# Pre-built wheels — in Docker image only, too large for git
+pkgs/*.whl
 
 # Local-only — Claude config, not for git
 CLAUDE.md
