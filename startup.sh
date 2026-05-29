@@ -10,12 +10,9 @@ cd "$PROJECT_DIR"
 
 
 echo "==> Restoring env files from image..."
-cp /workspace/env-staging/.env      "$PROJECT_DIR/.env"
-cp /workspace/env-staging/.env.keys "$PROJECT_DIR/.env.keys"
-cp /workspace/env-staging/frontend/.env      "$PROJECT_DIR/frontend/.env"
-cp /workspace/env-staging/frontend/.env.keys "$PROJECT_DIR/frontend/.env.keys"
-cp /workspace/env-staging/backend/.env      "$PROJECT_DIR/backend/.env"
-cp /workspace/env-staging/backend/.env.keys "$PROJECT_DIR/backend/.env.keys"
+cp /workspace/env-staging/.env           "$PROJECT_DIR/.env"
+cp /workspace/env-staging/frontend/.env  "$PROJECT_DIR/frontend/.env"
+cp /workspace/env-staging/backend/.env   "$PROJECT_DIR/backend/.env"
 
 echo "==> Installing dependencies..."
 which uv &>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
