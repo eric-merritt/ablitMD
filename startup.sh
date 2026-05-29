@@ -14,6 +14,11 @@ cp /workspace/env-staging/.env           "$PROJECT_DIR/.env"
 cp /workspace/env-staging/frontend/.env  "$PROJECT_DIR/frontend/.env"
 cp /workspace/env-staging/backend/.env   "$PROJECT_DIR/backend/.env"
 
+echo "==> Writing .env.keys from VastAI env vars..."
+echo "DOTENV_PRIVATE_KEY=$DOTENV_PRIVATE_KEY_ROOT"     > "$PROJECT_DIR/.env.keys"
+echo "DOTENV_PRIVATE_KEY=$DOTENV_PRIVATE_KEY_FRONTEND" > "$PROJECT_DIR/frontend/.env.keys"
+echo "DOTENV_PRIVATE_KEY=$DOTENV_PRIVATE_KEY_BACKEND"  > "$PROJECT_DIR/backend/.env.keys"
+
 echo "==> Installing dependencies..."
 which uv &>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 npm install --silent
