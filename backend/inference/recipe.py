@@ -44,9 +44,10 @@ def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarr
 
 def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int,
                  factor_a: float, factor_b: float, state_dir) -> dict:
-  """Stage 2 — build the two-phase abliteration recipe (hard + redirect).
-  Phase A (onset..split): per-category per-layer directions.
-  Phase B (split..last):  single shared direction (mean over split..last)."""
+  """Build the two-phase abliteration recipe.
+  Phase A (onset..split): one merged direction per category per layer
+    (mean of hard + redirect unit vectors, renormalized).
+  Phase B (split..last):  single shared direction (mean over all merged directions)."""
   per_category = rebuild_directions(run, model_id, gen_mode, state_dir)
   if not per_category:
     raise ValueError("no categories with directions")
@@ -54,31 +55,48 @@ def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int
   sample_mode = next(iter(next(iter(per_category.values()))["by_mode"].values()))
   last_layer = len(sample_mode["direction_per_layer"]) - 1
 
-  modes: dict[str, dict] = {}
-  for refusal_mode in ("hard", "redirect"):
-    category_directions: dict[str, np.ndarray] = {}
-    for category_id, cat_result in per_category.items():
-      entry = cat_result["by_mode"].get(refusal_mode)
-      if entry:
-        category_directions[category_id] = np.array(entry["direction_per_layer"], dtype=np.float32)
-    if not category_directions:
+  merged_per_category: dict[str, np.ndarray] = {}
+  for category_id, cat_result in per_category.items():
+    by_mode = cat_result["by_mode"]
+    hard  = by_mode.get("hard")
+    redir = by_mode.get("redirect")
+
+    if hard and redir:
+      raw = (
+        np.array(hard["direction_per_layer"],  dtype=np.float32) +
+        np.array(redir["direction_per_layer"], dtype=np.float32)
+      )
+    elif hard:
+      raw = np.array(hard["direction_per_layer"],  dtype=np.float32)
+    elif redir:
+      raw = np.array(redir["direction_per_layer"], dtype=np.float32)
+    else:
       continue
 
-    shared = shared_direction(list(category_directions.values()), split, last_layer)
-    modes[refusal_mode] = {
-      "phase_a": {
-        "layers": [onset, split],
-        "per_category": {
-          category_id: dpl[onset:split + 1, :].tolist()
-          for category_id, dpl in category_directions.items()
-        },
-      },
-      "phase_b": {"layers": [split, last_layer], "direction": shared.tolist()},
-    }
+    norms = np.linalg.norm(raw, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-8, 1.0, norms)
+    merged_per_category[category_id] = (raw / norms).astype(np.float32)
+
+  if not merged_per_category:
+    raise ValueError("no categories produced merged directions")
+
+  shared = shared_direction(list(merged_per_category.values()), split, last_layer)
 
   return {
     "run_id": run["run_id"], "model_id": model_id, "gen_mode": gen_mode,
     "onset": onset, "split": split, "last_layer": last_layer,
     "factor_a": factor_a, "factor_b": factor_b,
-    "modes": modes, "built_at": datetime.now(timezone.utc).isoformat(),
+    "modes": {
+      "merged": {
+        "phase_a": {
+          "layers": [onset, split],
+          "per_category": {
+            cat_id: dpl[onset:split + 1, :].tolist()
+            for cat_id, dpl in merged_per_category.items()
+          },
+        },
+        "phase_b": {"layers": [split, last_layer], "direction": shared.tolist()},
+      }
+    },
+    "built_at": datetime.now(timezone.utc).isoformat(),
   }

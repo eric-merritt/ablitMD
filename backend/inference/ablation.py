@@ -139,7 +139,8 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
     #     W = orthogonalize_weight(W, d, recipe["factor_b"])
     #   mtp_proj.weight.copy_(W.to(dtype))
 
-    torch.cuda.synchronize(device)
+    if device.type == "cuda":
+      torch.cuda.synchronize(device)
 
   print(f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
         f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
