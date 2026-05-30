@@ -317,6 +317,9 @@ async def ablate_verify(req: VerifyRequest, request: Request):
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
         if is_cancelled() or await request.is_disconnected():
+          await asyncio.to_thread(unload_model)
+          gc.collect()
+          torch.cuda.empty_cache()
           return
         yield chunk
     finally:
@@ -524,6 +527,9 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
         if is_cancelled() or await request.is_disconnected():
+          await asyncio.to_thread(unload_model)
+          gc.collect()
+          torch.cuda.empty_cache()
           return
         yield chunk
     finally:
