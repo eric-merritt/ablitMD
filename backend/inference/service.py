@@ -103,6 +103,7 @@ class AblateRequest(BaseModel):
 class VerifyRequest(BaseModel):
   run_id: str
   model_id: str
+  api_model_id: str
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
@@ -112,6 +113,7 @@ class VerifyRequest(BaseModel):
 class VerifyClassicRequest(BaseModel):
   run_id: str
   model_id: str
+  api_model_id: str
   gen_mode: str
   factor: float = 0.6
   disclaimer_ablate: bool = False
@@ -307,14 +309,9 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
   async def events():
     try:
-      run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
-      api_model_id = run_data.get("models", [None])[0] if run_data.get("models") else None
-      if not api_model_id:
-        raise ValueError(f"Could not find api_model_id for model {req.model_id}")
       unload_model()
-      await asyncio.to_thread(load_model, req.model_id, api_model_id)
-      if get_model() is None:
-        raise RuntimeError("Failed to load model")
+      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      await asyncio.sleep(0.1)
       snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
@@ -518,12 +515,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   async def events():
     try:
-      run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
-      api_model_id = run_data.get("models", [None])[0] if run_data.get("models") else None
-      if not api_model_id:
-        raise ValueError(f"Could not find api_model_id for model {req.model_id}")
       unload_model()
-      await asyncio.to_thread(load_model, req.model_id, api_model_id)
+      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
       if get_model() is None:
         raise RuntimeError("Failed to load model")
       snapshots = await asyncio.to_thread(
