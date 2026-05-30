@@ -11,7 +11,7 @@ type AblationMode = 'ablitmd' | 'classic'
 interface AblationPanelProps {
   runId: string
   models: { modelId: string; apiModelId: string; name: string }[]
-  onVerify: (modelId: string, apiModelId: string, genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
+  onVerify: (modelId: string, genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
 }
 
 type ModelLoadState = 'idle' | 'loading' | 'ready' | 'error'
@@ -218,8 +218,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
               tooltip={status === 'building' ? 'Recipe rebuilding…' : ''}
               onClick={() => {
                 if (recipe) {
-                  const model = models.find(m => m.modelId === recipe.model_id)
-                  if (model) onVerify(recipe.model_id, model.apiModelId, recipe.gen_mode, mode, classicFactor, disclaimerAblate, disclaimerFactor)
+                  onVerify(recipe.model_id, recipe.gen_mode, mode, classicFactor, disclaimerAblate, disclaimerFactor)
                 }
               }}>
               Verify
