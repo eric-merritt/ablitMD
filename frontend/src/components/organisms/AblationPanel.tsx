@@ -133,10 +133,10 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
     console.log('[recipe] params check', { same, paramKeys: Object.keys(params), builtParamKeys: builtParams ? Object.keys(builtParams) : 'null' })
     if (same) { console.log('[recipe] params unchanged, skipping'); return }
     console.log('[recipe] params changed, scheduling rebuild', params)
+    setStatus('building')
     const requestId = ++buildRequestIdRef.current
     const timer = setTimeout(() => {
       console.log('[recipe] executing rebuild with', params)
-      setStatus('building')
       buildRecipe(runId, params)
         .then(next => {
           if (requestId === buildRequestIdRef.current) {
