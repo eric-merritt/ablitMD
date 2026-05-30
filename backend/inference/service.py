@@ -103,7 +103,7 @@ class AblateRequest(BaseModel):
 class VerifyRequest(BaseModel):
   run_id: str
   model_id: str
-  api_model_id: str
+  api_model_id: str | None = None
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
@@ -113,7 +113,7 @@ class VerifyRequest(BaseModel):
 class VerifyClassicRequest(BaseModel):
   run_id: str
   model_id: str
-  api_model_id: str
+  api_model_id: str | None = None
   gen_mode: str
   factor: float = 0.6
   disclaimer_ablate: bool = False
@@ -309,6 +309,8 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
   async def events():
     try:
+      if not req.api_model_id:
+        raise ValueError("api_model_id is required")
       unload_model()
       await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
       if get_model() is None:
@@ -516,6 +518,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   async def events():
     try:
+      if not req.api_model_id:
+        raise ValueError("api_model_id is required")
       unload_model()
       await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
       if get_model() is None:
