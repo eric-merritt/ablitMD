@@ -4,7 +4,6 @@ import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
 import { DirectionCompareChart } from '../molecules/DirectionCompareChart'
 import { getDivergence, buildRecipe, bakeModel, compareDirections } from '../../api/ablation'
-import { inferenceStatus, inferenceLoad } from '../../api/inference'
 import type { ModeDivergence, SlimRecipe, DirectionCompareRow, RecipeParams } from '../../types/ablation'
 
 type AblationMode = 'ablitmd' | 'classic'
@@ -124,20 +123,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
         buildRecipe(runId, initialParams)
           .then(r => { if (requestId === buildRequestIdRef.current) { setRecipe(r); setBuiltParams(initialParams) } setStatus('idle') })
           .catch(err => { if (requestId === buildRequestIdRef.current) { setError(String(err.message)) }; setStatus('idle') })
-
-        const modelInfo = models.find(model => model.modelId === foundModelId)
-        if (!modelInfo) { setModelLoad('error'); setError(`Model ${foundModelId} not in registry`); return }
-
-        try {
-          const { loaded_model } = await inferenceStatus()
-          if (loaded_model === foundModelId) { setModelLoad('ready'); return }
-          setModelLoad('loading')
-          await inferenceLoad({ model_id: foundModelId, api_model_id: modelInfo.apiModelId })
-          setModelLoad('ready')
-        } catch (err) {
-          setModelLoad('error')
-          setError(`Model load failed: ${ String((err as Error).message) }`)
-        }
       })
       .catch(err => { setError(String(err.message)); setStatus('idle') })
   }, [runId, models])
@@ -229,8 +214,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
                 <SliderWithInput min={0.1} max={3.0} step={0.05} value={classicFactor} onChange={setClassicFactor} />
               </div>
             )}
-            <GatedButton disabled={!recipe || modelLoad !== 'ready' || status === 'building'}
-              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+            <GatedButton disabled={!recipe || status === 'building'}
+              tooltip={status === 'building' ? 'Recipe rebuilding…' : ''}
               onClick={() => {
                 if (recipe) {
                   const model = models.find(m => m.modelId === recipe.model_id)
@@ -239,8 +224,8 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
               }}>
               Verify
             </GatedButton>
-            <GatedButton disabled={!recipe || baking || modelLoad !== 'ready' || status === 'building'}
-              tooltip={status === 'building' ? 'Recipe rebuilding…' : modelLoad === 'loading' ? 'Model loading…' : 'Model not loaded'}
+            <GatedButton disabled={!recipe || baking || status === 'building'}
+              tooltip={status === 'building' ? 'Recipe rebuilding…' : ''}
               onClick={runBake}>
               {baking ? 'Baking…' : 'Bake & save model'}
             </GatedButton>
@@ -275,16 +260,6 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           )}
           {compareRows.length > 0 && <DirectionCompareChart rows={compareRows} />}
 
-          {modelLoad === 'loading' && (
-            <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-              <span className="spinner" /> Model loading: <code>{modelId}</code>
-            </div>
-          )}
-          {modelLoad === 'ready' && (
-            <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
-              Model loaded: <code>{modelId}</code>
-            </div>
-          )}
           {bakedPath && (
             <div style={{ color: 'var(--accent)', fontSize: '12px' }}>
               Saved abliterated model to <code>{bakedPath}</code>
