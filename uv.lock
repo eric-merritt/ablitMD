@@ -20,9 +20,10 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "accelerate" },
-    { name = "causal-conv1d", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "causal-conv1d" },
     { name = "datasets" },
     { name = "fastapi" },
+    { name = "flash-attn" },
     { name = "flash-linear-attention" },
     { name = "httpx" },
     { name = "huggingface-hub" },
@@ -42,6 +43,7 @@ requires-dist = [
     { name = "causal-conv1d", url = "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.6.2.post1/causal_conv1d-1.6.2.post1+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" },
     { name = "datasets", specifier = ">=4.8.5" },
     { name = "fastapi", specifier = ">=0.115.0" },
+    { name = "flash-attn", path = "pkgs/flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" },
     { name = "flash-linear-attention" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "huggingface-hub" },
@@ -279,9 +281,9 @@ name = "causal-conv1d"
 version = "1.6.2.post1"
 source = { url = "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.6.2.post1/causal_conv1d-1.6.2.post1+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
 dependencies = [
-    { name = "ninja", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
-    { name = "packaging", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
-    { name = "torch", marker = "python_full_version >= '3.12' and python_full_version < '3.14'" },
+    { name = "ninja" },
+    { name = "packaging" },
+    { name = "torch" },
 ]
 wheels = [
     { url = "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.6.2.post1/causal_conv1d-1.6.2.post1+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl", hash = "sha256:3d09789a5df2760a59c2064c4570a4ccd30315943581e9553eb1f412cd9e25a6" },
@@ -522,6 +524,24 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/03/14/2aabd37839b9f3c6a67fbc5678f906d04d0c242c603ac234eefe02df99a6/fla_core-0.5.0.tar.gz", hash = "sha256:476dd94711702af81cc4827010d9209f6053d8cdceac8e43d3c8497071f07a81", size = 418171, upload-time = "2026-04-21T20:25:40.948Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/03/96e6820d176256353670b41ca56dabbbebe129674b4f4ad7b54a152b7b36/fla_core-0.5.0-py3-none-any.whl", hash = "sha256:5c826ff32daf6b629658e3e4f6125d87cf8c32eea937e3be9ba85f51951d809a", size = 595276, upload-time = "2026-04-21T20:25:37.698Z" },
+]
+
+[[package]]
+name = "flash-attn"
+version = "2.8.3"
+source = { path = "pkgs/flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
+dependencies = [
+    { name = "einops" },
+    { name = "torch" },
+]
+wheels = [
+    { filename = "flash_attn-2.8.3+cu12torch2.9cxx11abitrue-cp312-cp312-linux_x86_64.whl", hash = "sha256:4e2f9e39313266b1544b68138b15b91ee6221eccf14f7902b7c6620351340810" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "einops" },
+    { name = "torch" },
 ]
 
 [[package]]

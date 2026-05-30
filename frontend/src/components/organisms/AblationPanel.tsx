@@ -141,12 +141,16 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   }, [runId, models])
 
   useEffect(() => {
-    if (!builtParams) return
-    if (params === builtParams) return
+    if (!builtParams) { console.log('[recipe] no builtParams yet'); return }
+    const same = params === builtParams
+    console.log('[recipe] params check', { same, paramKeys: Object.keys(params), builtParamKeys: builtParams ? Object.keys(builtParams) : 'null' })
+    if (same) { console.log('[recipe] params unchanged, skipping'); return }
+    console.log('[recipe] params changed, scheduling rebuild', params)
     const timer = setTimeout(() => {
+      console.log('[recipe] executing rebuild with', params)
       setStatus('building')
       buildRecipe(runId, params)
-        .then(next => { setRecipe(next); setBuiltParams(params); setStatus('idle') })
+        .then(next => { console.log('[recipe] build complete, updating builtParams'); setRecipe(next); setBuiltParams(params); setStatus('idle') })
         .catch(err => { setError(String(err.message)); setStatus('idle') })
     }, 400)
     return () => clearTimeout(timer)

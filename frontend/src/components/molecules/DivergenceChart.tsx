@@ -18,7 +18,7 @@ const REDIRECT_COLOR = '#f97316'
 const MAG_COLOR      = 'var(--text-muted)'
 const NONE_COLOR     = '#4ade80'
 
-export const DivergenceChart = ({ hard, redirect, none, onset, split, lastLayer, factorA, factorB }: DivergenceChartProps) => {
+export const DivergenceChart = ({ hard, redirect, none, onset, split, factorA, factorB }: DivergenceChartProps) => {
   const nLayers = Math.max(hard?.clumping.length ?? 0, redirect?.clumping.length ?? 0)
 
   const chartData = useMemo(() => {
