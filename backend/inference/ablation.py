@@ -67,6 +67,20 @@ def _projection_modules(layer):
 #   return projections
 
 
+def copy_model_to_cpu(model):
+  """Deep copy a model to CPU memory."""
+  import copy
+  model_cpu = copy.deepcopy(model)
+  model_cpu = model_cpu.cpu()
+  return model_cpu
+
+
+def apply_ablation_to_model_copy(recipe: dict, model):
+  """Apply ablation in-place to a model copy and return it."""
+  apply_ablation_in_place(recipe, model)
+  return model
+
+
 def apply_ablation_in_place(recipe: dict, model) -> dict:
   """Orthogonalize embedding + o_proj + down_proj in memory per the recipe.
   Returns a snapshot dict mapping each projection to its original weight clone

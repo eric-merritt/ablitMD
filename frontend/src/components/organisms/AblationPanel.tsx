@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { DivergenceChart } from '../molecules/DivergenceChart'
 import { LayerSplitControls } from '../molecules/LayerSplitControls'
 import { RecipePanel } from '../molecules/RecipePanel'
@@ -102,6 +102,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
   const [compareLoading, setCompareLoading] = useState(false)
   const [compareError, setCompareError]     = useState<string>()
   const [builtParams, setBuiltParams]       = useState<RecipeParams | null>(null)
+  const buildRequestIdRef = useRef(0)
 
   useEffect(() => {
     getDivergence(runId)
@@ -119,9 +120,10 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
           : DEFAULT_PARAMS
         setParams(initialParams)
         setStatus('building')
+        const requestId = ++buildRequestIdRef.current
         buildRecipe(runId, initialParams)
-          .then(r => { setRecipe(r); setBuiltParams(initialParams); setStatus('idle') })
-          .catch(err => { setError(String(err.message)); setStatus('idle') })
+          .then(r => { if (requestId === buildRequestIdRef.current) { setRecipe(r); setBuiltParams(initialParams) } setStatus('idle') })
+          .catch(err => { if (requestId === buildRequestIdRef.current) { setError(String(err.message)) }; setStatus('idle') })
 
         const modelInfo = models.find(model => model.modelId === foundModelId)
         if (!modelInfo) { setModelLoad('error'); setError(`Model ${foundModelId} not in registry`); return }
@@ -146,13 +148,26 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
     console.log('[recipe] params check', { same, paramKeys: Object.keys(params), builtParamKeys: builtParams ? Object.keys(builtParams) : 'null' })
     if (same) { console.log('[recipe] params unchanged, skipping'); return }
     console.log('[recipe] params changed, scheduling rebuild', params)
+    const requestId = ++buildRequestIdRef.current
     const timer = setTimeout(() => {
       console.log('[recipe] executing rebuild with', params)
       setStatus('building')
       buildRecipe(runId, params)
-        .then(next => { console.log('[recipe] build complete, updating builtParams'); setRecipe(next); setBuiltParams(params); setStatus('idle') })
-        .catch(err => { setError(String(err.message)); setStatus('idle') })
-    }, 400)
+        .then(next => {
+          if (requestId === buildRequestIdRef.current) {
+            console.log('[recipe] build complete, updating builtParams')
+            setRecipe(next)
+            setBuiltParams(params)
+          }
+          setStatus('idle')
+        })
+        .catch(err => {
+          if (requestId === buildRequestIdRef.current) {
+            setError(String(err.message))
+          }
+          setStatus('idle')
+        })
+    }, 5000)
     return () => clearTimeout(timer)
   }, [params, builtParams])
 
@@ -161,10 +176,10 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
     setCompareRows([])
     setCompareLoading(true)
     setCompareError(undefined)
-    compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode })
+    compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode, onset: recipe.onset, split: recipe.split, factor_a: recipe.factor_a, factor_b: recipe.factor_b })
       .then(rows => { setCompareRows(rows); setCompareLoading(false) })
       .catch(err => { setCompareError(String(err.message)); setCompareLoading(false) })
-  }, [recipe, modelId])
+  }, [recipe, modelId, runId])
 
   const runBake = () => {
     setBaking(true)

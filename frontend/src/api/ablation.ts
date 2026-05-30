@@ -40,7 +40,7 @@ export const bakeModel = (
 
 export const compareDirections = (
   runId: string,
-  body: { model_id: string; gen_mode: string }
+  body: { model_id: string; gen_mode: string; onset: number; split: number; factor_a: number; factor_b: number }
 ): Promise<DirectionCompareRow[]> =>
   fetch(`/api/ablation/${runId}/directions/compare`, {
     method: 'POST',

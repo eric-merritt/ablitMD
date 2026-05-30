@@ -29,10 +29,12 @@ from backend.inference.model_loader import (
   load_model,
   unload_model,
 )
+import backend.inference.model_loader as model_loader_module
 from backend.inference.ablation import (
   apply_ablation_in_place, apply_classic_in_place,
   compute_classic_directions, compare_directions,
   restore_model_weights, bake_and_save,
+  copy_model_to_cpu, apply_ablation_to_model_copy,
 )
 from backend.inference.verify import looks_like_refusal, projection_strength
 
@@ -147,6 +149,10 @@ class CompareDirectionsRequest(BaseModel):
   run_id: str
   model_id: str
   gen_mode: str
+  onset: int
+  split: int
+  factor_a: float
+  factor_b: float
 
 
 @app.get("/status")
@@ -302,17 +308,26 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
+    original_model = None
+    ablated_model = None
     try:
+      original_model = await asyncio.to_thread(copy_model_to_cpu, get_model())
+      unload_model()
+      ablated_model = await asyncio.to_thread(apply_ablation_to_model_copy, recipe, original_model)
+      ablated_model = ablated_model.to("cuda:0")
+      model_loader_module._model = ablated_model
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
         yield chunk
     finally:
-      if cancel_event.is_set():
-        await asyncio.to_thread(restore_model_weights, snapshots)
-      else:
-        unload_model()
-      del snapshots
+      model_loader_module._model = None
+      unload_model()
+      if original_model is not None:
+        del original_model
+      if ablated_model is not None:
+        del ablated_model
+      gc.collect()
+      torch.cuda.empty_cache()
 
   async def _verify_loop():
     global _verify_label_queue
@@ -426,6 +441,12 @@ async def ablate_directions_compare(req: CompareDirectionsRequest):
   if not recipe_path.exists():
     raise HTTPException(status_code=404, detail="Recipe not found — build it first")
   recipe    = json.loads(recipe_path.read_text())
+  recipe.update({
+    "onset": req.onset,
+    "split": req.split,
+    "factor_a": req.factor_a,
+    "factor_b": req.factor_b,
+  })
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
   try:
@@ -496,20 +517,30 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    snapshots = await asyncio.to_thread(
-      apply_classic_in_place, directions, req.factor, get_model(),
-      disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
-    )
+    original_model = None
+    ablated_model = None
     try:
+      original_model = await asyncio.to_thread(copy_model_to_cpu, get_model())
+      unload_model()
+      ablated_model = original_model
+      await asyncio.to_thread(
+        apply_classic_in_place, directions, req.factor, ablated_model,
+        disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+      )
+      ablated_model = ablated_model.to("cuda:0")
+      model_loader_module._model = ablated_model
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
         yield chunk
     finally:
-      if cancel_event.is_set():
-        await asyncio.to_thread(restore_model_weights, snapshots)
-      else:
-        unload_model()
-      del snapshots
+      model_loader_module._model = None
+      unload_model()
+      if original_model is not None:
+        del original_model
+      if ablated_model is not None:
+        del ablated_model
+      gc.collect()
+      torch.cuda.empty_cache()
 
   async def _classic_verify_loop():
     global _verify_label_queue
