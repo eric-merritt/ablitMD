@@ -29,12 +29,10 @@ from backend.inference.model_loader import (
   load_model,
   unload_model,
 )
-import backend.inference.model_loader as model_loader_module
 from backend.inference.ablation import (
   apply_ablation_in_place, apply_classic_in_place,
   compute_classic_directions, compare_directions,
   restore_model_weights, bake_and_save,
-  copy_model_to_cpu, apply_ablation_to_model_copy,
 )
 from backend.inference.verify import looks_like_refusal, projection_strength
 
@@ -105,6 +103,7 @@ class AblateRequest(BaseModel):
 class VerifyRequest(BaseModel):
   run_id: str
   model_id: str
+  api_model_id: str
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
@@ -114,6 +113,7 @@ class VerifyRequest(BaseModel):
 class VerifyClassicRequest(BaseModel):
   run_id: str
   model_id: str
+  api_model_id: str
   gen_mode: str
   factor: float = 0.6
   disclaimer_ablate: bool = False
@@ -308,24 +308,15 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    original_model = None
-    ablated_model = None
     try:
-      original_model = await asyncio.to_thread(copy_model_to_cpu, get_model())
       unload_model()
-      ablated_model = await asyncio.to_thread(apply_ablation_to_model_copy, recipe, original_model)
-      ablated_model = ablated_model.to("cuda:0")
-      model_loader_module._model = ablated_model
+      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
         yield chunk
     finally:
-      model_loader_module._model = None
       unload_model()
-      if original_model is not None:
-        del original_model
-      if ablated_model is not None:
-        del ablated_model
       gc.collect()
       torch.cuda.empty_cache()
 
@@ -517,28 +508,18 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     return cancel_event.is_set()
 
   async def events():
-    original_model = None
-    ablated_model = None
     try:
-      original_model = await asyncio.to_thread(copy_model_to_cpu, get_model())
       unload_model()
-      ablated_model = original_model
-      await asyncio.to_thread(
-        apply_classic_in_place, directions, req.factor, ablated_model,
+      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      snapshots = await asyncio.to_thread(
+        apply_classic_in_place, directions, req.factor, get_model(),
         disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
       )
-      ablated_model = ablated_model.to("cuda:0")
-      model_loader_module._model = ablated_model
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
         yield chunk
     finally:
-      model_loader_module._model = None
       unload_model()
-      if original_model is not None:
-        del original_model
-      if ablated_model is not None:
-        del ablated_model
       gc.collect()
       torch.cuda.empty_cache()
 
