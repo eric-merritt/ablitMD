@@ -311,9 +311,13 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     try:
       unload_model()
       await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      if get_model() is None:
+        raise RuntimeError("Failed to load model")
       snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
+        if is_cancelled() or await request.is_disconnected():
+          return
         yield chunk
     finally:
       unload_model()
@@ -511,12 +515,16 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     try:
       unload_model()
       await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      if get_model() is None:
+        raise RuntimeError("Failed to load model")
       snapshots = await asyncio.to_thread(
         apply_classic_in_place, directions, req.factor, get_model(),
         disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
       )
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
+        if is_cancelled() or await request.is_disconnected():
+          return
         yield chunk
     finally:
       unload_model()
