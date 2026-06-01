@@ -73,6 +73,35 @@ def _capture_and_save_hidden_states(input_ids, hidden_states_key: str, runs_dir:
   np.save(str(state_dir / f"{hidden_states_key}.npy"), hidden_states)
 
 
+def _capture_response_hidden_states(input_ids, response_text: str, hidden_states_key: str, runs_dir: Path, run_id: str) -> None:
+  tokenizer = get_tokenizer()
+  model = get_model()
+  response_ids = tokenizer(response_text, return_tensors="pt", add_special_tokens=False)["input_ids"].to(input_ids.device)
+  response_len = response_ids.shape[1]
+  if response_len == 0:
+    return
+  full_ids = torch.cat([input_ids, response_ids], dim=1)
+  prompt_len = input_ids.shape[1]
+  positions = {
+    "resp_first": prompt_len,
+    "resp_mid":   prompt_len + response_len // 2,
+    "resp_last":  -1,
+  }
+  with torch.inference_mode():
+    output = model(full_ids, output_hidden_states=True, use_cache=False)
+  n_layers = model.config.num_hidden_layers
+  state_dir = runs_dir / run_id
+  state_dir.mkdir(parents=True, exist_ok=True)
+  for suffix, pos in positions.items():
+    hidden_states = np.array([
+      output.hidden_states[layer_idx][0, pos, :].cpu().float().numpy()
+      for layer_idx in range(n_layers + 1)
+    ], dtype=np.float32)
+    np.save(str(state_dir / f"{hidden_states_key}__{suffix}.npy"), hidden_states)
+  del output
+  torch.cuda.empty_cache()
+
+
 def _claim_abort_event() -> threading.Event:
   """Signal any in-flight generation to stop, then return a fresh event for this call."""
   global _active_abort
@@ -138,6 +167,8 @@ def stream_prompt(
     gc.collect()
 
   stripped = THINKING_STRIP_RE.sub('', collected).strip()
+  if not skip_hidden_states and not abort_event.is_set():
+    _capture_response_hidden_states(input_ids, stripped, hidden_states_key, runs_dir, run_id)
   if abort_event.is_set():
     yield {"type": "aborted", "response": stripped}
   else:
