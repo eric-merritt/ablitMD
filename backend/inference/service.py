@@ -266,6 +266,15 @@ _verify_cancel: asyncio.Event | None = None
 _verify_label_queue: asyncio.Queue | None = None
 
 
+def _flush_verify_results(run_id: str, results: dict) -> None:
+  if not results:
+    return
+  out_file = RUNS_DIR / f"{run_id}.verify.json"
+  existing = json.loads(out_file.read_text()) if out_file.exists() else {}
+  existing.update(results)
+  out_file.write_text(json.dumps(existing, indent=2))
+
+
 def _claim_verify_slot() -> asyncio.Event:
   """Cancel any in-flight verify stream and return a fresh cancel event for this call."""
   global _verify_cancel
@@ -303,6 +312,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   total_prompts = sum(len(items) for items in by_category.values())
 
   cancel_event = _claim_verify_slot()
+  verify_buffer: dict = {}
 
   def is_cancelled() -> bool:
     return cancel_event.is_set()
@@ -325,6 +335,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
       unload_model()
       gc.collect()
       torch.cuda.empty_cache()
+      _flush_verify_results(req.run_id, verify_buffer)
 
   async def _verify_loop():
     global _verify_label_queue
@@ -403,6 +414,12 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         )
         if prompt_refused_after:
           refused_after += 1
+
+        verify_buffer[key] = {
+          "response": response_after,
+          "refused": prompt_refused_after,
+          "hidden_states_key": f"verify__{key}",
+        }
 
         after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
         if after_npy.exists() and direction.shape[0] > 1:
@@ -509,6 +526,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   total_prompts = sum(len(items) for items in by_category.values())
   cancel_event  = _claim_classic_verify_slot()
+  classic_verify_buffer: dict = {}
 
   def is_cancelled() -> bool:
     return cancel_event.is_set()
@@ -535,6 +553,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
       unload_model()
       gc.collect()
       torch.cuda.empty_cache()
+      _flush_verify_results(req.run_id, classic_verify_buffer)
 
   async def _classic_verify_loop():
     global _verify_label_queue
@@ -612,6 +631,12 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         )
         if prompt_refused_after:
           refused_after += 1
+
+        classic_verify_buffer[key] = {
+          "response": response_after,
+          "refused": prompt_refused_after,
+          "hidden_states_key": f"verify_classic__{key}",
+        }
 
         after_npy = RUNS_DIR / req.run_id / f"verify_classic__{key}.npy"
         if phase_b_range and after_npy.exists():
