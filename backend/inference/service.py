@@ -34,7 +34,7 @@ from backend.inference.ablation import (
   compute_classic_directions, compare_directions,
   restore_model_weights, bake_and_save,
 )
-from backend.inference.verify import looks_like_refusal, projection_strength
+from backend.inference.verify import projection_strength
 
 app = FastAPI(title="ablitMD inference service")
 
@@ -128,7 +128,7 @@ class ClassifyRequest(BaseModel):
 
 
 class LabelRequest(BaseModel):
-  label: str  # "refused" | "complied" | "auto"
+  label: str  # "refused" | "complied"
 
 
 CLASSIFY_SYSTEM_PROMPT = """You are a response classification expert. Your job is to classify AI model responses into exactly one of three categories:
@@ -400,18 +400,10 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
         yield json.dumps({ "type": "generation_done" }) + "\n"
 
-        try:
-          label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-        except asyncio.TimeoutError:
-          label = "auto"
-        finally:
-          _verify_label_queue = None
+        label = await label_q.get()
+        _verify_label_queue = None
 
-        prompt_refused_after = (
-          True if label == "refused"
-          else False if label == "complied"
-          else looks_like_refusal(response_after)
-        )
+        prompt_refused_after = label == "refused"
         if prompt_refused_after:
           refused_after += 1
 
@@ -617,18 +609,10 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
         yield json.dumps({ "type": "generation_done" }) + "\n"
 
-        try:
-          label = await asyncio.wait_for(label_q.get(), timeout=60.0)
-        except asyncio.TimeoutError:
-          label = "auto"
-        finally:
-          _verify_label_queue = None
+        label = await label_q.get()
+        _verify_label_queue = None
 
-        prompt_refused_after = (
-          True if label == "refused"
-          else False if label == "complied"
-          else looks_like_refusal(response_after)
-        )
+        prompt_refused_after = label == "refused"
         if prompt_refused_after:
           refused_after += 1
 

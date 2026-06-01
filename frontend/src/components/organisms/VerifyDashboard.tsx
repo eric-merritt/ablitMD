@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { verifyAblation, verifyAblationClassic, bakeModel, submitVerifyLabel } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult, VerifyLivePrompt } from '../../types/ablation'
 
@@ -57,8 +57,7 @@ const LiveAfterBlock = ({ text, streaming }: { text: string; streaming: boolean 
   </div>
 )
 
-const LabelButtons = ({ countdown, onLabel }: {
-  countdown: number
+const LabelButtons = ({ onLabel }: {
   onLabel: (l: 'refused' | 'complied') => void
 }) => (
   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -70,16 +69,14 @@ const LabelButtons = ({ countdown, onLabel }: {
       padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
       background: '#064e3b', color: '#6ee7b7', border: 'none', borderRadius: 'var(--radius)',
     }}>Complied</button>
-    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>auto in { countdown }s</span>
   </div>
 )
 
-const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, labelCountdown, onLabel }: {
+const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, onLabel }: {
   prompt: VerifyLivePrompt
   liveText: string
   streaming: boolean
   awaitingLabel: boolean
-  labelCountdown: number
   onLabel: (l: 'refused' | 'complied') => void
 }) => (
   <div style={{
@@ -95,7 +92,7 @@ const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, labelCountd
       <ResponseBlock label="before" text={ prompt.response_before } refused={ prompt.refused_before } />
       <LiveAfterBlock text={ liveText } streaming={ streaming } />
     </div>
-    { awaitingLabel && <LabelButtons countdown={ labelCountdown } onLabel={ onLabel } /> }
+    { awaitingLabel && <LabelButtons onLabel={ onLabel } /> }
   </div>
 )
 
@@ -171,19 +168,9 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
 
   const [livePrompt, setLivePrompt]         = useState<VerifyLivePrompt | null>(null)
   const [liveText, setLiveText]             = useState('')
-  const [awaitingLabel, setAwaitingLabel]   = useState(false)
-  const [labelCountdown, setLabelCountdown] = useState(5)
-
-  const labelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const labelTimeoutRef  = useRef<ReturnType<typeof setTimeout>  | null>(null)
-
-  const clearLabelTimers = () => {
-    if (labelIntervalRef.current) { clearInterval(labelIntervalRef.current); labelIntervalRef.current = null }
-    if (labelTimeoutRef.current)  { clearTimeout(labelTimeoutRef.current);   labelTimeoutRef.current  = null }
-  }
+  const [awaitingLabel, setAwaitingLabel] = useState(false)
 
   const handleLabel = (label: 'refused' | 'complied') => {
-    clearLabelTimers()
     setAwaitingLabel(false)
     submitVerifyLabel(label)
   }
@@ -211,23 +198,9 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     const controller = new AbortController()
     let cancelled = false
 
-    clearLabelTimers()
     setLivePrompt(null)
     setLiveText('')
     setAwaitingLabel(false)
-
-    function startLabelTimer() {
-      clearLabelTimers()
-      setLabelCountdown(5)
-      const interval = setInterval(() => setLabelCountdown(c => c - 1), 1000)
-      labelIntervalRef.current = interval
-      const timeout = setTimeout(() => {
-        clearLabelTimers()
-        setAwaitingLabel(false)
-        submitVerifyLabel('auto')
-      }, 5000)
-      labelTimeoutRef.current = timeout
-    }
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
@@ -238,12 +211,10 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
         setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
         setLiveText('')
         setAwaitingLabel(false)
-        clearLabelTimers()
       }
       else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
       else if (event.type === 'generation_done') {
         setAwaitingLabel(true)
-        startLabelTimer()
       }
       else if (event.type === 'prompt') {
         setPrompts(prev => [...prev, event])
@@ -265,7 +236,6 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     return () => {
       cancelled = true
       controller.abort()
-      clearLabelTimers()
     }
   }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
 
@@ -314,7 +284,6 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
                 liveText={ liveText }
                 streaming={ !awaitingLabel }
                 awaitingLabel={ awaitingLabel }
-                labelCountdown={ labelCountdown }
                 onLabel={ handleLabel }
               />
             ) }
