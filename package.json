@@ -7,7 +7,7 @@
     "backend"
   ],
   "scripts": {
-    "dev": "concurrently --names backend,inference,llama,frontend --prefix-colors cyan,yellow,blue,magenta \"npm run dev --workspace=backend\" \"uv run python backend/inference/service.py\" \"llama-server -m /home/ermer/models/Qwen/Qwen3.6-27B-BF16.gguf -ngl 14 --port 8239 -c 8192\" \"npm run dev --workspace=frontend\"",
+    "dev": "concurrently --names backend,inference,llama,frontend --prefix-colors cyan,yellow,blue,magenta \"npm run dev --workspace=backend\" \"uv run python -m backend.inference.service\" \"llama-server -m /home/ermer/models/Qwen/Qwen3.6-27B-BF16.gguf -ngl 14 --port 8239 -c 8192\" \"npm run dev --workspace=frontend\"",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "npm run dev --workspace=backend"
   },
