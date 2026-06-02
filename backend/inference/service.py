@@ -4,11 +4,6 @@ import json
 import sys
 import threading
 from pathlib import Path
-
-_project_root = Path(__file__).resolve().parents[2]
-if str(_project_root) not in sys.path:
-  sys.path.insert(0, str(_project_root))
-
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -33,9 +28,13 @@ from backend.inference.ablation import (
     compute_classic_directions,
     bake_and_save,
 )
-
-from backend.inference import compute_run_directions as compute_directions
+from backend.inference.direction import compute_run_directions as compute_directions
 from backend.inference.verify import projection_strength
+
+_project_root = Path(__file__).resolve().parents[2]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 
 # Ensure project root is on sys.path so `backend.*` imports resolve when the
 # script is invoked directly (e.g. `uv run python backend/inference/service.py`).
@@ -179,8 +178,8 @@ def load(req: LoadRequest):
 
 
 @app.post("/reset")
-def reset():
-    unload_model()
+async def reset():
+    await asyncio.to_thread(unload_model)
     return {"status": "model unloaded"}
 
 
@@ -345,7 +344,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
     async def events():
         try:
-            unload_model()
+            await asyncio.to_thread(unload_model)
             yield json.dumps({"type": "model_loading"}) + "\n"
             try:
                 await asyncio.to_thread(load_model(model_id, api_model_id))
@@ -381,7 +380,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                     return
                 yield chunk
         finally:
-            unload_model()
+            await asyncio.to_thread(unload_model)
             gc.collect()
             torch.cuda.empty_cache()
             _flush_verify_results(req.run_id, verify_buffer)
@@ -604,7 +603,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     async def events():
         try:
             yield json.dumps({"type": "model_loading"}) + "\n"
-            unload_model()
+            await asyncio.to_thread(unload_model)
             try:
                 await asyncio.to_thread(load_model, model_id, api_model_id)
             except Exception as exc:
@@ -649,7 +648,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
                     return
                 yield chunk
         finally:
-            unload_model()
+            await asyncio.to_thread(unload_model)
             gc.collect()
             torch.cuda.empty_cache()
             _flush_verify_results(req.run_id, classic_verify_buffer)
@@ -841,7 +840,7 @@ def ablate_bake(req: AblateRequest):
         get_tokenizer().save_pretrained(out_path)
 
     # baking mutated weights — drop them so next /load is clean
-    unload_model()
+    await asyncio.to_thread(unload_model)
     return {"saved_to": out_path}
 
 
