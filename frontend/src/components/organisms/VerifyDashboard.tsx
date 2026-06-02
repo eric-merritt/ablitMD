@@ -161,6 +161,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   const [prompts, setPrompts]                 = useState<VerifyPromptResult[]>([])
   const [categories, setCategories]           = useState<VerifyCategoryResult[]>([])
   const [error, setError]                     = useState<string>()
+  const [modelLoading, setModelLoading]       = useState(false)
   const [finished, setFinished]               = useState(false)
   const [baking, setBaking]                   = useState(false)
   const [bakedPath, setBakedPath]             = useState<string>()
@@ -203,7 +204,9 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
-      if (event.type === 'total') setTotal(event.prompts)
+      if (event.type === 'model_loading') setModelLoading(true)
+      else if (event.type === 'error') { setModelLoading(false); setError(event.message) }
+      else if (event.type === 'total') { setModelLoading(false); setTotal(event.prompts) }
       else if (event.type === 'category_start') setCurrentCategory(event.category)
       else if (event.type === 'prompt_start') {
         const { prompt_id, prompt_text, category, response_before, refused_before } = event
@@ -245,7 +248,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
-                Verify · { finished ? 'done' : 'running…' }
+                Verify · { modelLoading ? 'loading model…' : finished ? 'done' : 'running…' }
               </span>
               <span style={{
                 padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,

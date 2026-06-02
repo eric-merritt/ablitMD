@@ -314,10 +314,19 @@ async def ablate_verify(req: VerifyRequest, request: Request):
 
   async def events():
     try:
+      yield json.dumps({ "type": "model_loading" }) + "\n"
       unload_model()
-      await asyncio.to_thread(load_model, model_id, api_model_id)
+      try:
+        await asyncio.to_thread(load_model, model_id, api_model_id)
+      except Exception as exc:
+        yield json.dumps({ "type": "error", "message": f"Model load failed: {exc}" }) + "\n"
+        return
       await asyncio.sleep(0.1)
-      snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
+      try:
+        await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
+      except Exception as exc:
+        yield json.dumps({ "type": "error", "message": f"Ablation failed: {exc}" }) + "\n"
+        return
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _verify_loop():
         if is_cancelled() or await request.is_disconnected():
@@ -520,14 +529,22 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   async def events():
     try:
+      yield json.dumps({ "type": "model_loading" }) + "\n"
       unload_model()
-      await asyncio.to_thread(load_model, model_id, api_model_id)
-      if get_model() is None:
-        raise RuntimeError("Failed to load model")
-      snapshots = await asyncio.to_thread(
-        apply_classic_in_place, directions, req.factor, get_model(),
-        disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
-      )
+      try:
+        await asyncio.to_thread(load_model, model_id, api_model_id)
+      except Exception as exc:
+        yield json.dumps({ "type": "error", "message": f"Model load failed: {exc}" }) + "\n"
+        return
+      await asyncio.sleep(0.1)
+      try:
+        await asyncio.to_thread(
+          apply_classic_in_place, directions, req.factor, get_model(),
+          disclaimer_directions if req.disclaimer_ablate else None, req.disclaimer_factor
+        )
+      except Exception as exc:
+        yield json.dumps({ "type": "error", "message": f"Ablation failed: {exc}" }) + "\n"
+        return
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
       async for chunk in _classic_verify_loop():
         if is_cancelled() or await request.is_disconnected():
