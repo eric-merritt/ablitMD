@@ -671,12 +671,13 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
 @app.post("/ablate/bake")
 def ablate_bake(req: AblateRequest):
-  if get_loaded_model_id() is None:
-    raise HTTPException(status_code=400, detail="No model loaded")
-
   run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   state_dir = RUNS_DIR / req.run_id
-  model_id = get_loaded_model_id()
+  model_id = run_data["models"][0]
+  api_model_id = model_id
+
+  if get_loaded_model_id() != model_id:
+    load_model(model_id, api_model_id)
 
   if req.mode == "classic":
     if req.factor is None:
