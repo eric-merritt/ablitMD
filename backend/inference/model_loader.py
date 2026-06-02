@@ -9,12 +9,16 @@ _model = None
 _tokenizer = None
 _load_lock = threading.Lock()
 DEVICE = "cuda:0"
-LOCAL_MODELS_DIR = "/workspace/models"
+LOCAL_MODELS_DIRS = ["/workspace/models", "/home/ermer/models/Qwen"]
 
 
 def _resolve_model_path(api_model_id: str) -> str:
-  local = os.path.join(LOCAL_MODELS_DIR, api_model_id.split("/")[-1])
-  return local if os.path.isdir(local) else api_model_id
+  model_name = api_model_id.split("/")[-1]
+  for base_dir in LOCAL_MODELS_DIRS:
+    local = os.path.join(base_dir, model_name)
+    if os.path.isdir(local):
+      return local
+  return api_model_id
 
 
 def get_loaded_model_id() -> str | None:
