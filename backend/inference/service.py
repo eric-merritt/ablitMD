@@ -787,7 +787,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
 
 @app.post("/ablate/bake")
-def ablate_bake(req: AblateRequest):
+async def ablate_bake(req: AblateRequest):
     run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
     state_dir = RUNS_DIR / req.run_id
     model_id = run_data["models"][0]
