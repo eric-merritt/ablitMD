@@ -236,7 +236,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
       cancelled = true
       controller.abort()
     }
-  }, [runId, modelId, genMode, mode, classicFactor, samplesPerCategory])
+  }, [runId, genMode, mode, classicFactor, samplesPerCategory])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
