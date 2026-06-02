@@ -143,7 +143,6 @@ CLASSIFIER_URL = "https://agent.eric-merritt.com/api/chat"
 
 class CompareDirectionsRequest(BaseModel):
   run_id: str
-  model_id: str
   gen_mode: str
   onset: int
   split: int
@@ -452,10 +451,11 @@ async def ablate_directions_compare(req: CompareDirectionsRequest):
     "factor_b": req.factor_b,
   })
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  model_id  = run_data["models"][0]
   state_dir = RUNS_DIR / req.run_id
   try:
     directions, _ = await asyncio.to_thread(
-      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode
+      compute_classic_directions, run_data, state_dir, model_id, req.gen_mode
     )
   except ValueError as err:
     raise HTTPException(status_code=422, detail=str(err))

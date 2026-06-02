@@ -161,7 +161,7 @@ export const AblationPanel = ({ runId, models, onVerify }: AblationPanelProps) =
     setCompareRows([])
     setCompareLoading(true)
     setCompareError(undefined)
-    compareDirections(runId, { model_id: modelId, gen_mode: recipe.gen_mode, onset: recipe.onset, split: recipe.split, factor_a: recipe.factor_a, factor_b: recipe.factor_b })
+    compareDirections(runId, { gen_mode: recipe.gen_mode, onset: recipe.onset, split: recipe.split, factor_a: recipe.factor_a, factor_b: recipe.factor_b })
       .then(rows => { setCompareRows(rows); setCompareLoading(false) })
       .catch(err => { setCompareError(String(err.message)); setCompareLoading(false) })
   }, [recipe, modelId, runId])
