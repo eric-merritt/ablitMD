@@ -11,7 +11,7 @@ import type { Run } from './types/run'
 type Phase = 'config' | 'running' | 'review' | 'results' | 'verify'
 
 type AblationMode = 'ablitmd' | 'classic'
-interface VerifyContext { modelId: string; genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
+interface VerifyContext { genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
 
 const hasUnclassified = (run: Run): boolean =>
   run.prompts.some(prompt =>
@@ -26,8 +26,8 @@ const App = () => {
   const [activeRun, setActiveRun] = useState<Run | null>(null)
   const [verifyContext, setVerifyContext] = useState<VerifyContext | null>(null)
 
-  const handleVerifyStart = (modelId: string, genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => {
-    setVerifyContext({ modelId, genMode, samplesPerCategory: 2, mode, classicFactor, disclaimerAblate, disclaimerFactor })
+  const handleVerifyStart = (genMode: string, mode: AblationMode, classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => {
+    setVerifyContext({ genMode, samplesPerCategory: 2, mode, classicFactor, disclaimerAblate, disclaimerFactor })
     setPhase('verify')
   }
 
@@ -90,7 +90,6 @@ const App = () => {
       { phase === 'verify' && activeRun && verifyContext && (
         <VerifyDashboard
           runId={ activeRun.run_id }
-          modelId={ verifyContext.modelId }
           genMode={ verifyContext.genMode }
           mode={ verifyContext.mode }
           classicFactor={ verifyContext.classicFactor }

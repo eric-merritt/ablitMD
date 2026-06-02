@@ -78,7 +78,7 @@ const readNdjsonStream = async (
 
 export const verifyAblation = (
   runId: string,
-  body: { model_id: string; api_model_id: string; gen_mode: string; categories?: string[]; samples_per_category?: number },
+  body: { gen_mode: string; categories?: string[]; samples_per_category?: number },
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal)
@@ -92,7 +92,7 @@ export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto'): Promi
 
 export const verifyAblationClassic = (
   runId: string,
-  body: { model_id: string; api_model_id: string; gen_mode: string; factor: number; disclaimer_ablate?: boolean; disclaimer_factor?: number; categories?: string[]; samples_per_category?: number },
+  body: { gen_mode: string; factor: number; disclaimer_ablate?: boolean; disclaimer_factor?: number; categories?: string[]; samples_per_category?: number },
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify/classic`, body, onEvent, signal)

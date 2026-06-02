@@ -4,7 +4,6 @@ import type { VerifyPromptResult, VerifyCategoryResult, VerifyLivePrompt } from 
 
 interface VerifyDashboardProps {
   runId: string
-  modelId: string
   genMode: string
   mode: 'ablitmd' | 'classic'
   classicFactor: number
@@ -155,7 +154,7 @@ const CategorySummary = ({ rows }: { rows: VerifyCategoryResult[] }) => {
   )
 }
 
-export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, disclaimerAblate, disclaimerFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
+export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaimerAblate, disclaimerFactor, samplesPerCategory, onBack, onHome }: VerifyDashboardProps) => {
   const [total, setTotal]                     = useState(0)
   const [done, setDone]                       = useState(0)
   const [currentCategory, setCurrentCategory] = useState('')
@@ -226,8 +225,8 @@ export const VerifyDashboard = ({ runId, modelId, genMode, mode, classicFactor, 
     }
 
     const stream = mode === 'classic'
-      ? verifyAblationClassic(runId, { model_id: modelId, api_model_id: apiModelId, gen_mode: genMode, factor: classicFactor, disclaimer_ablate: disclaimerAblate, disclaimer_factor: disclaimerFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
-      : verifyAblation(runId, { model_id: modelId, api_model_id: apiModelId, gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+      ? verifyAblationClassic(runId, { gen_mode: genMode, factor: classicFactor, disclaimer_ablate: disclaimerAblate, disclaimer_factor: disclaimerFactor, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
+      : verifyAblation(runId, { gen_mode: genMode, samples_per_category: samplesPerCategory }, onEvent, controller.signal)
 
     stream
       .then(() => { if (!cancelled) setFinished(true) })

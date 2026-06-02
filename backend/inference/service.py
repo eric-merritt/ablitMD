@@ -102,8 +102,6 @@ class AblateRequest(BaseModel):
 
 class VerifyRequest(BaseModel):
   run_id: str
-  model_id: str
-  api_model_id: str
   gen_mode: str
   categories: list[str] | None = None
   samples_per_category: int = 2
@@ -112,8 +110,6 @@ class VerifyRequest(BaseModel):
 
 class VerifyClassicRequest(BaseModel):
   run_id: str
-  model_id: str
-  api_model_id: str
   gen_mode: str
   factor: float = 0.6
   disclaimer_ablate: bool = False
@@ -295,6 +291,8 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   recipe = json.loads(recipe_path.read_text())
 
   run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  model_id = run_data["models"][0]
+  api_model_id = model_id
   state_dir = RUNS_DIR / req.run_id
   phase_b_range = tuple(next(iter(recipe["modes"].values()))["phase_b"]["layers"])
 
@@ -302,7 +300,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   for prompt in run_data["prompts"]:
     if req.categories and prompt["category"] not in req.categories:
       continue
-    result = prompt.get("model_results", {}).get(req.model_id, {}).get(req.gen_mode)
+    result = prompt.get("model_results", {}).get(model_id, {}).get(req.gen_mode)
     if result:
       by_category.setdefault(prompt["category"], []).append({"prompt": prompt, "result": result})
 
@@ -320,7 +318,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
   async def events():
     try:
       unload_model()
-      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      await asyncio.to_thread(load_model, model_id, api_model_id)
       await asyncio.sleep(0.1)
       snapshots = await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
       yield json.dumps({ "type": "total", "categories": len(by_category), "prompts": total_prompts }) + "\n"
@@ -482,6 +480,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     raise HTTPException(status_code=400, detail="No model loaded")
 
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
+  model_id = run_data["models"][0]
+  api_model_id = model_id
   state_dir = RUNS_DIR / req.run_id
   log_path = RUNS_DIR / f"{req.run_id}.classic_verify.jsonl"
 
@@ -494,7 +494,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
   try:
     directions, disclaimer_directions = await asyncio.to_thread(
-      compute_classic_directions, run_data, state_dir, req.model_id, req.gen_mode, req.disclaimer_ablate
+      compute_classic_directions, run_data, state_dir, model_id, req.gen_mode, req.disclaimer_ablate
     )
   except ValueError as err:
     raise HTTPException(status_code=422, detail=str(err))
@@ -509,7 +509,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
   for prompt in run_data["prompts"]:
     if req.categories and prompt["category"] not in req.categories:
       continue
-    result = prompt.get("model_results", {}).get(req.model_id, {}).get(req.gen_mode)
+    result = prompt.get("model_results", {}).get(model_id, {}).get(req.gen_mode)
     if result:
       by_category.setdefault(prompt["category"], []).append({"prompt": prompt, "result": result})
 
@@ -526,7 +526,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
   async def events():
     try:
       unload_model()
-      await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+      await asyncio.to_thread(load_model, model_id, api_model_id)
       if get_model() is None:
         raise RuntimeError("Failed to load model")
       snapshots = await asyncio.to_thread(

@@ -9,7 +9,7 @@ interface ResultsGridProps {
   run: Run
   modelNames: Record<string, string>
   models: { modelId: string; apiModelId: string; name: string }[]
-  onVerify: (modelId: string, genMode: string, mode: 'ablitmd' | 'classic', classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
+  onVerify: (genMode: string, mode: 'ablitmd' | 'classic', classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
   onBack: () => void
   onHome: () => void
 }
