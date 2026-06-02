@@ -282,8 +282,6 @@ def _claim_verify_slot() -> asyncio.Event:
 
 @app.post("/ablate/verify")
 async def ablate_verify(req: VerifyRequest, request: Request):
-  if get_loaded_model_id() is None:
-    raise HTTPException(status_code=400, detail="No model loaded")
   recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
   if not recipe_path.exists():
     raise HTTPException(status_code=404, detail="Recipe not found")
@@ -476,9 +474,6 @@ def _claim_classic_verify_slot() -> asyncio.Event:
 
 @app.post("/ablate/verify/classic")
 async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
-  if get_loaded_model_id() is None:
-    raise HTTPException(status_code=400, detail="No model loaded")
-
   run_data  = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
   model_id = run_data["models"][0]
   api_model_id = model_id
