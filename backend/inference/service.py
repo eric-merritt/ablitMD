@@ -17,6 +17,7 @@ from backend.inference.generator import (
 )
 from backend.inference.model_loader import (
     get_loaded_model_id,
+    get_load_progress,
     get_model,
     get_tokenizer,
     load_model,
@@ -345,17 +346,17 @@ async def ablate_verify(req: VerifyRequest, request: Request):
     async def events():
         try:
             await asyncio.to_thread(unload_model)
-            yield json.dumps({"type": "model_loading"}) + "\n"
+            yield json.dumps({"type": "model_loading", "progress": 0.0}) + "\n"
+            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id, api_model_id))
+            while not load_task.done():
+                yield json.dumps({"type": "load_progress", "progress": round(get_load_progress(), 3)}) + "\n"
+                await asyncio.sleep(0.5)
             try:
-                await asyncio.to_thread(load_model, model_id, api_model_id)
+                await load_task
             except Exception as exc:
-                yield (
-                    json.dumps(
-                        {"type": "error", "message": f"Model load failed: {exc}"}
-                    )
-                    + "\n"
-                )
+                yield json.dumps({"type": "error", "message": f"Model load failed: {exc}"}) + "\n"
                 return
+            yield json.dumps({"type": "load_progress", "progress": 1.0}) + "\n"
             await asyncio.sleep(3.0)
             try:
                 await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
@@ -602,18 +603,18 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
 
     async def events():
         try:
-            yield json.dumps({"type": "model_loading"}) + "\n"
+            yield json.dumps({"type": "model_loading", "progress": 0.0}) + "\n"
             await asyncio.to_thread(unload_model)
+            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id, api_model_id))
+            while not load_task.done():
+                yield json.dumps({"type": "load_progress", "progress": round(get_load_progress(), 3)}) + "\n"
+                await asyncio.sleep(0.5)
             try:
-                await asyncio.to_thread(load_model, model_id, api_model_id)
+                await load_task
             except Exception as exc:
-                yield (
-                    json.dumps(
-                        {"type": "error", "message": f"Model load failed: {exc}"}
-                    )
-                    + "\n"
-                )
+                yield json.dumps({"type": "error", "message": f"Model load failed: {exc}"}) + "\n"
                 return
+            yield json.dumps({"type": "load_progress", "progress": 1.0}) + "\n"
             await asyncio.sleep(0.1)
             try:
                 await asyncio.to_thread(

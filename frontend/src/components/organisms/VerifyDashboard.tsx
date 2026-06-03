@@ -14,6 +14,18 @@ interface VerifyDashboardProps {
   onHome: () => void
 }
 
+const LoadProgressBar = ({ progress }: { progress: number }) => (
+  <div style={{ width: '100%', height: '3px', background: 'var(--border)', borderRadius: '2px', overflow: 'hidden' }}>
+    <div style={{
+      height: '100%',
+      width: `${progress}%`,
+      background: 'var(--accent)',
+      borderRadius: '2px',
+      transition: 'width 0.4s ease',
+    }} />
+  </div>
+)
+
 const RefusalBadge = ({ refused }: { refused: boolean }) => (
   <span style={{
     display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
@@ -162,6 +174,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   const [categories, setCategories]           = useState<VerifyCategoryResult[]>([])
   const [error, setError]                     = useState<string>()
   const [modelLoading, setModelLoading]       = useState(false)
+  const [loadProgress, setLoadProgress]       = useState(0)
   const [finished, setFinished]               = useState(false)
   const [baking, setBaking]                   = useState(false)
   const [bakedPath, setBakedPath]             = useState<string>()
@@ -206,7 +219,8 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
-      if (event.type === 'model_loading') setModelLoading(true)
+      if (event.type === 'model_loading') { setModelLoading(true); setLoadProgress(0) }
+      else if (event.type === 'load_progress') setLoadProgress(Math.round((event.progress as number) * 100))
       else if (event.type === 'error') { setModelLoading(false); setError(event.message) }
       else if (event.type === 'total') { setModelLoading(false); setTotal(event.prompts) }
       else if (event.type === 'category_start') setCurrentCategory(event.category)
@@ -279,11 +293,12 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
                 }}>
                 { baking ? 'Baking…' : 'Bake & Save' }
               </button>
-              <span onClick={ onBack } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>← Back</span>
+                <span onClick={ onBack } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>← Back</span>
               <span onClick={ onHome } style={{ cursor: 'pointer', color: 'var(--text-muted)', fontSize: '13px' }}>Home</span>
             </div>
           </div>
 
+          { modelLoading && <LoadProgressBar progress={ loadProgress } /> }
           { error && <div style={{ color: '#ef4444', fontSize: '12px' }}>{ error }</div> }
           { bakedPath && <div style={{ color: 'var(--accent)', fontSize: '12px' }}>Saved abliterated model to <code>{ bakedPath }</code></div> }
 
