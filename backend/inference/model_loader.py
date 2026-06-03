@@ -4,6 +4,15 @@ import threading
 import torch
 import tqdm.auto
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from bitsandbytes.nn import Params4bit as _Params4bit
+
+# transformers 5.x passes _is_hf_initialized to Params4bit.__new__ but
+# bitsandbytes 0.49.x doesn't have that parameter yet.
+_p4b_orig_new = _Params4bit.__new__
+def _p4b_new(cls, *args, **kwargs):
+  kwargs.pop('_is_hf_initialized', None)
+  return _p4b_orig_new(cls, *args, **kwargs)
+_Params4bit.__new__ = staticmethod(_p4b_new)
 
 
 _loaded_model_id: str | None = None
@@ -58,17 +67,7 @@ def _restore_tqdm(orig):
   _load_progress = 1.0
 
 
-def _patch_params4bit_compat():
-  from bitsandbytes.nn import Params4bit
-  _orig_new = Params4bit.__new__
-  def _new(cls, *args, **kwargs):
-    kwargs.pop('_is_hf_initialized', None)
-    return _orig_new(cls, *args, **kwargs)
-  Params4bit.__new__ = staticmethod(_new)
-
-
 def _from_cache(cache_dir: str):
-  _patch_params4bit_compat()
   orig = _patch_tqdm()
   try:
     return AutoModelForCausalLM.from_pretrained(
