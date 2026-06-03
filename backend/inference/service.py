@@ -172,8 +172,8 @@ def status():
 
 
 @app.post("/load")
-def load(req: LoadRequest):
-    load_model(req.model_id, req.api_model_id)
+async def load(req: LoadRequest):
+    await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
     return {"loaded_model": req.model_id}
 
 
@@ -347,7 +347,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
             await asyncio.to_thread(unload_model)
             yield json.dumps({"type": "model_loading"}) + "\n"
             try:
-                await asyncio.to_thread(load_model(model_id, api_model_id))
+                await asyncio.to_thread(load_model, model_id, api_model_id)
             except Exception as exc:
                 yield (
                     json.dumps(
@@ -361,7 +361,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                 await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
                 await asyncio.sleep(3.0)
             except RuntimeError:
-                await asyncio.to_thread(load_model(model_id, api_model_id))
+                await asyncio.to_thread(load_model, model_id, api_model_id)
             yield (
                 json.dumps(
                     {
@@ -794,7 +794,7 @@ async def ablate_bake(req: AblateRequest):
     api_model_id = model_id
 
     if get_loaded_model_id() != model_id:
-        load_model(model_id, api_model_id)
+        await asyncio.to_thread(load_model, model_id, api_model_id)
 
     if req.mode == "classic":
         if req.factor is None:
