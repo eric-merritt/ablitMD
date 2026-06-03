@@ -166,9 +166,10 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   const [baking, setBaking]                   = useState(false)
   const [bakedPath, setBakedPath]             = useState<string>()
 
+  const [started, setStarted]               = useState(false)
   const [livePrompt, setLivePrompt]         = useState<VerifyLivePrompt | null>(null)
   const [liveText, setLiveText]             = useState('')
-  const [awaitingLabel, setAwaitingLabel] = useState(false)
+  const [awaitingLabel, setAwaitingLabel]   = useState(false)
 
   const handleLabel = (label: 'refused' | 'complied') => {
     setAwaitingLabel(false)
@@ -195,6 +196,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   }
 
   useEffect(() => {
+    if (!started) return
     const controller = new AbortController()
     let cancelled = false
 
@@ -239,7 +241,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
       cancelled = true
       controller.abort()
     }
-  }, [runId, genMode, mode, classicFactor, samplesPerCategory])
+  }, [started, runId, genMode, mode, classicFactor, samplesPerCategory])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -248,7 +250,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
-                Verify · { modelLoading ? 'loading model…' : finished ? 'done' : 'running…' }
+                Verify · { !started ? 'ready' : modelLoading ? 'loading model…' : finished ? 'done' : 'running…' }
               </span>
               <span style={{
                 padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
@@ -259,6 +261,16 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
               </span>
             </div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              { !started && (
+                <button onClick={ () => setStarted(true) }
+                  style={{
+                    padding: '6px 14px', fontSize: '12px', cursor: 'pointer',
+                    background: 'var(--accent)', color: 'var(--bg)', border: 'none', borderRadius: 'var(--radius)',
+                    fontWeight: 600,
+                  }}>
+                  Start Verify
+                </button>
+              )}
               <button onClick={ runBake } disabled={ baking }
                 style={{
                   padding: '6px 14px', fontSize: '12px', cursor: baking ? 'not-allowed' : 'pointer',
