@@ -102,7 +102,14 @@ def _quantize_and_cache(source_path: str, cache_dir: str):
   finally:
     _restore_tqdm(orig)
   print(f"[model_loader] saving NF4 cache to {cache_dir}", flush=True)
-  model.save_pretrained(cache_dir)
+  try:
+    model.save_pretrained(cache_dir)
+    AutoTokenizer.from_pretrained(source_path).save_pretrained(cache_dir)
+    print(f"[model_loader] cache saved", flush=True)
+  except Exception as err:
+    print(f"[model_loader] cache save failed ({err}), continuing without cache", flush=True)
+    import shutil
+    shutil.rmtree(cache_dir, ignore_errors=True)
   return model
 
 
