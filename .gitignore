@@ -28,3 +28,4 @@ pkgs/*.whl
 CLAUDE.md
 .claude/
 docs/superpowers/
+.pids
