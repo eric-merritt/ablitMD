@@ -13,10 +13,17 @@ _load_lock = threading.Lock()
 _load_progress: float = 0.0
 DEVICE = "cuda:0"
 MODELS_DIR = "/home/ermer/models/Qwen"
+NF4_SUFFIX = "-nf4"
+
+MAX_MEMORY = {0: "13500MiB", "cpu": "64GiB"}
 
 
 def get_load_progress() -> float:
   return _load_progress
+
+
+def get_loaded_model_id() -> str | None:
+  return _loaded_model_id
 
 
 def _resolve_model_path(model_id: str) -> str:
@@ -27,8 +34,8 @@ def _resolve_model_path(model_id: str) -> str:
   return model_id
 
 
-def get_loaded_model_id() -> str | None:
-  return _loaded_model_id
+def _cache_path(model_id: str) -> str:
+  return os.path.join(MODELS_DIR, model_id.split("/")[-1] + NF4_SUFFIX)
 
 
 class _ProgressTqdm(tqdm.auto.tqdm):
@@ -39,6 +46,67 @@ class _ProgressTqdm(tqdm.auto.tqdm):
       _load_progress = self.n / self.total
 
 
+def _patch_tqdm():
+  _orig = tqdm.auto.tqdm
+  tqdm.auto.tqdm = _ProgressTqdm
+  return _orig
+
+
+def _restore_tqdm(orig):
+  global _load_progress
+  tqdm.auto.tqdm = orig
+  _load_progress = 1.0
+
+
+def _patch_params4bit_compat():
+  from bitsandbytes.nn import Params4bit
+  _orig_new = Params4bit.__new__
+  def _new(cls, *args, **kwargs):
+    kwargs.pop('_is_hf_initialized', None)
+    return _orig_new(cls, *args, **kwargs)
+  Params4bit.__new__ = staticmethod(_new)
+
+
+def _from_cache(cache_dir: str):
+  _patch_params4bit_compat()
+  orig = _patch_tqdm()
+  try:
+    return AutoModelForCausalLM.from_pretrained(
+      cache_dir,
+      device_map="auto",
+      max_memory=MAX_MEMORY,
+      torch_dtype=torch.bfloat16,
+      attn_implementation="flash_attention_2",
+    )
+  finally:
+    _restore_tqdm(orig)
+
+
+def _quantize_and_cache(source_path: str, cache_dir: str):
+  quant_cfg = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",
+    llm_int8_enable_fp32_cpu_offload=True,
+  )
+  orig = _patch_tqdm()
+  try:
+    model = AutoModelForCausalLM.from_pretrained(
+      source_path,
+      quantization_config=quant_cfg,
+      device_map="auto",
+      max_memory=MAX_MEMORY,
+      torch_dtype=torch.bfloat16,
+      attn_implementation="flash_attention_2",
+    )
+  finally:
+    _restore_tqdm(orig)
+  print(f"[model_loader] saving NF4 cache to {cache_dir}", flush=True)
+  model.save_pretrained(cache_dir)
+  return model
+
+
 def load_model(model_id: str, api_model_id: str) -> None:
   global _model, _tokenizer, _loaded_model_id, _load_progress
   with _load_lock:
@@ -46,30 +114,18 @@ def load_model(model_id: str, api_model_id: str) -> None:
       return
     _do_unload()
     _load_progress = 0.0
-    path = _resolve_model_path(api_model_id)
-    quant_cfg = BitsAndBytesConfig(
-      load_in_4bit=True,
-      bnb_4bit_compute_dtype=torch.bfloat16,
-      bnb_4bit_use_double_quant=True,
-      bnb_4bit_quant_type="nf4",
-      llm_int8_enable_fp32_cpu_offload=True,
-    )
-    _orig_tqdm = tqdm.auto.tqdm
-    tqdm.auto.tqdm = _ProgressTqdm
-    try:
-      _model = AutoModelForCausalLM.from_pretrained(
-        path,
-        quantization_config=quant_cfg,
-        device_map="auto",
-        max_memory={0: "13500MiB", "cpu": "64GiB"},
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
-      )
-    finally:
-      tqdm.auto.tqdm = _orig_tqdm
-      _load_progress = 1.0
+    cache_dir = _cache_path(api_model_id)
+    if os.path.isdir(cache_dir):
+      print(f"[model_loader] loading from NF4 cache: {cache_dir}", flush=True)
+      _model = _from_cache(cache_dir)
+    else:
+      source_path = _resolve_model_path(api_model_id)
+      print(f"[model_loader] quantizing {source_path} → {cache_dir}", flush=True)
+      _model = _quantize_and_cache(source_path, cache_dir)
     _model.eval()
-    _tokenizer = AutoTokenizer.from_pretrained(path)
+    _tokenizer = AutoTokenizer.from_pretrained(
+      cache_dir if os.path.isdir(cache_dir) else _resolve_model_path(api_model_id)
+    )
     _loaded_model_id = model_id
 
 
