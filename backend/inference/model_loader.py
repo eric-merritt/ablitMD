@@ -42,7 +42,7 @@ def load_model(model_id: str, api_model_id: str) -> None:
       path,
       quantization_config=quant_cfg,
       device_map="auto",
-      max_memory={0: "13500MiB", "cpu": "200GiB"},
+      max_memory={0: "13500MiB", "cpu": "64GiB"},
       torch_dtype=torch.bfloat16,
       attn_implementation="flash_attention_2",
     )
