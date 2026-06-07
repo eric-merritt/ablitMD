@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, readdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, readdir, access } from 'fs/promises'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
@@ -86,7 +86,33 @@ export const createRun = async ({ models, mode_selection, prompt_scope, sequence
   return run
 }
 
+const fileExists = async (path) => {
+  try { await access(path); return true } catch { return false }
+}
+
+// Pull a single run (and its directions) from Mongo to disk — used when opening/resuming
+// a run that isn't local, so you don't have to rsync run data to a fresh instance.
+const pullRunFromMongo = async (run_id) => {
+  const doc = await Run.findOne({ run_id }).lean()
+  if (!doc) return false
+  const { _id, __v, direction_results, ...slim } = doc
+  await mkdir(RUNS_DIR, { recursive: true })
+  await writeFile(runPath(run_id), JSON.stringify(slim, null, 2))
+  const dirs = await Direction.find({ run_id }).lean()
+  if (dirs.length) {
+    const results = {}
+    for (const dir of dirs) {
+      const { _id, __v, run_id: rid, category_id, ...payload } = dir
+      results[category_id] = payload
+    }
+    await writeDirectionsSidecar(run_id, results)
+  }
+  await mkdir(statesDir(run_id), { recursive: true })
+  return true
+}
+
 export const readRun = async (run_id) => {
+  if (!await fileExists(runPath(run_id))) await pullRunFromMongo(run_id)
   const run = await readRunSlim(run_id)
 
   // legacy runs bundled direction_results into the main file. Preserve them in a sidecar

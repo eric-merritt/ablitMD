@@ -5,7 +5,6 @@ import promptsRouter from "./routes/api/prompts.js";
 import runsRouter from "./routes/api/runs.js";
 import inferenceRouter from "./routes/api/inference.js";
 import ablationRouter from "./routes/api/ablation.js";
-import { syncWithMongo } from "./lib/sync.js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -15,10 +14,7 @@ if (!MONGO_URI) throw new Error("MONGO_URI is not set");
 
 mongoose
   .connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-  .then(() => {
-    console.log("MongoDB connected");
-    if (process.env.NODE_ENV !== "test") syncWithMongo();
-  })
+  .then(() => console.log("MongoDB connected"))
   .catch((err) => {
     if (process.env.NODE_ENV !== "test") {
       console.error("MongoDB connection error:", err);
