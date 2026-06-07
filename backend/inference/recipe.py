@@ -1,9 +1,22 @@
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 
 from backend.inference.run_loader import rebuild_directions
+
+
+def load_directions(run: dict, model_id: str, gen_mode: str, state_dir: Path) -> dict:
+  """Per-category directions for recipe building. Prefer the directions sidecar
+  (<run_id>.directions.json, populated by the Mongo startup pull) so a fresh instance
+  never needs the raw .npy hidden states; fall back to recomputing from .npy."""
+  sidecar = state_dir.parent / f"{run['run_id']}.directions.json"
+  if sidecar.exists():
+    data = json.loads(sidecar.read_text())
+    if data:
+      return data
+  return rebuild_directions(run, model_id, gen_mode, state_dir)
 
 
 def recipe_filename(run_id: str) -> str:
@@ -97,7 +110,7 @@ def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int
   Phase A (onset..split): one merged direction per category per layer
     (mean of hard + redirect unit vectors, renormalized).
   Phase B (split..last):  single shared direction (mean over all merged directions)."""
-  per_category = rebuild_directions(run, model_id, gen_mode, state_dir)
+  per_category = load_directions(run, model_id, gen_mode, state_dir)
   if not per_category:
     raise ValueError("no categories with directions")
 

@@ -18,6 +18,17 @@ export interface SlimRecipeMode {
   phase_b: { layers: [number, number] };
 }
 
+export interface CategoryOutcome {
+  category: string;
+  complied: number;
+  refused: number;
+}
+
+export interface RecipePriorAttempt {
+  categories: CategoryOutcome[];
+  verified_at: string;
+}
+
 export interface SlimRecipe {
   run_id: string;
   model_id: string;
@@ -30,6 +41,8 @@ export interface SlimRecipe {
   factor_a_per_category: Record<string, number>;
   built_at: string;
   modes: Record<string, SlimRecipeMode>;
+  // Present when this exact master-factor combo was verified before (reuse warning).
+  prior_attempt?: RecipePriorAttempt;
 }
 
 export interface RecipeParams {

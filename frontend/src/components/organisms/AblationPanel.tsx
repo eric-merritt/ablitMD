@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { DivergenceChart } from "../molecules/DivergenceChart";
 import { LayerSplitControls } from "../molecules/LayerSplitControls";
 import { CategoryFactorSliders } from "../molecules/CategoryFactorSliders";
+import { RecipeReuseWarning } from "../molecules/RecipeReuseWarning";
 import { RecipePanel } from "../molecules/RecipePanel";
 import { getDivergence, buildRecipe, bakeModel } from "../../api/ablation";
 import type {
@@ -409,6 +410,15 @@ export const AblationPanel = ({
               {baking ? "Baking…" : "Bake & save model"}
             </GatedButton>
           </div>
+          {mode === "ablitmd" && recipe?.prior_attempt && (
+            <RecipeReuseWarning
+              priorAttempt={recipe.prior_attempt}
+              onset={recipe.onset}
+              split={recipe.split}
+              factorA={recipe.factor_a}
+              factorB={recipe.factor_b}
+            />
+          )}
           {mode === "ablitmd" && (
             <CategoryFactorSliders
               categories={categories}
