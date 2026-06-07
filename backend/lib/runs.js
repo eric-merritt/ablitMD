@@ -1,4 +1,5 @@
 import { readFile, writeFile, mkdir, readdir, access } from 'fs/promises'
+import { spawn } from 'node:child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
@@ -7,6 +8,8 @@ import { Direction } from '../models/direction.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RUNS_DIR = process.env.RUNS_DIR || join(__dirname, '../../data/runs')
+const REMOTE_DATA_BASE = process.env.REMOTE_DATA_BASE
+const REMOTE_DATA_KEY = process.env.REMOTE_DATA_KEY
 
 const mirrorRunToMongo = (run) => {
   const { direction_results, ...runDoc } = run
@@ -90,6 +93,35 @@ const fileExists = async (path) => {
   try { await access(path); return true } catch { return false }
 }
 
+// Fetch a whole run (json + sidecars + .npy hidden states) as one tarball from the
+// remote data server (eric-merritt.com/ablitMD/data) and extract it in place. Lets a
+// zero-touch vast.ai instance pull everything a run needs on open — no rsync.
+const fetchRunFromRemote = async (run_id) => {
+  if (!REMOTE_DATA_BASE || !REMOTE_DATA_KEY) return false
+  const url = `${REMOTE_DATA_BASE}/run/${encodeURIComponent(run_id)}.tar?key=${encodeURIComponent(REMOTE_DATA_KEY)}`
+  let response
+  try { response = await fetch(url) }
+  catch (err) { console.error(`[runs] remote fetch failed for ${run_id}: ${err.message}`); return false }
+  if (!response.ok || !response.body) {
+    console.error(`[runs] remote fetch ${run_id}: HTTP ${response.status}`)
+    return false
+  }
+  await mkdir(RUNS_DIR, { recursive: true })
+  const tar = spawn('tar', ['-xf', '-', '-C', RUNS_DIR])
+  const extracted = new Promise((resolve, reject) => {
+    tar.on('error', reject)
+    tar.on('close', code => code === 0 ? resolve() : reject(new Error(`tar exit ${code}`)))
+  })
+  try {
+    for await (const chunk of response.body) {
+      if (!tar.stdin.write(chunk)) await new Promise(drain => tar.stdin.once('drain', drain))
+    }
+    tar.stdin.end()
+    await extracted
+  } catch (err) { console.error(`[runs] extract failed for ${run_id}: ${err.message}`); return false }
+  return fileExists(runPath(run_id))
+}
+
 // Pull a single run (and its directions) from Mongo to disk — used when opening/resuming
 // a run that isn't local, so you don't have to rsync run data to a fresh instance.
 const pullRunFromMongo = async (run_id) => {
@@ -112,7 +144,12 @@ const pullRunFromMongo = async (run_id) => {
 }
 
 export const readRun = async (run_id) => {
-  if (!await fileExists(runPath(run_id))) await pullRunFromMongo(run_id)
+  // Zero-touch fetch when a run isn't local: full tarball (incl .npy) from the remote
+  // data server first, Mongo (metadata + stripped directions) as fallback.
+  if (!await fileExists(runPath(run_id))) {
+    const fetched = await fetchRunFromRemote(run_id)
+    if (!fetched) await pullRunFromMongo(run_id)
+  }
   const run = await readRunSlim(run_id)
 
   // legacy runs bundled direction_results into the main file. Preserve them in a sidecar
