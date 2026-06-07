@@ -57,4 +57,6 @@ const server = http.createServer(async (req, res) => {
   streamRunTar(runId, entries, res)
 })
 
-server.listen(PORT, () => console.log(`[data-server] serving ${RUNS_DIR} on :${PORT}`))
+// Bind loopback only — nginx fronts it; the port must never be publicly reachable.
+const HOST = process.env.DATA_HOST || '127.0.0.1'
+server.listen(PORT, HOST, () => console.log(`[data-server] serving ${RUNS_DIR} on ${HOST}:${PORT}`))
