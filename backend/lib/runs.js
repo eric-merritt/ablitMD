@@ -208,23 +208,27 @@ export const listRuns = async () => {
   await mkdir(RUNS_DIR, { recursive: true })
   const files = await readdir(RUNS_DIR)
 
-  const summaries = await Promise.all(
-    files
-      .filter(file => file.endsWith('.json') && !file.endsWith('.directions.json'))
-      .map(async (file) => {
-        const content = await readFile(join(RUNS_DIR, file), 'utf-8')
-        const { prompts, direction_results, ...summary } = JSON.parse(content)
-        return {
-          run_id: summary.run_id ?? file.replace(/\.json$/, ''),
-          started_at: summary.started_at ?? null,
-          completed_at: summary.completed_at ?? null,
-          incomplete: summary.incomplete ?? true,
-          models: Array.isArray(summary.models) ? summary.models : [],
-          mode_selection: summary.mode_selection ?? null,
-          prompt_count: prompts?.length ?? 0,
-        }
-      })
-  )
+  // Only genuine run files: `<run_id>.json` has exactly one dot (run ids carry no dots).
+  // Every sidecar — `.recipe.<ts>.json`, `.directions.json`, `.verify.json`,
+  // `.divergence.json` — has more; the multi-MB recipe files would otherwise OOM the heap.
+  const runFiles = files.filter(file => /^[^.]+\.json$/.test(file))
+
+  // Sequential, not Promise.all: a legacy run can be hundreds of MB (bundled directions),
+  // and parsing several at once blows the heap. One file in flight caps peak memory.
+  const summaries = []
+  for (const file of runFiles) {
+    const content = await readFile(join(RUNS_DIR, file), 'utf-8')
+    const { prompts, direction_results, ...summary } = JSON.parse(content)
+    summaries.push({
+      run_id: summary.run_id ?? file.replace(/\.json$/, ''),
+      started_at: summary.started_at ?? null,
+      completed_at: summary.completed_at ?? null,
+      incomplete: summary.incomplete ?? true,
+      models: Array.isArray(summary.models) ? summary.models : [],
+      mode_selection: summary.mode_selection ?? null,
+      prompt_count: prompts?.length ?? 0,
+    })
+  }
 
   return summaries
     .filter(run => run.started_at)
