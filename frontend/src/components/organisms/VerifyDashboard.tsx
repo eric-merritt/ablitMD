@@ -192,6 +192,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
     if (labeledRef.current) return
     labeledRef.current = true
     setAwaitingLabel(false)
+    setGenerating(false)   // immediate cut-off feedback; backend aborts gen on the label POST
     submitVerifyLabel(label)
   }
 
