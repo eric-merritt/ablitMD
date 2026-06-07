@@ -64,16 +64,18 @@ const localRunIds = async () => {
   return ids
 }
 
-// Reconcile: push any local run (and its directions) that Mongo is missing. Guards
-// the fire-and-forget write mirrors — if a prior push silently failed, this catches it
-// on next boot. Only pushes runs absent from Mongo, so it's cheap on a warm DB.
-export const pushMissingToMongo = async () => {
-  let pushed = 0
+// Reconcile: upsert every local run AND its directions, regardless of whether the run
+// already exists in Mongo. Guards the fire-and-forget write mirrors — any change that
+// silently failed to push (a prompt classification, a directions compute) is caught on
+// next boot. Upserts are idempotent; the stored directions are stripped/small.
+export const pushLocalToMongo = async () => {
+  let runsPushed = 0
+  let dirsPushed = 0
   for (const runId of await localRunIds()) {
-    if (await Run.exists({ run_id: runId })) continue
     const run = JSON.parse(await readFile(runPath(runId), 'utf-8'))
     const { direction_results, ...slim } = run
     await Run.updateOne({ run_id: runId }, slim, { upsert: true })
+    runsPushed++
     const sidecar = await readDirectionsSidecar(runId)
     if (sidecar) {
       for (const [categoryId, payload] of Object.entries(sidecar)) {
@@ -82,11 +84,11 @@ export const pushMissingToMongo = async () => {
           { run_id: runId, category_id: categoryId, ...payload },
           { upsert: true },
         )
+        dirsPushed++
       }
     }
-    pushed++
   }
-  return pushed
+  return { runsPushed, dirsPushed }
 }
 
 // Run once at startup: reconcile-push first (so nothing local is lost), then pull
@@ -94,9 +96,9 @@ export const pushMissingToMongo = async () => {
 // unreachable never blocks the server.
 export const syncWithMongo = async () => {
   try {
-    const pushed = await pushMissingToMongo()
+    const { runsPushed, dirsPushed } = await pushLocalToMongo()
     const pulled = await pullAllFromMongo()
-    console.log(`[sync] startup reconcile: pushed ${pushed} run(s), pulled ${pulled} run(s)`)
+    console.log(`[sync] startup reconcile: pushed ${runsPushed} run(s) + ${dirsPushed} direction doc(s), pulled ${pulled} run(s)`)
   } catch (err) {
     console.error(`[sync] startup sync failed (continuing): ${err.message}`)
   }

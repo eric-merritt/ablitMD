@@ -7,14 +7,30 @@ import numpy as np
 from backend.inference.run_loader import rebuild_directions
 
 
+def _sidecar_has_vectors(data: dict) -> bool:
+  """The directions sidecar / Mongo docs are normally stripped of direction_per_layer
+  (the ~150MB per-layer vectors) since no chart reads them. Recipe building DOES need
+  them, so only trust the sidecar when those vectors are actually present."""
+  for cat_result in data.values():
+    if not isinstance(cat_result, dict):
+      continue
+    by_mode = cat_result.get("by_mode")
+    if not isinstance(by_mode, dict):
+      continue
+    for mode_data in by_mode.values():
+      if isinstance(mode_data, dict) and mode_data.get("direction_per_layer"):
+        return True
+  return False
+
+
 def load_directions(run: dict, model_id: str, gen_mode: str, state_dir: Path) -> dict:
-  """Per-category directions for recipe building. Prefer the directions sidecar
-  (<run_id>.directions.json, populated by the Mongo startup pull) so a fresh instance
-  never needs the raw .npy hidden states; fall back to recomputing from .npy."""
+  """Per-category directions for recipe building. Use the directions sidecar only when
+  it carries the full per-layer vectors (a future full-directions pull); otherwise
+  recompute from the raw .npy hidden states, which always have them."""
   sidecar = state_dir.parent / f"{run['run_id']}.directions.json"
   if sidecar.exists():
     data = json.loads(sidecar.read_text())
-    if data:
+    if data and _sidecar_has_vectors(data):
       return data
   return rebuild_directions(run, model_id, gen_mode, state_dir)
 
