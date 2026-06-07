@@ -10,19 +10,73 @@
 
 import http from 'node:http'
 import { spawn } from 'node:child_process'
-import { readdir } from 'node:fs/promises'
+import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const RUNS_DIR = process.env.RUNS_DIR || join(__dirname, '..', 'data', 'runs')
 const DATA_KEY = process.env.DATA_KEY
 const PORT = Number(process.env.DATA_PORT || 8240)
+const SSH_DIR = join(homedir(), '.ssh')
+const SSH_CONFIG = join(SSH_DIR, 'config')
+const DEFAULT_ALIAS = process.env.VAST_SSH_ALIAS || 'ablitmd-vast'
 
 if (!DATA_KEY) throw new Error('DATA_KEY must be set')
 
 // run ids are `run_<iso>_<hex>` or simple slugs — never contains a slash or dot-dot.
 const SAFE_RUN_ID = /^[A-Za-z0-9._-]+$/
+const SAFE_NAME = /^[A-Za-z0-9._-]+$/                 // alias, user
+const SAFE_HOST = /^[A-Za-z0-9.:-]+$/                 // IPv4/IPv6/hostname, no spaces/newlines
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const sshBlock = ({ alias, ip, port, user }) =>
+  `# >>> ${alias} (auto-managed by ablitmd data-server) >>>\n` +
+  `Host ${alias}\n` +
+  `    HostName ${ip}\n` +
+  `    Port ${port}\n` +
+  `    User ${user}\n` +
+  `    StrictHostKeyChecking no\n` +       // vast instances are ephemeral — host key churns
+  `    UserKnownHostsFile /dev/null\n` +
+  `# <<< ${alias} <<<`
+
+// Replace (or insert) the alias's managed block in ~/.ssh/config, leaving everything else intact.
+const updateSshConfig = async ({ alias, ip, port, user }) => {
+  await mkdir(SSH_DIR, { recursive: true, mode: 0o700 })
+  let existing = ''
+  try { existing = await readFile(SSH_CONFIG, 'utf8') }
+  catch (err) { if (err.code !== 'ENOENT') throw err }
+  const block = new RegExp(
+    `\\n*# >>> ${escapeRe(alias)} \\(auto-managed[^\\n]*\\n[\\s\\S]*?# <<< ${escapeRe(alias)} <<<\\n*`, 'g')
+  const cleaned = existing.replace(block, '\n').trimEnd()
+  const next = (cleaned ? `${cleaned}\n\n` : '') + sshBlock({ alias, ip, port, user }) + '\n'
+  await writeFile(SSH_CONFIG, next, { mode: 0o600 })
+}
+
+const ATLAS_PUBLIC = process.env.ATLAS_API_PUBLIC_KEY
+const ATLAS_PRIVATE = process.env.ATLAS_API_PRIVATE_KEY
+const ATLAS_PROJECT = process.env.ATLAS_PROJECT_ID
+
+// Whitelist an IP in the Atlas project's access list via the Admin API, so the instance
+// can reach Mongo without you hand-adding it. Digest auth — shelled to curl (Node fetch
+// can't do HTTP Digest). 201 = added, 409 = already present; both are success.
+const atlasWhitelist = (ip) => new Promise((resolve) => {
+  if (!ATLAS_PUBLIC || !ATLAS_PRIVATE || !ATLAS_PROJECT) {
+    resolve({ ok: false, status: 'atlas-not-configured' }); return
+  }
+  const body = JSON.stringify([{ ipAddress: ip, comment: `ablitmd-vast ${new Date().toISOString().slice(0, 10)}` }])
+  const curl = spawn('curl', [
+    '-s', '-o', '/dev/null', '-w', '%{http_code}', '--digest',
+    '-u', `${ATLAS_PUBLIC}:${ATLAS_PRIVATE}`,
+    '-X', 'POST', `https://cloud.mongodb.com/api/atlas/v1.0/groups/${ATLAS_PROJECT}/accessList`,
+    '-H', 'Content-Type: application/json', '-d', body,
+  ])
+  let code = ''
+  curl.stdout.on('data', chunk => { code += chunk })
+  curl.on('error', () => resolve({ ok: false, status: 'curl-error' }))
+  curl.on('close', () => resolve({ ok: code.startsWith('2') || code === '409', status: code }))
+})
 
 const tarEntriesFor = async (runId) => {
   const names = await readdir(RUNS_DIR)
