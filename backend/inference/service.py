@@ -33,6 +33,7 @@ from backend.inference.ablation import (
     bake_and_save,
 )
 from backend.inference.direction import compute_run_directions as compute_directions
+from backend.inference.recipe import latest_recipe_path
 from backend.inference.verify import projection_strength
 
 _project_root = Path(__file__).resolve().parents[2]
@@ -311,8 +312,8 @@ def _claim_verify_slot() -> asyncio.Event:
 
 @app.post("/ablate/verify")
 async def ablate_verify(req: VerifyRequest, request: Request):
-    recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
-    if not recipe_path.exists():
+    recipe_path = latest_recipe_path(RUNS_DIR, req.run_id)
+    if recipe_path is None:
         raise HTTPException(status_code=404, detail="Recipe not found")
     recipe = json.loads(recipe_path.read_text())
 
@@ -578,8 +579,8 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         raise HTTPException(status_code=422, detail=str(err))
 
     phase_b_range: tuple[int, int] | None = None
-    recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
-    if recipe_path.exists():
+    recipe_path = latest_recipe_path(RUNS_DIR, req.run_id)
+    if recipe_path is not None:
         recipe = json.loads(recipe_path.read_text())
         phase_b_range = tuple(next(iter(recipe["modes"].values()))["phase_b"]["layers"])
 
@@ -836,8 +837,8 @@ async def ablate_bake(req: AblateRequest):
         bake_date = datetime.now().strftime("%Y-%m-%d")
         out_path = f"{BAKE_DIR}/classic{round(req.factor * 100)}_{base_name}_{bake_date}"
     else:
-        recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
-        if not recipe_path.exists():
+        recipe_path = latest_recipe_path(RUNS_DIR, req.run_id)
+        if recipe_path is None:
             raise HTTPException(status_code=404, detail="Recipe not found")
         recipe = json.loads(recipe_path.read_text())
         print(

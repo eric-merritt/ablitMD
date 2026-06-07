@@ -1,52 +1,52 @@
 import type {
-  DivergencePayload, SlimRecipe, RecipeParams, VerifyEvent, DirectionCompareRow,
-} from '../types/ablation'
+  DivergencePayload,
+  SlimRecipe,
+  RecipeParams,
+  VerifyEvent,
+} from "../types/ablation";
 
 const jsonOrThrow = async (response: Response) => {
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || `request failed (${response.status})`)
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || `request failed (${response.status})`);
   }
-  return response.json()
-}
+  return response.json();
+};
 
 export const getDivergence = (runId: string): Promise<DivergencePayload> =>
-  fetch(`/api/ablation/${runId}/divergence`).then(jsonOrThrow)
+  fetch(`/api/ablation/${runId}/divergence`).then(jsonOrThrow);
 
-export const buildRecipe = (runId: string, params: RecipeParams): Promise<SlimRecipe> =>
+export const buildRecipe = (
+  runId: string,
+  params: RecipeParams,
+): Promise<SlimRecipe> =>
   fetch(`/api/ablation/${runId}/recipe`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
-  }).then(jsonOrThrow)
+  }).then(jsonOrThrow);
 
 export const bakeModel = (
   runId: string,
-  mode: 'ablitmd' | 'classic' = 'ablitmd',
+  mode: "ablitmd" | "classic" = "ablitmd",
   factor?: number,
   disclaimerAblate?: boolean,
   disclaimerFactor?: number,
 ): Promise<{ saved_to: string }> =>
   fetch(`/api/ablation/${runId}/bake`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       mode,
       ...(factor !== undefined && { factor }),
-      ...(disclaimerAblate !== undefined && { disclaimer_ablate: disclaimerAblate }),
-      ...(disclaimerFactor !== undefined && { disclaimer_factor: disclaimerFactor }),
+      ...(disclaimerAblate !== undefined && {
+        disclaimer_ablate: disclaimerAblate,
+      }),
+      ...(disclaimerFactor !== undefined && {
+        disclaimer_factor: disclaimerFactor,
+      }),
     }),
-  }).then(jsonOrThrow)
-
-export const compareDirections = (
-  runId: string,
-  body: { gen_mode: string; onset: number; split: number; factor_a: number; factor_b: number }
-): Promise<DirectionCompareRow[]> =>
-  fetch(`/api/ablation/${runId}/directions/compare`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).then(jsonOrThrow)
+  }).then(jsonOrThrow);
 
 const readNdjsonStream = async (
   url: string,
@@ -55,44 +55,65 @@ const readNdjsonStream = async (
   signal?: AbortSignal,
 ): Promise<void> => {
   const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal,
-  })
-  if (!response.ok || !response.body) throw new Error(`verify failed (${response.status})`)
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
+  });
+  if (!response.ok || !response.body)
+    throw new Error(`verify failed (${response.status})`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
   for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
     for (const line of lines) {
-      if (line.trim()) onEvent(JSON.parse(line))
+      if (line.trim()) onEvent(JSON.parse(line));
     }
   }
-}
+};
 
 export const verifyAblation = (
   runId: string,
-  body: { gen_mode: string; categories?: string[]; samples_per_category?: number },
+  body: {
+    gen_mode: string;
+    categories?: string[];
+    samples_per_category?: number;
+  },
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
-): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal)
+): Promise<void> =>
+  readNdjsonStream(`/api/ablation/${runId}/verify`, body, onEvent, signal);
 
-export const submitVerifyLabel = (label: 'refused' | 'complied' | 'auto'): Promise<void> =>
-  fetch('/api/ablation/verify/label', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+export const submitVerifyLabel = (
+  label: "refused" | "complied" | "auto",
+): Promise<void> =>
+  fetch("/api/ablation/verify/label", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ label }),
-  }).then(jsonOrThrow)
+  }).then(jsonOrThrow);
 
 export const verifyAblationClassic = (
   runId: string,
-  body: { gen_mode: string; factor: number; disclaimer_ablate?: boolean; disclaimer_factor?: number; categories?: string[]; samples_per_category?: number },
+  body: {
+    gen_mode: string;
+    factor: number;
+    disclaimer_ablate?: boolean;
+    disclaimer_factor?: number;
+    categories?: string[];
+    samples_per_category?: number;
+  },
   onEvent: (event: VerifyEvent) => void,
   signal?: AbortSignal,
-): Promise<void> => readNdjsonStream(`/api/ablation/${runId}/verify/classic`, body, onEvent, signal)
+): Promise<void> =>
+  readNdjsonStream(
+    `/api/ablation/${runId}/verify/classic`,
+    body,
+    onEvent,
+    signal,
+  );

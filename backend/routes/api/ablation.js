@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { spawn } from 'node:child_process'
-import { readFile, access } from 'node:fs/promises'
+import { readFile, access, readdir, stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
@@ -11,6 +11,19 @@ const RUNS_DIR = path.join(PROJECT_ROOT, 'data', 'runs')
 
 const fileExists = async (filePath) => {
   try { await access(filePath); return true } catch { return false }
+}
+
+// Newest recipe file for a run (timestamped builds + any legacy <runId>.recipe.json).
+const latestRecipeFile = async (runId) => {
+  const prefix = `${runId}.recipe.`
+  const names = (await readdir(RUNS_DIR)).filter(name => name.startsWith(prefix) && name.endsWith('.json'))
+  if (names.length === 0) return null
+  const timed = await Promise.all(names.map(async name => ({
+    path: path.join(RUNS_DIR, name),
+    mtime: (await stat(path.join(RUNS_DIR, name))).mtimeMs,
+  })))
+  timed.sort((a, b) => b.mtime - a.mtime)
+  return timed[0].path
 }
 
 const runPython = (args) => new Promise((resolve, reject) => {
@@ -26,6 +39,7 @@ const slimRecipe = (recipe) => ({
   run_id: recipe.run_id, model_id: recipe.model_id, gen_mode: recipe.gen_mode,
   onset: recipe.onset, split: recipe.split, last_layer: recipe.last_layer,
   factor_a: recipe.factor_a, factor_b: recipe.factor_b, built_at: recipe.built_at,
+  factor_a_per_category: recipe.factor_a_per_category || {},
   modes: Object.fromEntries(Object.entries(recipe.modes).map(([mode, data]) => [mode, {
     phase_a: { layers: data.phase_a.layers,
                category_ids: Object.keys(data.phase_a.per_category) },
@@ -50,21 +64,25 @@ const buildLocks = new Map()
 
 router.post('/:runId/recipe', async (req, res) => {
   const { runId } = req.params
-  const { onset, split, factorA, factorB } = req.body
+  const { onset, split, factorA, factorB, factorAByCategory } = req.body
   if (!await fileExists(path.join(RUNS_DIR, `${runId}.json`))) {
     res.status(404).json({ detail: 'Run not found' }); return
   }
+  const perCategoryArgs = factorAByCategory && Object.keys(factorAByCategory).length
+    ? ['--factor-a-per-category', JSON.stringify(factorAByCategory)]
+    : []
   const prev = buildLocks.get(runId) || Promise.resolve()
   const work = prev.then(async () => {
     await runPython(['scripts/build_recipe.py', runId,
       '--onset', String(onset), '--split', String(split),
-      '--factor-a', String(factorA), '--factor-b', String(factorB)])
+      '--factor-a', String(factorA), '--factor-b', String(factorB),
+      ...perCategoryArgs])
   })
   buildLocks.set(runId, work.catch(() => {}))
   try {
     await work
   } catch (err) { res.status(500).json({ detail: String(err.message) }); return }
-  const recipe = JSON.parse(await readFile(path.join(RUNS_DIR, `${runId}.recipe.json`), 'utf8'))
+  const recipe = JSON.parse(await readFile(await latestRecipeFile(runId), 'utf8'))
   res.json(slimRecipe(recipe))
 })
 
@@ -82,8 +100,12 @@ const proxyToInference = (inferencePath, buildBody) => async (req, res) => {
   res.status(response.status).json(await safeJson(response))
 }
 
-router.post('/:runId/bake',
-  proxyToInference('/ablate/bake', req => ({ run_id: req.params.runId, ...req.body })))
+router.post('/:runId/bake', async (req, res) => {
+  // Always bake the latest recipe: wait out any in-flight rebuild first.
+  const pending = buildLocks.get(req.params.runId)
+  if (pending) { try { await pending } catch {} }
+  return proxyToInference('/ablate/bake', r => ({ run_id: r.params.runId, ...r.body }))(req, res)
+})
 
 router.post('/:runId/directions/compare',
   proxyToInference('/ablate/directions/compare', req => ({ run_id: req.params.runId, ...req.body })))

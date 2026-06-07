@@ -1,8 +1,27 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 
 from backend.inference.run_loader import rebuild_directions
+
+
+def recipe_filename(run_id: str) -> str:
+  """Timestamped recipe filename: <run_id>.recipe.<YYYY-MM-DD_HHMMSS>.json.
+  Every build writes a fresh file so each baked model is traceable to its recipe."""
+  return f"{run_id}.recipe.{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"
+
+
+def latest_recipe_path(runs_dir: Path, run_id: str):
+  """Newest recipe for a run: most-recently-written of the timestamped files,
+  falling back to a legacy <run_id>.recipe.json. Returns None if none exist."""
+  candidates = list(runs_dir.glob(f"{run_id}.recipe.*.json"))
+  legacy = runs_dir / f"{run_id}.recipe.json"
+  if legacy.exists():
+    candidates.append(legacy)
+  if not candidates:
+    return None
+  return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
 def _renormalize(vector: np.ndarray) -> np.ndarray:
@@ -19,31 +38,61 @@ def shared_direction(directions: list[np.ndarray], start: int, end: int) -> np.n
   return _renormalize(flat.mean(axis=0)).astype(np.float32)
 
 
+def dedup_overlap(pairs: list[tuple[np.ndarray, float]]) -> list[tuple[np.ndarray, float]]:
+  """Ordered Gram-Schmidt so a subspace shared by several categories is ablated
+  once, at the greatest factor among the categories that share it.
+
+  Process directions highest-factor first; each lower-factor direction keeps only
+  the component orthogonal to the directions already taken, ablated at its own
+  factor. The shared part is therefore ablated solely by the highest-factor
+  direction. pairs: [(unit_vector, factor), ...]; returns [(residual_unit, factor), ...]."""
+  ordered = sorted(pairs, key=lambda pair: -pair[1])
+  basis: list[np.ndarray] = []
+  result: list[tuple[np.ndarray, float]] = []
+  for vector, factor in ordered:
+    residual = vector.astype(np.float32).copy()
+    for prior in basis:
+      residual = residual - float(residual @ prior) * prior
+    norm = float(np.linalg.norm(residual))
+    if norm <= 1e-6:
+      continue  # fully covered by a higher-factor direction
+    unit = (residual / norm).astype(np.float32)
+    result.append((unit, factor))
+    basis.append(unit)
+  return result
+
+
 def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarray, float]]:
   """Directions active at a hidden-state index:
-  phase-A (onset..split): per-category direction for this layer.
+  phase-A (onset..split): per-category direction for this layer, each at its own
+    factor (factor_a_per_category, falling back to factor_a), overlap-deduplicated.
   phase-B (split..last):  single shared direction.
   Returns [(vector, factor), ...]."""
   onset, split, last = recipe["onset"], recipe["split"], recipe["last_layer"]
   factor_a, factor_b = recipe["factor_a"], recipe["factor_b"]
+  per_category_factor = recipe.get("factor_a_per_category") or {}
   result: list[tuple[np.ndarray, float]] = []
 
   for mode_data in recipe["modes"].values():
     if onset <= hidden_index <= split:
       layer_offset = hidden_index - onset
-      for per_layer in mode_data["phase_a"]["per_category"].values():
+      pairs: list[tuple[np.ndarray, float]] = []
+      for category_id, per_layer in mode_data["phase_a"]["per_category"].items():
         arr = np.array(per_layer, dtype=np.float32)
         vec = arr[layer_offset] if arr.ndim == 2 else arr
         norm = float(np.linalg.norm(vec))
         if norm > 1e-8:
-          result.append((vec / norm, factor_a))
+          factor = float(per_category_factor.get(category_id, factor_a))
+          pairs.append((vec / norm, factor))
+      result.extend(dedup_overlap(pairs))
     elif split < hidden_index <= last:
       result.append((np.array(mode_data["phase_b"]["direction"], dtype=np.float32), factor_b))
   return result
 
 
 def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int,
-                 factor_a: float, factor_b: float, state_dir) -> dict:
+                 factor_a: float, factor_b: float, state_dir,
+                 factor_a_per_category: dict[str, float] | None = None) -> dict:
   """Build the two-phase abliteration recipe.
   Phase A (onset..split): one merged direction per category per layer
     (mean of hard + redirect unit vectors, renormalized).
@@ -86,6 +135,11 @@ def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int
     "run_id": run["run_id"], "model_id": model_id, "gen_mode": gen_mode,
     "onset": onset, "split": split, "last_layer": last_layer,
     "factor_a": factor_a, "factor_b": factor_b,
+    "factor_a_per_category": {
+      cat_id: float(factor)
+      for cat_id, factor in (factor_a_per_category or {}).items()
+      if cat_id in merged_per_category
+    },
     "modes": {
       "merged": {
         "phase_a": {
