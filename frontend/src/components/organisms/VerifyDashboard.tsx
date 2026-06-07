@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { verifyAblation, verifyAblationClassic, bakeModel, submitVerifyLabel } from '../../api/ablation'
 import type { VerifyPromptResult, VerifyCategoryResult, VerifyLivePrompt } from '../../types/ablation'
 
@@ -182,9 +182,15 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   const [started, setStarted]               = useState(false)
   const [livePrompt, setLivePrompt]         = useState<VerifyLivePrompt | null>(null)
   const [liveText, setLiveText]             = useState('')
+  const [generating, setGenerating]         = useState(false)
   const [awaitingLabel, setAwaitingLabel]   = useState(false)
+  // One label per prompt: once labeled, don't re-show buttons on generation_done — a
+  // second submit would land in the backend label queue and be consumed by the next prompt.
+  const labeledRef = useRef(false)
 
   const handleLabel = (label: 'refused' | 'complied') => {
+    if (labeledRef.current) return
+    labeledRef.current = true
     setAwaitingLabel(false)
     submitVerifyLabel(label)
   }
@@ -215,7 +221,9 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
 
     setLivePrompt(null)
     setLiveText('')
+    setGenerating(false)
     setAwaitingLabel(false)
+    labeledRef.current = false
 
     function onEvent(event: Parameters<typeof verifyAblation>[2] extends (e: infer E) => void ? E : never) {
       if (cancelled) return
@@ -228,17 +236,27 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
         const { prompt_id, prompt_text, category, response_before, refused_before } = event
         setLivePrompt({ prompt_id, prompt_text, category, response_before, refused_before })
         setLiveText('')
+        setGenerating(true)
         setAwaitingLabel(false)
+        labeledRef.current = false
       }
-      else if (event.type === 'verify_token') setLiveText(prev => prev + event.text)
+      else if (event.type === 'verify_token') {
+        setLiveText(prev => prev + event.text)
+        // Labeling is live the instant the first token hits the DOM — no waiting for the
+        // full response. The backend queues an early label and consumes it on completion.
+        if (!labeledRef.current) setAwaitingLabel(true)
+      }
       else if (event.type === 'generation_done') {
-        setAwaitingLabel(true)
+        setGenerating(false)
+        if (!labeledRef.current) setAwaitingLabel(true)
       }
       else if (event.type === 'prompt') {
         setPrompts(prev => [...prev, event])
         setDone(prev => prev + 1)
         setLivePrompt(null)
         setLiveText('')
+        setGenerating(false)
+        setAwaitingLabel(false)
       }
       else if (event.type === 'category_result') setCategories(prev => [...prev, event])
     }
@@ -311,7 +329,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
               <LivePromptRow
                 prompt={ livePrompt }
                 liveText={ liveText }
-                streaming={ !awaitingLabel }
+                streaming={ generating }
                 awaitingLabel={ awaitingLabel }
                 onLabel={ handleLabel }
               />
