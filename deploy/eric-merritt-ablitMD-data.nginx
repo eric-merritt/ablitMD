@@ -1,0 +1,14 @@
+# Paste this location block inside the HTTPS `server { ... }` block of
+# /etc/nginx/sites-available/eric-merritt.com.conf (alongside the other /subpath blocks),
+# then: sudo nginx -t && sudo systemctl reload nginx
+#
+# The trailing slashes strip the /ablitMD/data prefix, so the data server sees /run/<id>.tar.
+
+    # /ablitMD/data -> ablitMD run-data server (port 8240)
+    location /ablitMD/data/ {
+        proxy_pass http://127.0.0.1:8240/;
+        proxy_http_version 1.1;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_buffering off;          # stream large run tarballs straight through
+        proxy_read_timeout 600s;
+    }

@@ -1,0 +1,15 @@
+[Unit]
+Description=ablitMD run-data server (serves data/runs as gated tarballs)
+After=network.target
+
+[Service]
+Type=simple
+User=ermer
+# Secrets/config live here (root-only, NOT in git): DATA_KEY, DATA_PORT, RUNS_DIR
+EnvironmentFile=/etc/ablitmd-data.env
+ExecStart=/home/ermer/.nvm/versions/node/v24.16.0/bin/node /home/ermer/devproj/js/react/ablitMD/scripts/data_server.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
