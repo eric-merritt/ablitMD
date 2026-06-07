@@ -6,31 +6,13 @@ import numpy as np
 import torch
 
 from backend.inference.recipe import directions_for_layer
-from asyncio import sleep
 
 
 def _get_weight_f32(proj) -> torch.Tensor:
-  try:
-    import bitsandbytes as bnb
-    if isinstance(proj.weight, bnb.nn.Params4bit):
-      return bnb.functional.dequantize_4bit(
-        proj.weight.data, proj.weight.quant_state
-      ).to(torch.float32)
-  except ImportError:
-    pass
   return proj.weight.data.to(torch.float32)
 
 
 def _set_weight(proj, weight_f32: torch.Tensor, target_dtype: torch.dtype) -> None:
-  try:
-    import bitsandbytes as bnb
-    if isinstance(proj.weight, bnb.nn.Params4bit):
-      proj.weight = torch.nn.Parameter(
-        weight_f32.to(target_dtype), requires_grad=False
-      )
-      return
-  except ImportError:
-    pass
   proj.weight.copy_(weight_f32.to(target_dtype))
 
 
@@ -99,11 +81,10 @@ def _projection_modules(layer):
 #   return projections
 
 
-async def apply_ablation_in_place(recipe: dict, model) -> dict:
+def apply_ablation_in_place(recipe: dict, model) -> dict:
     """Orthogonalize embedding + o_proj + down_proj in memory per the recipe.
     Returns a snapshot dict mapping each projection to its original weight clone
     so restore_model_weights can undo the edit without reloading from disk."""
-    await sleep(10)
     device = next(model.parameters()).device
     dtype = next(model.parameters()).dtype
     layers = _decoder_layers(model)

@@ -3,6 +3,7 @@ import gc
 import json
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 import uvicorn
@@ -22,6 +23,8 @@ from backend.inference.model_loader import (
     get_tokenizer,
     load_model,
     unload_model,
+    set_model_dirty,
+    BAKE_DIR,
 )
 from backend.inference.ablation import (
     apply_ablation_in_place,
@@ -360,6 +363,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
             await asyncio.sleep(3.0)
             try:
                 await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
+                set_model_dirty(True)
                 await asyncio.sleep(3.0)
             except RuntimeError:
                 await asyncio.to_thread(load_model, model_id, api_model_id)
@@ -625,6 +629,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
                     disclaimer_directions if req.disclaimer_ablate else None,
                     req.disclaimer_factor,
                 )
+                set_model_dirty(True)
             except Exception as exc:
                 yield (
                     json.dumps({"type": "error", "message": f"Ablation failed: {exc}"})
@@ -787,6 +792,15 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
     return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
+def _recipe_tag(recipe: dict) -> str:
+    """Encode the recipe into the bake filename: onset|split|factorA*100|factorB*100.
+    e.g. onset 15, split 35, factor_a .55, factor_b 1.8 → '153555180'."""
+    return (
+        f"{recipe['onset']}{recipe['split']}"
+        f"{round(recipe['factor_a'] * 100)}{round(recipe['factor_b'] * 100)}"
+    )
+
+
 @app.post("/ablate/bake")
 async def ablate_bake(req: AblateRequest):
     run_data = json.loads((RUNS_DIR / f"{req.run_id}.json").read_text())
@@ -794,8 +808,9 @@ async def ablate_bake(req: AblateRequest):
     model_id = run_data["models"][0]
     api_model_id = model_id
 
-    if get_loaded_model_id() != model_id:
-        await asyncio.to_thread(load_model, model_id, api_model_id)
+    # Always reload from disk — load_model short-circuits only on a clean resident
+    # model, so a prior verify's ablated weights can never be baked in.
+    await asyncio.to_thread(load_model, model_id, api_model_id)
 
     if req.mode == "classic":
         if req.factor is None:
@@ -816,10 +831,10 @@ async def ablate_bake(req: AblateRequest):
             disclaimer_directions if req.disclaimer_ablate else None,
             req.disclaimer_factor,
         )
+        set_model_dirty(True)
         base_name = model_id.split("/")[-1]
-        out_path = (
-            f"/workspace/models/{base_name}-classic-{req.factor:.2f}-{req.run_id}"
-        )
+        bake_date = datetime.now().strftime("%Y-%m-%d")
+        out_path = f"{BAKE_DIR}/classic{round(req.factor * 100)}_{base_name}_{bake_date}"
     else:
         recipe_path = RUNS_DIR / f"{req.run_id}.recipe.json"
         if not recipe_path.exists():
@@ -832,8 +847,10 @@ async def ablate_bake(req: AblateRequest):
         )
         _check_model_clean(get_model())
         base_name = recipe["model_id"].split("/")[-1]
-        out_path = f"/workspace/models/{base_name}-ablit-{req.run_id}"
+        bake_date = datetime.now().strftime("%Y-%m-%d")
+        out_path = f"{BAKE_DIR}/{_recipe_tag(recipe)}_{base_name}_{bake_date}"
         bake_and_save(recipe, get_model(), get_tokenizer(), out_path)
+        set_model_dirty(True)
 
     # Save even for classic (bake_and_save does it for ablitmd)
     if req.mode == "classic":
