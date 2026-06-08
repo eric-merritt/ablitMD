@@ -7,6 +7,9 @@ data/runs/*.bak
 data/charts/
 data/mongo_backup/
 data/vastai_mirror/
+data/layerHash.json
+data/layerHash_ablit.json
+data/refusal_scope_research.json
 
 # Python
 __pycache__/
@@ -17,6 +20,9 @@ __pycache__/
 .env.keys
 backend/.env.keys
 frontend/.env.keys
+id_ed25519
+id_ed25519.pub
+*.pem
 
 # Node
 node_modules/
@@ -29,3 +35,4 @@ CLAUDE.md
 .claude/
 docs/superpowers/
 .pids
+STATUS.md
