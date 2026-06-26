@@ -133,6 +133,7 @@ def stream_prompt(
 
   abort_event = _claim_abort_event()
   streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=60)
+  pad_token_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
 
   def _run_generate():
     with torch.inference_mode():
@@ -141,6 +142,7 @@ def stream_prompt(
         attention_mask=attention_mask,
         max_new_tokens=1024,
         do_sample=False,
+        pad_token_id=pad_token_id,
         streamer=streamer,
         stopping_criteria=StoppingCriteriaList([_EventStop(abort_event)]),
       )

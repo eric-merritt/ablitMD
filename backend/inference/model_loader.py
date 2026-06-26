@@ -73,15 +73,36 @@ def _restore_tqdm(orig):
   _load_progress = 1.0
 
 
+def _strip_to_text_model(model) -> None:
+  """Drop the vision tower and MTP head, leaving a pure text causal LM.
+
+  Qwen3.5+ checkpoints ship as ForConditionalGeneration: a `model.visual`
+  vision tower plus a top-level `mtp` multi-token-prediction head. For text
+  abliteration we want only `model.language_model` + `lm_head`. The MTP head
+  also perturbs the next-token logits during generate, so removing it is what
+  lets greedy decoding produce real tokens instead of an immediate stop.
+
+  Guarded by getattr, so this is a no-op on already-text checkpoints."""
+  inner = getattr(model, "model", None)
+  if inner is not None and getattr(inner, "visual", None) is not None:
+    inner.visual = None
+  if getattr(model, "mtp", None) is not None:
+    model.mtp = None
+  gc.collect()
+  torch.cuda.empty_cache()
+
+
 def _load_pretrained(source_path: str):
   orig = _patch_tqdm()
   try:
-    return AutoModelForCausalLM.from_pretrained(
+    model = AutoModelForCausalLM.from_pretrained(
       source_path,
       device_map="auto",
       torch_dtype=torch.bfloat16,
       attn_implementation="flash_attention_2",
     )
+    _strip_to_text_model(model)
+    return model
   finally:
     _restore_tqdm(orig)
 
