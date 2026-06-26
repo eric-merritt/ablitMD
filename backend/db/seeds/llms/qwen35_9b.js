@@ -8,7 +8,7 @@ export const qwen359bSeed = new LLM({
   apiProvider: 'self_hosted',
   apiModelId: 'Qwen/Qwen3.5-9B',
   architecture: {
-    numLayers: 32,
+    numLayers: 30,
     hiddenSize: 4096,
     intermediateSize: 12288,
     numAttentionHeads: 16,

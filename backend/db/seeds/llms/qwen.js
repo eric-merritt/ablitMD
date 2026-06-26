@@ -10,10 +10,10 @@ export const qwenSeed = new LLM({
   architecture: {
     numLayers: 62,
     hiddenSize: 5120,
-    intermediateSize: null,
-    numAttentionHeads: null,
-    architectureType: 'transformer',
-    outputProjections: ['o_proj', 'down_proj'],
+    intermediateSize: 17408,
+    numAttentionHeads: 24,
+    architectureType: 'hybrid_linear_attention',
+    outputProjections: ['o_proj', 'out_proj', 'down_proj'],
     dtype: 'bfloat16',
   },
   abliterationDefaults: {
