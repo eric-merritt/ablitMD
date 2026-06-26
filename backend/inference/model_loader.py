@@ -35,7 +35,17 @@ def is_model_dirty() -> bool:
   return _model_dirty
 
 
+# Local checkouts to load from disk instead of HF, keyed by HF model id.
+# Guarded by isdir below, so these stay inert where the path is absent (e.g. runpod).
+LOCAL_MODEL_PATHS = {
+  "Qwen/Qwen3.5-9B": os.path.expanduser("~/models/Qwen/Qwen3.5-9B-Base"),
+}
+
+
 def _resolve_model_path(model_id: str) -> str:
+  override = LOCAL_MODEL_PATHS.get(model_id)
+  if override and os.path.isdir(override):
+    return override
   model_name = model_id.split("/")[-1]
   local = os.path.join(MODELS_DIR, model_name)
   if os.path.isdir(local):
