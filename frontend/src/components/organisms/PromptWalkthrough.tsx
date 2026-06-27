@@ -92,6 +92,28 @@ export const PromptWalkthrough = ({ initialRun, models, onReadyForReview, onBack
   const response = currentPrompt ? responses[currentPrompt.prompt_id] ?? null : null
   const genError = currentPrompt ? genErrors[currentPrompt.prompt_id] ?? null : null
 
+  // Effect 0 — resumed onto an already-finished step (every prompt has a result): skip the
+  // model load and generation entirely, and advance to the next step — or hand off to review
+  // if it was the last. Without this the model would be loaded into GPU just to find no work.
+  useEffect(() => {
+    if (!run || !currentStep) return
+    if (pendingPrompts.length > 0) return
+    if (advancing.current) return
+    advancing.current = true
+
+    const isLastStep = run.current_sequence_index >= run.sequence.length - 1
+    if (isLastStep) {
+      onReadyForReview(run)
+      return
+    }
+
+    updateRunFields({ current_sequence_index: run.current_sequence_index + 1 })
+      .finally(() => { advancing.current = false })
+    setStepPosition(0)
+    setResponses({})
+    setGenErrors({})
+  }, [currentStep?.model, currentStep?.mode, pendingPrompts.length, run])
+
   // Effect 1 — load model whenever the active model changes, but only if this step has pending work
   useEffect(() => {
     if (!currentModel) return
@@ -173,7 +195,7 @@ export const PromptWalkthrough = ({ initialRun, models, onReadyForReview, onBack
     return <div style={{ padding: '48px', color: 'var(--text-muted)' }}>Loading run…</div>
   }
 
-  if (!modelReady) {
+  if (!modelReady && pendingPrompts.length > 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', maxWidth: '480px', width: '100%', margin: '0 auto' }}>
