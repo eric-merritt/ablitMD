@@ -37,7 +37,7 @@ export const ResultsGrid = ({ run, modelNames, models, onVerify, onBack, onHome 
       <div style={{ flex: 1, overflow: 'auto' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
           <div style={{ marginBottom: '24px' }}>
-            <DirectionVectorChart />
+            <DirectionVectorChart run={run} />
           </div>
           <div style={{ marginBottom: '24px' }}>
             <AblationPanel runId={run.run_id} models={models} onVerify={onVerify} />

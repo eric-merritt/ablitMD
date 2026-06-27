@@ -77,3 +77,40 @@ export const inferenceCompute = async (body: {
   if (!res.ok) throw new Error(`inferenceCompute failed: ${res.status}`)
   return res.json()
 }
+
+export interface PcaArrow {
+  id: string
+  name: string
+  peak_layer: number
+  magnitude: number
+  x: number
+  y: number
+}
+
+export interface ProjectionPayload {
+  hard: PcaArrow[]
+  redirect: PcaArrow[]
+  variance_explained: number[]
+}
+
+export interface PcaPayload {
+  centered: ProjectionPayload
+  uncentered: ProjectionPayload
+  n_categories: number
+  hidden_dim: number
+  extraction: { mode: 'peak' | 'mean'; range?: [number, number] }
+}
+
+export const inferenceDirectionPca = async (body: {
+  run_id: string
+  model_id: string
+  mode: string
+}): Promise<PcaPayload> => {
+  const res = await fetch('/api/inference/direction_pca', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`inferenceDirectionPca failed: ${res.status}`)
+  return res.json()
+}

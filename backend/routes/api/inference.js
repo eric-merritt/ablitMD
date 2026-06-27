@@ -24,6 +24,7 @@ router.get('/status', async (req, res) => {
 
 router.post('/load', proxyPost('/load'))
 router.post('/compute', proxyPost('/compute'))
+router.post('/direction_pca', proxyPost('/direction_pca'))
 
 router.post('/generate', async (req, res) => {
   const upstream = await fetch(`${INFERENCE_BASE}/generate`, {

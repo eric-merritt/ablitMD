@@ -47,6 +47,12 @@ _project_root = Path(__file__).resolve().parents[2]
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+# compute_direction_pca lives in scripts/ (a CLI tool); reuse its projection logic here.
+_scripts_dir = str(_project_root / "scripts")
+if _scripts_dir not in sys.path:
+    sys.path.insert(0, _scripts_dir)
+import compute_direction_pca as pca_script
+
 app = FastAPI(title="ablitMD inference service")
 
 RUNS_DIR = Path("./data/runs")
@@ -120,6 +126,13 @@ class ComputeRequest(BaseModel):
     run_id: str
     model_id: str
     mode: str
+
+
+class PcaRequest(BaseModel):
+    run_id: str
+    model_id: str
+    mode: str
+    range: list[int] | None = None  # [start, end] inclusive; omitted = peak-layer per category
 
 
 class AblateRequest(BaseModel):
@@ -285,6 +298,49 @@ def compute(req: ComputeRequest):
             mode_data.pop("direction_per_layer", None)
 
     return direction_results
+
+
+def _direction_results_for_pca(run_data: dict, state_dir: Path, model_id: str, mode: str) -> dict:
+    """Recompute per-category directions (vectors intact) from saved hidden states, for 2D
+    projection. Mirrors /compute's loading but keeps direction_per_layer instead of stripping it."""
+    all_hidden: dict[str, np.ndarray] = {}
+    per_category: dict[str, list] = {}
+    for prompt in run_data["prompts"]:
+        result = prompt.get("model_results", {}).get(model_id, {}).get(mode)
+        if not result:
+            continue
+        key = result["hidden_states_key"]
+        npy_path = state_dir / f"{key}.npy"
+        if not npy_path.exists():
+            continue
+        all_hidden[key] = np.load(str(npy_path))
+        per_category.setdefault(prompt["category"], []).append({
+            "hidden_states_key": key,
+            "refused": result["refused"],
+            "refusal_mode": result.get("refusal_mode", "hard" if result["refused"] else "none"),
+        })
+
+    direction_results: dict[str, dict] = {}
+    for category, classifications in per_category.items():
+        cat_hidden = {c["hidden_states_key"]: all_hidden[c["hidden_states_key"]] for c in classifications}
+        result = compute_directions(cat_hidden, classifications, category=category)
+        if result:
+            direction_results[category] = result
+    return direction_results
+
+
+@app.post("/direction_pca")
+def direction_pca(req: PcaRequest):
+    run_file = RUNS_DIR / f"{req.run_id}.json"
+    if not run_file.exists():
+        raise HTTPException(status_code=404, detail="Run not found")
+    run_data = json.loads(run_file.read_text())
+    state_dir = RUNS_DIR / req.run_id
+    direction_results = _direction_results_for_pca(run_data, state_dir, req.model_id, req.mode)
+    payload = pca_script.compute_pca(direction_results, tuple(req.range) if req.range else None)
+    if payload is None:
+        raise HTTPException(status_code=422, detail="no hard directions to project for this run/model/mode")
+    return payload
 
 
 _verify_cancel: asyncio.Event | None = None

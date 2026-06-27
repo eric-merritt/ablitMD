@@ -1,28 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CATEGORIES, GROUP_LABELS } from '../../types/categories'
-
-interface PcaArrow {
-  id: string
-  name: string
-  peak_layer: number
-  magnitude: number
-  x: number
-  y: number
-}
-
-interface ProjectionPayload {
-  hard: PcaArrow[]
-  redirect: PcaArrow[]
-  variance_explained: number[]
-}
-
-interface PcaPayload {
-  centered:     ProjectionPayload
-  uncentered:   ProjectionPayload
-  n_categories: number
-  hidden_dim:   number
-  extraction:   { mode: 'peak' | 'mean'; range?: [number, number] }
-}
+import { inferenceDirectionPca, type ProjectionPayload, type PcaPayload } from '../../api/inference'
+import type { Run } from '../../types/run'
 
 const W = 480
 const H = 460
@@ -170,16 +149,20 @@ const VectorPlot = ({ title, subtitle, payload, markerSuffix }: VectorPlotProps)
   )
 }
 
-export const DirectionVectorChart = () => {
+export const DirectionVectorChart = ({ run }: { run: Run }) => {
   const [data, setData] = useState<PcaPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const step = run.sequence[0]
+
   useEffect(() => {
-    fetch('/direction_pca.json')
-      .then(res => res.ok ? res.json() : Promise.reject(new Error(`status ${res.status}`)))
+    if (!step) { setError('run has no sequence step'); return }
+    setData(null)
+    setError(null)
+    inferenceDirectionPca({ run_id: run.run_id, model_id: step.model, mode: step.mode })
       .then(setData)
       .catch(err => setError(err.message))
-  }, [])
+  }, [run.run_id, step?.model, step?.mode])
 
   if (error) return <div style={{ padding: '24px', color: '#ef4444' }}>Failed to load PCA: {error}</div>
   if (!data)  return <div style={{ padding: '24px', color: 'var(--text-muted)' }}>Loading direction embedding…</div>

@@ -147,53 +147,56 @@ def build_projection(matrix, meta_by_mode, centered):
   return {**arrows_by_mode, "variance_explained": variance_explained}
 
 
-def main():
-  args = parse_args(sys.argv)
-  run_path = args["run_path"]
-  out_path = args["out_path"]
-  layer_range = args["range"]
-
-  run = json.loads(run_path.read_text())
-  direction_results = run.get("direction_results") or {}
-
+def compute_pca(direction_results, layer_range=None):
+  """Project per-category hard+redirect direction vectors to 2D (centered + uncentered).
+  Returns the chart payload dict, or None if there are no hard directions."""
   meta_by_mode: dict[str, list[dict]] = {"hard": [], "redirect": []}
 
-  for category_id, cat_result in direction_results.items():
+  for category_id, cat_result in (direction_results or {}).items():
     by_mode = (cat_result or {}).get("by_mode", {})
     for mode_name in ("hard", "redirect"):
       mode_entry = by_mode.get(mode_name)
       if not mode_entry: continue
-      peak = extract_direction(mode_entry, layer_range)
-      if not peak: continue
+      extracted = extract_direction(mode_entry, layer_range)
+      if not extracted: continue
       meta_by_mode[mode_name].append({
         "id":         category_id,
         "name":       CATEGORY_NAMES.get(category_id, category_id),
-        "peak_layer": peak["peak_layer"],
-        "magnitude":  peak["magnitude"],
-        "vector":     peak["vector"],
+        "peak_layer": extracted["peak_layer"],
+        "magnitude":  extracted["magnitude"],
+        "vector":     extracted["vector"],
       })
 
   if not meta_by_mode["hard"]:
+    return None
+
+  hard_matrix = np.stack([entry["vector"] for entry in meta_by_mode["hard"]], axis=0)
+  return {
+    "centered":     build_projection(hard_matrix, meta_by_mode, centered=True),
+    "uncentered":   build_projection(hard_matrix, meta_by_mode, centered=False),
+    "n_categories": int(hard_matrix.shape[0]),
+    "hidden_dim":   int(hard_matrix.shape[1]),
+    "extraction":   {"mode": "mean", "range": list(layer_range)} if layer_range else {"mode": "peak"},
+  }
+
+
+def main():
+  args = parse_args(sys.argv)
+  out_path = args["out_path"]
+  layer_range = args["range"]
+
+  run = json.loads(args["run_path"].read_text())
+  payload = compute_pca(run.get("direction_results") or {}, layer_range)
+  if payload is None:
     print("[pca] no hard directions found")
     sys.exit(1)
 
-  hard_matrix = np.stack([entry["vector"] for entry in meta_by_mode["hard"]], axis=0)
-
-  centered_payload   = build_projection(hard_matrix, meta_by_mode, centered=True)
-  uncentered_payload = build_projection(hard_matrix, meta_by_mode, centered=False)
-
   out_path.parent.mkdir(parents=True, exist_ok=True)
-  out_path.write_text(json.dumps({
-    "centered":     centered_payload,
-    "uncentered":   uncentered_payload,
-    "n_categories": hard_matrix.shape[0],
-    "hidden_dim":   hard_matrix.shape[1],
-    "extraction":   {"mode": "mean", "range": list(layer_range)} if layer_range else {"mode": "peak"},
-  }, indent=2))
+  out_path.write_text(json.dumps(payload, indent=2))
 
   mode_label = f"mean L{layer_range[0]}–L{layer_range[1]}" if layer_range else "peak"
-  centered_var   = centered_payload["variance_explained"]
-  uncentered_var = uncentered_payload["variance_explained"]
+  centered_var   = payload["centered"]["variance_explained"]
+  uncentered_var = payload["uncentered"]["variance_explained"]
   print(f"[pca] wrote {out_path} — {mode_label}")
   print(f"      centered   PC1={centered_var[0]:.3f} PC2={centered_var[1]:.3f}")
   print(f"      uncentered PC1={uncentered_var[0]:.3f} PC2={uncentered_var[1]:.3f}")
