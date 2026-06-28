@@ -6,7 +6,7 @@ runs harmful prompts, and reports compliance rate. Cancels generation after
 
 Usage:
   uv run python scripts/probe.py \
-    --model /workspace/models/Qwen3.6-27B \
+    --model os.path.join(os.path.expanduser("~"),"models")/Qwen3.6-27B \
     --run-id run_2026-05-17T19-57-17-480Z_8696f34a \
     --onset 29 --split 38 \
     --factor-a 0.93 --factor-b 0.265 \

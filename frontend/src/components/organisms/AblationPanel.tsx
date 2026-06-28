@@ -232,41 +232,28 @@ export const AblationPanel = ({
   }, [runId, models]);
 
   useEffect(() => {
-    if (!builtParams) {
-      console.log("[recipe] no builtParams yet");
-      return;
-    }
+    if (!builtParams) return;
     const same = JSON.stringify(params) === JSON.stringify(builtParams);
-    console.log("[recipe] params check", {
-      same,
-      paramKeys: Object.keys(params),
-      builtParamKeys: builtParams ? Object.keys(builtParams) : "null",
-    });
-    if (same) {
-      console.log("[recipe] params unchanged, skipping");
-      return;
-    }
-    console.log("[recipe] params changed, scheduling rebuild", params);
+    if (same) return;
     setStatus("building");
     const requestId = ++buildRequestIdRef.current;
     const timer = setTimeout(() => {
-      console.log("[recipe] executing rebuild with", params);
       buildRecipe(runId, params)
+        // A superseded request (newer knob change in flight) owns the state now —
+        // it must not write recipe/status/error, or it would re-enable the action
+        // buttons while a stale recipe is still the newest file on disk.
         .then((next) => {
-          if (requestId === buildRequestIdRef.current) {
-            console.log("[recipe] build complete, updating builtParams");
-            setRecipe(next);
-            setBuiltParams(params);
-          }
+          if (requestId !== buildRequestIdRef.current) return;
+          setRecipe(next);
+          setBuiltParams(params);
           setStatus("idle");
         })
         .catch((err) => {
-          if (requestId === buildRequestIdRef.current) {
-            setError(String(err.message));
-          }
+          if (requestId !== buildRequestIdRef.current) return;
+          setError(String(err.message));
           setStatus("idle");
         });
-    }, 5000);
+    }, 400);
     return () => clearTimeout(timer);
   }, [params, builtParams]);
 

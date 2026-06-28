@@ -6,7 +6,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-RUN_FILE = Path('/home/ermer/devproj/js/react/ablitMD/data/vastai_mirror/run_2026-05-17T19-57-17-480Z_8696f34a.json')
+RUN_FILE = Path('/home/ermer/devproj/js/react/ablitMD/data/runs/run_2026-05-17T19-57-17-480Z_8696f34a.json')
+DIRECTIONS_FILE = Path('/home/ermer/devproj/js/react/ablitMD/data/runs/run_2026-05-17T19-57-17-480Z_8696f34a.directions.json')
 OUT = Path('/home/ermer/devproj/js/react/ablitMD/data/charts')
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -28,7 +29,7 @@ prompts = run['prompts']
 classified = []
 for prompt in prompts:
   result = prompt.get('model_results', {}).get(MODEL_ID, {}).get(MODE)
-  if result:
+  if result and 'refused' in result:
     classified.append({
       'category': prompt['category'],
       'category_group': prompt['category_group'],
@@ -121,7 +122,8 @@ plt.savefig(OUT / '04_refusal_rate_by_group.png', dpi=110, facecolor=plt.rcParam
 plt.close()
 
 # ─── Chart 5: direction magnitudes per category, per refusal mode ───────────
-dr = run.get('direction_results') or {}
+directions = json.loads(DIRECTIONS_FILE.read_text()) if DIRECTIONS_FILE.exists() else {}
+dr = directions.get(MODEL_ID, {}).get(MODE, {}).get('per_category', {})
 if dr:
   cats_with_dirs = [c for c, v in dr.items() if v.get('by_mode')]
   n_cats = len(cats_with_dirs)

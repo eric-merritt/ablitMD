@@ -16,7 +16,6 @@ interface DivergenceChartProps {
 const HARD_COLOR     = '#ef4444'
 const REDIRECT_COLOR = '#f97316'
 const MAG_COLOR      = 'var(--text-muted)'
-const NONE_COLOR     = '#4ade80'
 
 export const DivergenceChart = ({ hard, redirect, none, onset, split, factorA, factorB }: DivergenceChartProps) => {
   const nLayers = Math.max(hard?.clumping.length ?? 0, redirect?.clumping.length ?? 0)
@@ -72,8 +71,6 @@ export const DivergenceChart = ({ hard, redirect, none, onset, split, factorA, f
 
           <Line yAxisId="clump" type="monotone" dataKey="magnitude" name="magnitude"
             stroke={MAG_COLOR} strokeWidth={1} strokeDasharray="2 3" dot={false} connectNulls />
-          {none && <Line yAxisId="clump" type="monotone" dataKey="noneClumping" name="non-refusal"
-            stroke={NONE_COLOR} strokeWidth={1.5} strokeDasharray="4 2" dot={false} connectNulls />}
           {hard && (factorA != null || factorB != null) && (
             <Line yAxisId="clump" type="monotone" dataKey="hardPredicted" name="hard (predicted)"
               stroke={HARD_COLOR} strokeWidth={1} strokeDasharray="3 2" dot={false} connectNulls opacity={0.5} />

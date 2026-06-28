@@ -4,7 +4,7 @@ Writes data/layerHash.json. Run this once against the clean model before
 any ablation so the bake endpoint can detect dirty pre-bake state.
 
 Usage (on VastAI, from the ablitMD project root):
-  uv run python scripts/hash_reference_model.py /workspace/models/Qwen3.6-27B
+  uv run python scripts/hash_reference_model.py os.path.join(os.path.expanduser("~"),"models")/Qwen3.6-27B
 """
 
 import argparse

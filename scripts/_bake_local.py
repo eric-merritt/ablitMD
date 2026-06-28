@@ -1,0 +1,94 @@
+"""Local CPU bake driver — memory-lean variant of the /ablate/bake (ablitmd) path.
+
+Loads the base model fully on CPU (single device — the shared ablation assumes one
+device and flash-attn is CUDA-only), applies the latest recipe in place WITHOUT
+retaining f32 snapshot clones (a bake never needs to restore), then saves the baked
+variant to ~/models/<family>/<name>-Ablit (the abliterated monorepo root).
+
+Usage:
+  uv run python scripts/_bake_local.py [run_id]
+"""
+
+import json
+import sys
+from pathlib import Path
+
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+_here = Path(__file__).resolve()
+sys.path.insert(0, str(_here.parents[1]))
+sys.path.insert(0, str(_here.parent))
+
+from _run_picker import resolve_run_id
+from backend.inference.ablation import (
+  orthogonalize_weight, _decoder_layers, _projection_modules,
+)
+from backend.inference.recipe import latest_recipe_path, directions_for_layer
+
+RUNS_DIR = _here.parents[1] / "data" / "runs"
+MODELS_ROOT = Path.home() / "models"
+
+
+def model_dirs(model_id: str) -> tuple[str, str]:
+  """Map an org/name model id to its on-disk (base, abliterated) dirs:
+  ~/models/<family>/<name>-BaseModel and ~/models/<family>/<name>-Ablit."""
+  family, _, name = model_id.rpartition("/")
+  family_dir = MODELS_ROOT / family if family else MODELS_ROOT
+  return str(family_dir / f"{name}-BaseModel"), str(family_dir / f"{name}-Ablit")
+
+
+def ablate_cpu(recipe: dict, model) -> None:
+  """Mirror apply_ablation_in_place's math, on CPU, without snapshot clones.
+  Decoder layer i is hidden_index i+1 (layer 0 / MTP head is left alone)."""
+  layers = _decoder_layers(model)
+  logged = False
+  with torch.no_grad():
+    for decoder_idx in range(len(layers)):
+      raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
+      if not raw:
+        continue
+      for proj in _projection_modules(layers[decoder_idx]):
+        weight_f32 = proj.weight.data.to(torch.float32)
+        for vector, factor in raw:
+          direction = torch.tensor(vector, dtype=torch.float32)
+          orthogonalize_weight(weight_f32, direction, float(factor))
+        proj.weight.data = weight_f32.to(torch.bfloat16)
+        if not logged:
+          logged = True
+          print(f"[ablation] first edit layer={decoder_idx + 1} proj={type(proj).__name__} "
+                f"shape={tuple(proj.weight.shape)}", flush=True)
+
+
+def main():
+  run_id = resolve_run_id(sys.argv[1] if len(sys.argv) > 1 else None)
+  run_data = json.loads((RUNS_DIR / f"{run_id}.json").read_text())
+  model_id = run_data["models"][0]
+  base_dir, ablit_dir = model_dirs(model_id)
+  source = sys.argv[2] if len(sys.argv) > 2 else base_dir
+
+  print(f"[bake] loading {source} on CPU (bf16, eager attn)", flush=True)
+  model = AutoModelForCausalLM.from_pretrained(
+    source, dtype=torch.bfloat16, device_map="cpu",
+    low_cpu_mem_usage=True, attn_implementation="eager",
+  )
+  model.eval()
+  tokenizer = AutoTokenizer.from_pretrained(source)
+
+  recipe_path = latest_recipe_path(RUNS_DIR, run_id)
+  if recipe_path is None:
+    raise SystemExit("no recipe found for run")
+  recipe = json.loads(recipe_path.read_text())
+  print(f"[bake] recipe {recipe_path.name}: onset={recipe['onset']} split={recipe['split']} "
+        f"last={recipe['last_layer']} factor_a={recipe['factor_a']} factor_b={recipe['factor_b']}",
+        flush=True)
+
+  ablate_cpu(recipe, model)
+  print(f"[bake] saving to {ablit_dir}", flush=True)
+  model.save_pretrained(ablit_dir)
+  tokenizer.save_pretrained(ablit_dir)
+  print(f"[bake] saved_to {ablit_dir}", flush=True)
+
+
+if __name__ == "__main__":
+  main()
