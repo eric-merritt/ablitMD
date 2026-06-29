@@ -12,8 +12,9 @@ import json
 import sys
 from pathlib import Path
 
+import transformers
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoTokenizer
 
 _here = Path(__file__).resolve()
 sys.path.insert(0, str(_here.parents[1]))
@@ -67,9 +68,14 @@ def main():
   base_dir, ablit_dir = model_dirs(model_id)
   source = sys.argv[2] if len(sys.argv) > 2 else base_dir
 
-  print(f"[bake] loading {source} (bf16, eager attn)", flush=True)
-  model = AutoModelForCausalLM.from_pretrained(
-    source, torch_dtype=torch.bfloat16, device_map="auto",
+  cfg = AutoConfig.from_pretrained(source)
+  arch = (cfg.architectures or [None])[0]
+  model_class = getattr(transformers, arch) if arch else None
+  if model_class is None:
+    raise SystemExit(f"[bake] cannot resolve model class for architecture: {arch}")
+  print(f"[bake] loading {source} as {arch} (bf16, eager attn)", flush=True)
+  model = model_class.from_pretrained(
+    source, dtype=torch.bfloat16, device_map="auto",
     low_cpu_mem_usage=True, attn_implementation="eager",
   )
   model.eval()
