@@ -80,7 +80,7 @@ def main():
     raise SystemExit(f"[bake] cannot resolve model class for architecture: {arch}")
   print(f"[bake] loading {source} as {arch} (bf16, eager attn)", flush=True)
   model = model_class.from_pretrained(
-    source, dtype=torch.bfloat16, device_map="auto",
+    source, torch_dtype=torch.bfloat16, device_map="auto",
     low_cpu_mem_usage=True, attn_implementation="eager",
   )
   model.eval()
