@@ -68,6 +68,10 @@ def main():
   base_dir, ablit_dir = model_dirs(model_id)
   source = sys.argv[2] if len(sys.argv) > 2 else base_dir
 
+  ablit_path = Path(ablit_dir)
+  if ablit_path.exists() and any(ablit_path.iterdir()):
+    raise SystemExit(f"[bake] abort: target already exists and is non-empty: {ablit_dir}")
+
   cfg = AutoConfig.from_pretrained(source)
   arch = (cfg.architectures or [None])[0]
   model_class = getattr(transformers, arch) if arch else None
