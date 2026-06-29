@@ -96,7 +96,7 @@ def main():
 
   ablate(recipe, model)
   print(f"[bake] saving to {ablit_dir}", flush=True)
-  model.save_pretrained(ablit_dir)
+  model.save_pretrained(ablit_dir, max_shard_size="3GB")
   tokenizer.save_pretrained(ablit_dir)
   print(f"[bake] saved_to {ablit_dir}", flush=True)
 
