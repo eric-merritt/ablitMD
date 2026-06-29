@@ -31,7 +31,7 @@ def load_directions(run: dict, model_id: str, gen_mode: str, state_dir: Path) ->
   if sidecar.exists():
     data = json.loads(sidecar.read_text())
     if data and _sidecar_has_vectors(data):
-      return data
+      return {k: v for k, v in data.items() if isinstance(v, dict) and "by_mode" in v}
   return rebuild_directions(run, model_id, gen_mode, state_dir)
 
 
