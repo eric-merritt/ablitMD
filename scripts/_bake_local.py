@@ -67,6 +67,7 @@ def main():
   model_id = run_data["models"][0]
   base_dir, ablit_dir = model_dirs(model_id)
   source = sys.argv[2] if len(sys.argv) > 2 else base_dir
+  ablit_dir = sys.argv[3] if len(sys.argv) > 3 else ablit_dir
 
   ablit_path = Path(ablit_dir)
   if ablit_path.exists() and any(ablit_path.iterdir()):
