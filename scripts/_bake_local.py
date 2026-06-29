@@ -1,9 +1,8 @@
-"""Local CPU bake driver — memory-lean variant of the /ablate/bake (ablitmd) path.
+"""Local bake driver — memory-lean variant of the /ablate/bake (ablitmd) path.
 
-Loads the base model fully on CPU (single device — the shared ablation assumes one
-device and flash-attn is CUDA-only), applies the latest recipe in place WITHOUT
-retaining f32 snapshot clones (a bake never needs to restore), then saves the baked
-variant to ~/models/<family>/<name>-Ablit (the abliterated monorepo root).
+Loads the base model with device_map="auto" (GPU when available), applies the latest
+recipe in place WITHOUT retaining f32 snapshot clones (a bake never needs to restore),
+then saves the baked variant to ~/models/<family>/<name>-Ablit.
 
 Usage:
   uv run python scripts/_bake_local.py [run_id]
@@ -38,8 +37,8 @@ def model_dirs(model_id: str) -> tuple[str, str]:
   return str(family_dir / f"{name}-BaseModel"), str(family_dir / f"{name}-Ablit")
 
 
-def ablate_cpu(recipe: dict, model) -> None:
-  """Mirror apply_ablation_in_place's math, on CPU, without snapshot clones.
+def ablate(recipe: dict, model) -> None:
+  """Mirror apply_ablation_in_place's math without snapshot clones.
   Decoder layer i is hidden_index i+1 (layer 0 / MTP head is left alone)."""
   layers = _decoder_layers(model)
   logged = False
@@ -49,9 +48,10 @@ def ablate_cpu(recipe: dict, model) -> None:
       if not raw:
         continue
       for proj in _projection_modules(layers[decoder_idx]):
+        device = proj.weight.device
         weight_f32 = proj.weight.data.to(torch.float32)
         for vector, factor in raw:
-          direction = torch.tensor(vector, dtype=torch.float32)
+          direction = torch.tensor(vector, dtype=torch.float32, device=device)
           orthogonalize_weight(weight_f32, direction, float(factor))
         proj.weight.data = weight_f32.to(torch.bfloat16)
         if not logged:
@@ -67,9 +67,9 @@ def main():
   base_dir, ablit_dir = model_dirs(model_id)
   source = sys.argv[2] if len(sys.argv) > 2 else base_dir
 
-  print(f"[bake] loading {source} on CPU (bf16, eager attn)", flush=True)
+  print(f"[bake] loading {source} (bf16, eager attn)", flush=True)
   model = AutoModelForCausalLM.from_pretrained(
-    source, dtype=torch.bfloat16, device_map="cpu",
+    source, torch_dtype=torch.bfloat16, device_map="auto",
     low_cpu_mem_usage=True, attn_implementation="eager",
   )
   model.eval()
@@ -83,7 +83,7 @@ def main():
         f"last={recipe['last_layer']} factor_a={recipe['factor_a']} factor_b={recipe['factor_b']}",
         flush=True)
 
-  ablate_cpu(recipe, model)
+  ablate(recipe, model)
   print(f"[bake] saving to {ablit_dir}", flush=True)
   model.save_pretrained(ablit_dir)
   tokenizer.save_pretrained(ablit_dir)
