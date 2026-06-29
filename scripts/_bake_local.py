@@ -98,14 +98,6 @@ def main():
   print(f"[bake] saving to {ablit_dir}", flush=True)
   model.save_pretrained(ablit_dir, max_shard_size="3GB")
   tokenizer.save_pretrained(ablit_dir)
-
-  cfg_path = Path(ablit_dir) / "config.json"
-  saved_cfg = json.loads(cfg_path.read_text())
-  saved_cfg["model_type"] = "qwen3_5_text"
-  saved_cfg["architectures"] = ["Qwen3_5ForCausalLM"]
-  cfg_path.write_text(json.dumps(saved_cfg, indent=2))
-  print(f"[bake] patched config: model_type=qwen3_5_text", flush=True)
-
   print(f"[bake] saved_to {ablit_dir}", flush=True)
 
 
