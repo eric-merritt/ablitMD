@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "dotenvx run --env-file .env.backend -- node --watch bin/www",
-    "start": "dotenvx run --env-file .env.backend -- node bin/www",
+    "dev": "dotenvx run --env-file .env -- node --watch bin/www",
+    "start": "dotenvx run --env-file .env -- node bin/www",
     "test": "vitest run",
     "test:watch": "vitest",
     "seed": "node db/seed.js"
