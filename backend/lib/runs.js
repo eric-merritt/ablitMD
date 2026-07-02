@@ -122,6 +122,29 @@ const fetchRunFromRemote = async (run_id) => {
   return fileExists(runPath(run_id))
 }
 
+// Run ids on the remote data server, for the Merge Run Data picker. Null when the
+// remote isn't configured (e.g. running on the home box itself).
+export const listRemoteRunIds = async () => {
+  if (!REMOTE_DATA_BASE || !REMOTE_DATA_KEY) return null
+  const url = `${REMOTE_DATA_BASE}/runs?key=${encodeURIComponent(REMOTE_DATA_KEY)}`
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`remote run list: HTTP ${response.status}`)
+  return response.json()
+}
+
+// Sync each requested run from the remote data server onto local disk, then read it
+// back. Returns { run_id, ok, run } per entry so one bad id doesn't sink the batch.
+export const syncRunsFromRemote = async (runIds) => {
+  const results = []
+  for (const runId of runIds) {
+    const fetched = await fetchRunFromRemote(runId)
+    results.push(fetched
+      ? { run_id: runId, ok: true, run: await readRun(runId) }
+      : { run_id: runId, ok: false, run: null })
+  }
+  return results
+}
+
 // Pull a single run (and its directions) from Mongo to disk — used when opening/resuming
 // a run that isn't local, so you don't have to rsync run data to a fresh instance.
 const pullRunFromMongo = async (run_id) => {

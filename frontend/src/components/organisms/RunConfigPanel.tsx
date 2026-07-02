@@ -3,7 +3,8 @@ import type { CSSProperties } from "react";
 import { ModeRadioGroup } from "../molecules/ModeRadioGroup";
 import { ModelCheckboxList } from "../molecules/ModelCheckboxList";
 import { CategoryList } from "../molecules/CategoryList";
-import { createRun, fetchRuns, fetchRun } from "../../api/runs";
+import { RunSyncModal } from "../molecules/RunSyncModal";
+import { createRun, fetchRuns, fetchRun, fetchRemoteRunIds, syncRuns } from "../../api/runs";
 import { CATEGORIES } from "../../types/categories";
 import type { LLM } from "../../types/model";
 import type { Run, RunSummary, RunMode } from "../../types/run";
@@ -77,6 +78,35 @@ const PagesIcon = () => (
   </svg>
 );
 
+interface MergeRunDataButtonProps {
+  hovered: boolean;
+  loading: boolean;
+  onClick: () => void;
+  onHoverChange: (hovered: boolean) => void;
+}
+
+const MergeRunDataButton = ({ hovered, loading, onClick, onHoverChange }: MergeRunDataButtonProps) => (
+  <span
+    onClick={onClick}
+    onMouseEnter={() => onHoverChange(true)}
+    onMouseLeave={() => onHoverChange(false)}
+    style={{
+      color: hovered ? "var(--accent)" : "var(--text)",
+      fontSize: "15px",
+      cursor: "pointer",
+      userSelect: "none",
+      transition: "color 0.15s",
+      textDecoration: hovered ? "underline" : "none",
+    }}
+  >
+    {loading ? "Loading…" : "Merge Run Data"}
+  </span>
+);
+
+const MergeError = ({ message }: { message: string }) => (
+  <span style={{ color: "#ef4444", fontSize: "12px" }}>{message}</span>
+);
+
 const missingLabel = (noModels: boolean, noCategories: boolean) => {
   if (noModels && noCategories)
     return "Select at least one model and one category";
@@ -99,6 +129,11 @@ export const RunConfigPanel = ({
   const [starting, setStarting] = useState(false);
   const [startHovered, setStartHovered] = useState(false);
   const [prevRunsHovered, setPrevRunsHovered] = useState(false);
+  const [mergeHovered, setMergeHovered] = useState(false);
+  const [remoteRunIds, setRemoteRunIds] = useState<string[] | null>(null);
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,6 +207,34 @@ export const RunConfigPanel = ({
   const handleSelectRun = async (summary: RunSummary) => {
     const run = await fetchRun(summary.run_id);
     onRunOpen(run);
+  };
+
+  const handleMergeOpen = async () => {
+    if (loadingRemote || remoteRunIds) return;
+    setLoadingRemote(true);
+    setMergeError(null);
+    try {
+      setRemoteRunIds(await fetchRemoteRunIds());
+    } catch {
+      setMergeError("Remote data server unreachable");
+      setTimeout(() => setMergeError(null), 3000);
+    } finally {
+      setLoadingRemote(false);
+    }
+  };
+
+  const handleSyncConfirm = async (selectedRunIds: string[]) => {
+    setSyncing(true);
+    try {
+      await syncRuns(selectedRunIds);
+      setRemoteRunIds(null);
+      if (existingRuns) setExistingRuns(await fetchRuns());
+    } catch {
+      setMergeError("Sync failed — see backend log");
+      setTimeout(() => setMergeError(null), 3000);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -272,7 +335,15 @@ export const RunConfigPanel = ({
             padding: "10px 32px",
           }}
         >
-          <div style={{ position: "relative" }}>
+          <div
+            style={{
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "6px",
+            }}
+          >
             <span
               onClick={handleOpenExisting}
               onMouseEnter={() => setPrevRunsHovered(true)}
@@ -345,6 +416,13 @@ export const RunConfigPanel = ({
                 ))}
               </div>
             )}
+            <MergeRunDataButton
+              hovered={mergeHovered}
+              loading={loadingRemote}
+              onClick={handleMergeOpen}
+              onHoverChange={setMergeHovered}
+            />
+            {mergeError && <MergeError message={mergeError} />}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
@@ -389,6 +467,15 @@ export const RunConfigPanel = ({
           </div>
         </div>
       </div>
+
+      {remoteRunIds && (
+        <RunSyncModal
+          runIds={remoteRunIds}
+          syncing={syncing}
+          onConfirm={handleSyncConfirm}
+          onCancel={() => setRemoteRunIds(null)}
+        />
+      )}
     </div>
   );
 };

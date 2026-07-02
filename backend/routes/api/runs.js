@@ -1,10 +1,47 @@
 import { Router } from 'express'
 import { Prompt } from '../../models/prompt.js'
 import {
-  createRun, readRun, writePromptResult, updateRunField, listRuns, stripDirectionVectors
+  createRun, readRun, writePromptResult, updateRunField, listRuns, stripDirectionVectors,
+  listRemoteRunIds, syncRunsFromRemote
 } from '../../lib/runs.js'
 
+const SAFE_RUN_ID = /^[A-Za-z0-9._-]+$/
+
 const router = Router()
+
+// Registered before /:runId so "remote" is never read as a run id.
+router.get('/remote', async (req, res) => {
+  try {
+    const runIds = await listRemoteRunIds()
+    if (runIds === null) {
+      res.status(503).json({ error: 'Remote data server not configured' })
+      return
+    }
+    res.json(runIds)
+  } catch (err) {
+    res.status(502).json({ error: err.message })
+  }
+})
+
+router.post('/sync', async (req, res) => {
+  const { message, run_id, run_ids } = req.body
+  if (message !== 'sync') {
+    res.status(400).json({ error: 'Expected message: "sync"' })
+    return
+  }
+  const requestedIds = run_ids ?? (run_id ? [run_id] : [])
+  if (requestedIds.length === 0 || !requestedIds.every(id => SAFE_RUN_ID.test(id))) {
+    res.status(400).json({ error: 'Provide run_id or run_ids of valid run ids' })
+    return
+  }
+  try {
+    const results = await syncRunsFromRemote(requestedIds)
+    for (const result of results) stripDirectionVectors(result.run?.direction_results)
+    res.json(run_ids ? results : results[0])
+  } catch (err) {
+    res.status(502).json({ error: err.message })
+  }
+})
 
 router.get('/', async (req, res) => {
   const runs = await listRuns()

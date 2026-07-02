@@ -30,6 +30,28 @@ export const fetchRuns = async (): Promise<RunSummary[]> => {
   return res.json()
 }
 
+export const fetchRemoteRunIds = async (): Promise<string[]> => {
+  const res = await fetch('/api/runs/remote')
+  if (!res.ok) throw new Error(`fetchRemoteRunIds failed: ${res.status}`)
+  return res.json()
+}
+
+export interface SyncResult {
+  run_id: string
+  ok: boolean
+  run: Run | null
+}
+
+export const syncRuns = async (runIds: string[]): Promise<SyncResult[]> => {
+  const res = await fetch('/api/runs/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'sync', run_ids: runIds }),
+  })
+  if (!res.ok) throw new Error(`syncRuns failed: ${res.status}`)
+  return res.json()
+}
+
 export const createRun = async (body: {
   models: string[]
   mode_selection: RunMode

@@ -6,6 +6,7 @@
 // Front it at eric-merritt.com/ablitMD/data (reverse-proxy /ablitMD/data -> this port).
 // Endpoints:
 //   GET /health                     -> "ok"
+//   GET /runs?key=SECRET            -> JSON array of run ids available to sync
 //   GET /run/:runId.tar?key=SECRET  -> tarball of <runId>.json, <runId>.*, and <runId>/ (npy)
 
 import http from "node:http";
@@ -108,6 +109,17 @@ const atlasWhitelist = (ip) =>
     );
   });
 
+// Genuine run files only: `<runId>.json` has exactly one dot (run ids carry no dots).
+// Sidecars (.directions.json, .recipe.*.json, …) all have more.
+const listRunIds = async () => {
+  const names = await readdir(RUNS_DIR);
+  return names
+    .filter((name) => /^[^.]+\.json$/.test(name))
+    .map((name) => name.replace(/\.json$/, ""))
+    .sort()
+    .reverse();
+};
+
 const tarEntriesFor = async (runId) => {
   const names = await readdir(RUNS_DIR);
   // the run json, every sidecar (<runId>.directions.json, .recipe.*, .verify.json …),
@@ -139,6 +151,19 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/health") {
     res.writeHead(200);
     res.end("ok");
+    return;
+  }
+
+  // Run inventory for the Merge Run Data sync flow on remote instances.
+  if (url.pathname === "/runs") {
+    if (url.searchParams.get("key") !== DATA_KEY) {
+      res.writeHead(403);
+      res.end("forbidden");
+      return;
+    }
+    const runIds = await listRunIds();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(runIds));
     return;
   }
 
