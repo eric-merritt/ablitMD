@@ -1,0 +1,17 @@
+**/node_modules
+**/__pycache__
+**/*.pyc
+.venv
+.git
+.pytest_cache
+data
+docs
+frontend/dist
+.claude
+.remember
+.pids
+
+# Private keys — never bake into the image
+**/.env.keys
+id_ed25519*
+*.pem
