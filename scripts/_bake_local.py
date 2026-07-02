@@ -85,6 +85,12 @@ def main():
   )
   model.eval()
   tokenizer = AutoTokenizer.from_pretrained(source)
+  declared_vocab = (getattr(cfg, "text_config", None) or cfg).vocab_size
+  if len(tokenizer) < declared_vocab // 2:
+    raise SystemExit(
+      f"[bake] abort: tokenizer loaded only {len(tokenizer)} tokens but config declares "
+      f"{declared_vocab} — tokenizer.json is missing or corrupt in {source}"
+    )
 
   recipe_path = latest_recipe_path(RUNS_DIR, run_id)
   if recipe_path is None:
