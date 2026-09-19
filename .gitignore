@@ -17,11 +17,10 @@ __pycache__/
 .venv/
 
 # Secrets
-.env.keys
+.env.keys*
 backend/.env.keys
 frontend/.env.keys
-id_ed25519
-id_ed25519.pub
+ghid_ed25519
 *.pem
 
 # Node

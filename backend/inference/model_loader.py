@@ -4,7 +4,7 @@ import threading
 import torch
 import tqdm.auto
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODELS_DIR = os.environ.get("ABLIT_MODELS_DIR", "/workspace/models")
 
@@ -17,15 +17,11 @@ def get_model(model_path: str | None = None):
             raise RuntimeError("No model loaded")
         return _model
 
-    # INT8 weight-only quantization via bitsandbytes
-    quantization_config = BitsAndBytesConfig(
-        load_in_8bit=True,
-    )
+
 
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.float16,
-        quantization_config=quantization_config,
         device_map="auto",
     )
 
@@ -127,7 +123,7 @@ def load_model(model_id: str, api_model_id: str) -> None:
         unload_model()
         _load_progress = 0.0
         model_path = _resolve_model_path(model_id, api_model_id)
-        print(f"[model_loader] loading {model_path} (int8 bnb, device_map=auto)", flush=True)
+        print(f"[model_loader] loading {model_path} (device_map=auto)", flush=True)
         orig = _patch_tqdm()
         try:
             _model = get_model(model_path)
