@@ -68,6 +68,24 @@ const LiveAfterBlock = ({ text, streaming }: { text: string; streaming: boolean 
   </div>
 )
 
+const AutoLabelBadge = ({ label }: { label: 'hard' | 'redirect' | 'none' }) => {
+  const colors: Record<string, { bg: string; fg: string }> = {
+    hard:     { bg: '#7f1d1d', fg: '#fca5a5' },
+    redirect: { bg: '#78350f', fg: '#fcd34d' },
+    none:     { bg: '#064e3b', fg: '#6ee7b7' },
+  }
+  const c = colors[label]
+  return (
+    <span style={{
+      display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '11px',
+      fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+      background: c.bg, color: c.fg,
+    }}>
+      auto: { label }
+    </span>
+  )
+}
+
 const LabelButtons = ({ onLabel }: {
   onLabel: (l: 'refused' | 'complied') => void
 }) => (
@@ -83,12 +101,32 @@ const LabelButtons = ({ onLabel }: {
   </div>
 )
 
-const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, onLabel }: {
+const AutoLabelButtons = ({ onAccept, onReject }: {
+  onAccept: () => void
+  onReject: () => void
+}) => (
+  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <button onClick={ onAccept } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#064e3b', color: '#6ee7b7', border: 'none', borderRadius: 'var(--radius)',
+    }}>✓ Yes, this is good</button>
+    <button onClick={ onReject } style={{
+      padding: '4px 14px', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+      background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: 'var(--radius)',
+    }}>✗ This is bad</button>
+  </div>
+)
+
+const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, autoClassified, showAutoButtons, onLabel, onAcceptAuto, onRejectAuto }: {
   prompt: VerifyLivePrompt
   liveText: string
   streaming: boolean
   awaitingLabel: boolean
+  autoClassified?: 'hard' | 'redirect' | 'none'
+  showAutoButtons: boolean
   onLabel: (l: 'refused' | 'complied') => void
+  onAcceptAuto: () => void
+  onRejectAuto: () => void
 }) => (
   <div style={{
     background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)',
@@ -103,7 +141,13 @@ const LivePromptRow = ({ prompt, liveText, streaming, awaitingLabel, onLabel }: 
       <ResponseBlock label="before" text={ prompt.response_before } refused={ prompt.refused_before } />
       <LiveAfterBlock text={ liveText } streaming={ streaming } />
     </div>
-    { awaitingLabel && <LabelButtons onLabel={ onLabel } /> }
+    { awaitingLabel && showAutoButtons && autoClassified && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <AutoLabelBadge label={ autoClassified } />
+        <AutoLabelButtons onAccept={ onAcceptAuto } onReject={ onRejectAuto } />
+      </div>
+    ) }
+    { awaitingLabel && !showAutoButtons && <LabelButtons onLabel={ onLabel } /> }
   </div>
 )
 
@@ -184,6 +228,9 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   const [liveText, setLiveText]             = useState('')
   const [generating, setGenerating]         = useState(false)
   const [awaitingLabel, setAwaitingLabel]   = useState(false)
+  const [autoClassified, setAutoClassified] = useState<'hard' | 'redirect' | 'none' | undefined>(undefined)
+  // "auto" = show accept/reject buttons; "manual" = show refused/complied buttons
+  const [labelMode, setLabelMode]           = useState<'auto' | 'manual'>('auto')
   // One label per prompt: once labeled, don't re-show buttons on generation_done — a
   // second submit would land in the backend label queue and be consumed by the next prompt.
   const labeledRef = useRef(false)
@@ -194,6 +241,19 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
     setAwaitingLabel(false)
     setGenerating(false)   // immediate cut-off feedback; backend aborts gen on the label POST
     submitVerifyLabel(label)
+  }
+
+  const handleAcceptAuto = () => {
+    if (labeledRef.current) return
+    labeledRef.current = true
+    setAwaitingLabel(false)
+    setGenerating(false)
+    submitVerifyLabel('auto')
+  }
+
+  const handleRejectAuto = () => {
+    // Switch to manual labeling — don't mark as labeled yet, user still needs to pick
+    setLabelMode('manual')
   }
 
   const runBake = async () => {
@@ -239,6 +299,8 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
         setLiveText('')
         setGenerating(true)
         setAwaitingLabel(false)
+        setAutoClassified(undefined)
+        setLabelMode('auto')
         labeledRef.current = false
       }
       else if (event.type === 'verify_token') {
@@ -249,6 +311,7 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
       }
       else if (event.type === 'generation_done') {
         setGenerating(false)
+        setAutoClassified(event.auto_classified)
         if (!labeledRef.current) setAwaitingLabel(true)
       }
       else if (event.type === 'prompt') {
@@ -332,7 +395,11 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
                 liveText={ liveText }
                 streaming={ generating }
                 awaitingLabel={ awaitingLabel }
+                autoClassified={ autoClassified }
+                showAutoButtons={ labelMode === 'auto' }
                 onLabel={ handleLabel }
+                onAcceptAuto={ handleAcceptAuto }
+                onRejectAuto={ handleRejectAuto }
               />
             ) }
             { prompts.slice().reverse().map(prompt => (

@@ -76,6 +76,7 @@ export interface VerifyPromptResult {
   response_after: string;
   refused_before: boolean;
   refused_after: boolean;
+  auto_classified?: 'hard' | 'redirect' | 'none';
 }
 
 export interface VerifyLivePrompt {
@@ -84,6 +85,7 @@ export interface VerifyLivePrompt {
   category: string;
   response_before: string;
   refused_before: boolean;
+  auto_classified?: 'hard' | 'redirect' | 'none';
 }
 
 export type VerifyEvent =

@@ -547,12 +547,25 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
 
-                yield json.dumps({"type": "generation_done"}) + "\n"
+                # Auto-classify the generated response. The frontend shows the user
+                # the proposed label; if they reject it ("this bad") we fall back to
+                # manual labeling via the existing label queue.
+                auto_label = auto_classify_response(response_after)
+                yield (
+                    json.dumps({"type": "generation_done", "auto_classified": auto_label})
+                    + "\n"
+                )
 
+                # Wait for the user's decision: accept the auto-label or reject it and
+                # submit a manual label. The frontend sends "auto" (accept) or
+                # "refused"/"complied" (manual override).
                 label = await label_q.get()
                 _verify_label_queue = None
 
-                prompt_refused_after = label == "refused"
+                if label == "auto":
+                    prompt_refused_after = auto_label in ("hard", "redirect")
+                else:
+                    prompt_refused_after = label == "refused"
                 if prompt_refused_after:
                     refused_after += 1
 
@@ -560,6 +573,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                     "response": response_after,
                     "refused": prompt_refused_after,
                     "hidden_states_key": f"verify__{key}",
+                    "auto_classified": auto_label,
                 }
 
                 after_npy = RUNS_DIR / req.run_id / f"verify__{key}.npy"
@@ -581,6 +595,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                             "response_after": response_after,
                             "refused_before": prompt_refused_before,
                             "refused_after": prompt_refused_after,
+                            "auto_classified": auto_label,
                         }
                     )
                     + "\n"
@@ -961,7 +976,10 @@ async def submit_verify_label(req: LabelRequest):
     global _verify_label_queue
     if _verify_label_queue is None:
         raise HTTPException(status_code=409, detail="No active verify session")
-    await asyncio.to_thread(abort_and_join_generation)
+    # "auto" means the user approved the auto-classification — no need to abort
+    # generation (it's already done). Only manual labels need the abort.
+    if req.label != "auto":
+        await asyncio.to_thread(abort_and_join_generation)
     await _verify_label_queue.put(req.label)
     return {"ok": True}
 
