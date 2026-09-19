@@ -3,12 +3,19 @@ import os
 import threading
 import torch
 import tqdm.auto
+from huggingface_hub import snapshot_download
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-LOCAL_MODEL_PATH = os.path.expanduser("~/models/Qwen/Qwen3.8-27B-Base/")
+MODELS_DIR = os.environ.get("ABLIT_MODELS_DIR", "/workspace/models")
 
-def get_model():
-    model_path = f"{LOCAL_MODEL_PATH}"
+
+def get_model(model_path: str | None = None):
+    """Load the resident model, or a fresh one from model_path if given."""
+    global _model
+    if model_path is None:
+        if _model is None:
+            raise RuntimeError("No model loaded")
+        return _model
 
     # INT8 weight-only quantization via bitsandbytes
     quantization_config = BitsAndBytesConfig(
@@ -27,9 +34,15 @@ def get_model():
 
 
 
-def get_tokenizer():
-    """Loads and returns the local tokenizer."""
-    tokenizer = AutoTokenizer.from_pretrained(LOCAL_MODEL_PATH)
+def get_tokenizer(model_path: str | None = None):
+    """Return the resident tokenizer, or load one from model_path if given."""
+    global _tokenizer
+    if model_path is None:
+        if _tokenizer is None:
+            raise RuntimeError("No tokenizer loaded")
+        return _tokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     return tokenizer
 
 
@@ -43,8 +56,23 @@ _tokenizer = None
 _model_dirty = False
 _load_lock = threading.Lock()
 _load_progress: float = 0.0
-MODELS_DIR = os.environ.get("ABLIT_MODELS_DIR", "/workspace/models")
 BAKE_DIR = os.environ.get("ABLIT_BAKE_DIR", MODELS_DIR)
+
+
+def _resolve_model_path(model_id: str, api_model_id: str) -> str:
+    """Resolve the on-disk path for model_id.
+
+    Prefers a local checkout under MODELS_DIR (keyed by api_model_id, falling
+    back to model_id); otherwise downloads from Hugging Face into MODELS_DIR."""
+    candidates = [
+        os.path.join(MODELS_DIR, api_model_id),
+        os.path.join(MODELS_DIR, model_id),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(os.path.join(candidate, "config.json")):
+            return candidate
+    print(f"[model_loader] {model_id} not found locally, downloading from HF", flush=True)
+    return snapshot_download(model_id, local_dir=os.path.join(MODELS_DIR, model_id))
 
 
 def get_load_progress() -> float:
@@ -96,12 +124,13 @@ def load_model(model_id: str, api_model_id: str) -> None:
             return
         unload_model()
         _load_progress = 0.0
-        print(f"[model_loader] loading {LOCAL_MODEL_PATH} (int8 bnb, device_map=auto)", flush=True)
+        model_path = _resolve_model_path(model_id, api_model_id)
+        print(f"[model_loader] loading {model_path} (int8 bnb, device_map=auto)", flush=True)
         orig = _patch_tqdm()
         try:
-            _model = get_model()
+            _model = get_model(model_path)
             _model.eval()
-            _tokenizer = get_tokenizer()
+            _tokenizer = get_tokenizer(model_path)
         finally:
             _restore_tqdm(orig)
         _loaded_model_id = model_id
