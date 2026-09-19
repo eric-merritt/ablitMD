@@ -202,7 +202,7 @@ export const ClassifyReview = ({ run, modelNames, onComplete, onBack, onHome }: 
 
   if (rows.length === 0) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
         <div style={{ flex: 1, padding: '48px', color: 'var(--text-muted)', textAlign: 'center' }}>
           No responses to review yet.
         </div>
@@ -215,9 +215,9 @@ export const ClassifyReview = ({ run, modelNames, onComplete, onBack, onHome }: 
   const newCount = rows.filter( row => row.existingSelection === null ).length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '20px 16px 8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div style={{ width: 'fit-content', margin: '0 auto' }}>
           <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Review &amp; classify</div>
           <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text)' }}>{ headerLabel }</div>
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -225,7 +225,7 @@ export const ClassifyReview = ({ run, modelNames, onComplete, onBack, onHome }: 
           </div>
           { submitError && <div style={{ marginTop: '12px', color: '#ef4444', fontSize: '13px' }}>{ submitError }</div> }
         </div>
-        <div style={{ maxWidth: '1280px', margin: '0 auto' }}>
+        <div style={{ width: 'fit-content', margin: '0 auto', marginTop: '16px' }}>
           { rows.map( row => (
             <ReviewRow
               key={ rowKey( row ) }

@@ -34,14 +34,14 @@ const ColumnsStyle: CSSProperties = {
   display: "flex",
   flexDirection: "row",
   gap: "12px",
-  width: "60vw",
+  width: "fit-content",
   marginLeft: "auto",
   marginRight: "auto",
   alignItems: "flex-start",
 };
 
 const HeaderCardStyle: CSSProperties = {
-  width: "60vw",
+  width: "fit-content",
   display: "flex",
   alignItems: "center",
   gap: "10px",
@@ -238,7 +238,7 @@ export const RunConfigPanel = ({
   };
 
   return (
-    <div style={{ position: "relative", height: "100%", width: "100%" }}>
+    <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: 'auto' }}>
       <div style={PanelStyle}>
         <div style={HeaderCardStyle}>
           <span
@@ -304,7 +304,7 @@ export const RunConfigPanel = ({
               ...ColumnCardStyle,
               flex: 2,
               minWidth: "220px",
-              height: "676px",
+              maxHeight: '100%',
               overflowY: "auto",
             }}
           >

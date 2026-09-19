@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from backend.inference.run_loader import rebuild_directions
+from backend.inference.som import compute_som_directions, select_best_layer
 
 
 def _sidecar_has_vectors(data: dict) -> bool:
@@ -67,6 +68,16 @@ def shared_direction(directions: list[np.ndarray], start: int, end: int) -> np.n
   return _renormalize(flat.mean(axis=0)).astype(np.float32)
 
 
+def phase_a_direction(directions: list[np.ndarray], onset: int, split: int) -> np.ndarray:
+  """Legacy wrapper for phase-A unit direction: shared_direction over the onset..split window."""
+  return shared_direction(directions, onset, split)
+
+
+def phase_b_direction(directions: np.ndarray, split: int, last: int) -> np.ndarray:
+  """Legacy wrapper for phase-B unit direction: shared_direction over split..last."""
+  return shared_direction([directions], split, last)
+
+
 def dedup_overlap(pairs: list[tuple[np.ndarray, float]]) -> list[tuple[np.ndarray, float]]:
   """Ordered Gram-Schmidt so a subspace shared by several categories is ablated
   once, at the greatest factor among the categories that share it.
@@ -92,11 +103,12 @@ def dedup_overlap(pairs: list[tuple[np.ndarray, float]]) -> list[tuple[np.ndarra
 
 
 def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarray, float]]:
-  """Directions active at a hidden-state index:
-  phase-A (onset..split): per-category direction for this layer, each at its own
-    factor (factor_a_per_category, falling back to factor_a), overlap-deduplicated.
-  phase-B (split..last):  single shared direction.
-  Returns [(vector, factor), ...]."""
+  """Directions active at a hidden-state index.
+  Dispatches to the SOM-MD handler for recipes with method="som_md",
+  otherwise uses the two-phase (phase-A / phase-B) logic."""
+  if recipe.get("method") == "som_md":
+    return directions_for_layer_som_md(recipe, hidden_index)
+
   onset, split, last = recipe["onset"], recipe["split"], recipe["last_layer"]
   factor_a, factor_b = recipe["factor_a"], recipe["factor_b"]
   per_category_factor = recipe.get("factor_a_per_category") or {}
@@ -104,34 +116,51 @@ def directions_for_layer(recipe: dict, hidden_index: int) -> list[tuple[np.ndarr
 
   for mode_data in recipe["modes"].values():
     if onset <= hidden_index <= split:
-      layer_offset = hidden_index - onset
-      pairs: list[tuple[np.ndarray, float]] = []
-      for category_id, per_layer in mode_data["phase_a"]["per_category"].items():
-        arr = np.array(per_layer, dtype=np.float32)
-        vec = arr[layer_offset] if arr.ndim == 2 else arr
+      # Legacy schema: mode_data["phase_a"] has "direction" directly
+      if "per_category" in mode_data["phase_a"]:
+        layer_offset = hidden_index - onset
+        pairs: list[tuple[np.ndarray, float]] = []
+        for category_id, per_layer in mode_data["phase_a"]["per_category"].items():
+          arr = np.array(per_layer, dtype=np.float32)
+          vec = arr[layer_offset] if arr.ndim == 2 else arr
+          norm = float(np.linalg.norm(vec))
+          if norm > 1e-8:
+            factor = float(per_category_factor.get(category_id, factor_a))
+            pairs.append((vec / norm, factor))
+        result.extend(dedup_overlap(pairs))
+      elif "direction" in mode_data["phase_a"]:
+        vec = np.array(mode_data["phase_a"]["direction"], dtype=np.float32)
         norm = float(np.linalg.norm(vec))
         if norm > 1e-8:
-          factor = float(per_category_factor.get(category_id, factor_a))
-          pairs.append((vec / norm, factor))
-      result.extend(dedup_overlap(pairs))
+          result.append((vec / norm, factor_a))
     elif split < hidden_index <= last:
-      result.append((np.array(mode_data["phase_b"]["direction"], dtype=np.float32), factor_b))
+      # Phase B: legacy has per_category, new has direction
+      if "per_category" in mode_data["phase_b"]:
+        for cat_id, vec in mode_data["phase_b"]["per_category"].items():
+          result.append((np.array(vec, dtype=np.float32), factor_b))
+      elif "direction" in mode_data["phase_b"]:
+        result.append((np.array(mode_data["phase_b"]["direction"], dtype=np.float32), factor_b))
   return result
 
 
 def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int,
                  factor_a: float, factor_b: float, state_dir,
-                 factor_a_per_category: dict[str, float] | None = None) -> dict:
+                 factor_a_per_category: dict[str, float] | None = None,
+                 last_layer: int | None = None) -> dict:
   """Build the two-phase abliteration recipe.
   Phase A (onset..split): one merged direction per category per layer
     (mean of hard + redirect unit vectors, renormalized).
-  Phase B (split..last):  single shared direction (mean over all merged directions)."""
+  Phase B (split..last):  single shared direction (mean over all merged directions).
+  last_layer: optional override to cap the final ablation layer (e.g. 35 instead of all)."""
   per_category = load_directions(run, model_id, gen_mode, state_dir)
   if not per_category:
     raise ValueError("no categories with directions")
 
   sample_mode = next(iter(next(iter(per_category.values()))["by_mode"].values()))
-  last_layer = len(sample_mode["direction_per_layer"]) - 1
+  total_layers = len(sample_mode["direction_per_layer"]) - 1
+  last_layer = last_layer if last_layer is not None else total_layers
+  # Clamp to valid range
+  last_layer = min(last_layer, total_layers)
 
   merged_per_category: dict[str, np.ndarray] = {}
   for category_id, cat_result in per_category.items():
@@ -183,3 +212,111 @@ def build_recipe(run: dict, model_id: str, gen_mode: str, onset: int, split: int
     },
     "built_at": datetime.now(timezone.utc).isoformat(),
   }
+
+
+def build_som_md_recipe(
+    run: dict,
+    model_id: str,
+    gen_mode: str,
+    k: int = 7,
+    grid_shape: tuple[int, int] = (4, 4),
+    factor: float = 1.0,
+    state_dir=None,
+) -> dict:
+    """Build a SOM-MD recipe: train a SOM on harmful hidden states at the best
+    layer, compute k directions from top neurons toward the harmless centroid,
+    and apply them uniformly across all decoder layers.
+
+    Args:
+        run: run dict with prompts + model_results.
+        model_id: model identifier.
+        gen_mode: generation mode key.
+        k: number of SOM directions to use.
+        grid_shape: SOM lattice dimensions (rows, cols).
+        factor: ablation strength for all directions.
+        state_dir: directory containing .npy hidden-state files.
+
+    Returns:
+        Recipe dict with "method": "som_md" and per-layer direction lists.
+    """
+    if state_dir is None:
+        raise ValueError("state_dir required for SOM-MD recipe")
+
+    # Load all hidden states, split into harmful (refused) vs harmless (complied).
+    harmful_states: list[np.ndarray] = []
+    harmless_states: list[np.ndarray] = []
+
+    for prompt in run["prompts"]:
+        result = prompt.get("model_results", {}).get(model_id, {}).get(gen_mode)
+        if not result:
+            continue
+        key = result["hidden_states_key"]
+        npy_path = state_dir / f"{key}.npy"
+        if not npy_path.exists():
+            continue
+        hidden = np.load(str(npy_path))  # (n_layers, dim)
+        if result.get("refused"):
+            harmful_states.append(hidden)
+        else:
+            harmless_states.append(hidden)
+
+    if not harmful_states or not harmless_states:
+        raise ValueError(
+            f"need both refused ({len(harmful_states)}) and complied "
+            f"({len(harmless_states)}) hidden states for SOM-MD"
+        )
+
+    harmful_all = np.stack(harmful_states, axis=0)  # (n_h, n_layers, dim)
+    harmless_all = np.stack(harmless_states, axis=0)  # (n_hl, n_layers, dim)
+
+    # Select the best layer using the refusal metric.
+    best_layer = select_best_layer(harmful_all, harmless_all, grid_shape=grid_shape)
+
+    # Compute k SOM directions at that layer.
+    harmful_at_layer = harmful_all[:, best_layer, :]  # (n_h, dim)
+    harmless_centroid = harmless_all[:, best_layer, :].mean(axis=0)  # (dim,)
+
+    directions = compute_som_directions(
+        harmful_at_layer,
+        harmless_centroid,
+        grid_shape=grid_shape,
+        k=k,
+    )
+
+    n_layers = harmful_all.shape[1]
+    dim = harmful_all.shape[2]
+
+    # Build per-layer direction lists: same k directions for every decoder layer.
+    # Hidden-state index 0 is the embedding; decoder layers start at index 1.
+    per_layer: dict[int, list[list[float]]] = {}
+    for layer_idx in range(1, n_layers):
+        per_layer[layer_idx] = [d.tolist() for d in directions]
+
+    return {
+        "run_id": run["run_id"],
+        "model_id": model_id,
+        "gen_mode": gen_mode,
+        "method": "som_md",
+        "k": k,
+        "grid_shape": list(grid_shape),
+        "best_layer": best_layer,
+        "factor": factor,
+        "n_layers": n_layers,
+        "per_layer_directions": {str(idx): dirs for idx, dirs in per_layer.items()},
+        "built_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def directions_for_layer_som_md(recipe: dict, hidden_index: int) -> list[tuple[np.ndarray, float]]:
+    """Directions active at a hidden-state index for a SOM-MD recipe.
+
+    Returns the k SOM directions (each at `factor`) for any decoder layer.
+    Hidden-state index 0 (embedding) returns nothing — same convention as
+    the two-phase recipe."""
+    if hidden_index <= 0:
+        return []
+    factor = float(recipe["factor"])
+    dirs_raw = recipe.get("per_layer_directions", {}).get(str(hidden_index))
+    if not dirs_raw:
+        return []
+    return [(np.array(d, dtype=np.float32), factor) for d in dirs_raw]

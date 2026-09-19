@@ -4,6 +4,7 @@ import { LayerSplitControls } from "../molecules/LayerSplitControls";
 import { CategoryFactorSliders } from "../molecules/CategoryFactorSliders";
 import { RecipeReuseWarning } from "../molecules/RecipeReuseWarning";
 import { RecipePanel } from "../molecules/RecipePanel";
+import { SomMdPanel } from "../molecules/SomMdPanel";
 import { getDivergence, buildRecipe, bakeModel } from "../../api/ablation";
 import type {
   ModeDivergence,
@@ -154,6 +155,7 @@ const pickFirstModelEntry = (payload: Record<string, unknown>) => {
 const DEFAULT_PARAMS: RecipeParams = {
   onset: 38,
   split: 50,
+  lastLayer: 35,
   factorA: 0.15,
   factorB: 0.15,
   factorAByCategory: {},
@@ -318,6 +320,7 @@ export const AblationPanel = ({
             factorA={params.factorA}
             factorB={params.factorB}
           />
+          <SomMdPanel runId={runId} />
           <div
             style={{
               display: "flex",

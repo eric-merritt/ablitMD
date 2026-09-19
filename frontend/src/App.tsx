@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react'
 import './App.css'
 import { RunConfigPanel } from './components/organisms/RunConfigPanel'
 import { PromptWalkthrough } from './components/organisms/PromptWalkthrough'
+import { AutoClassifyReview } from './components/organisms/AutoClassifyReview'
 import { ClassifyReview } from './components/organisms/ClassifyReview'
 import { ResultsGrid } from './components/organisms/ResultsGrid'
 import { VerifyDashboard } from './components/organisms/VerifyDashboard'
 import { useModels } from './hooks/useModels'
 import type { Run } from './types/run'
 
-type Phase = 'config' | 'running' | 'review' | 'results' | 'verify'
+type Phase = 'config' | 'running' | 'auto-review' | 'review' | 'results' | 'verify'
 
 type AblationMode = 'ablitmd' | 'classic'
 interface VerifyContext { genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
@@ -49,9 +50,9 @@ const App = () => {
       return
     }
     if (run.incomplete) { setPhase('running'); return }
-    setPhase(hasUnclassified(run) ? 'review' : 'results')
+    setPhase(hasUnclassified(run) ? 'auto-review' : 'results')
   }
-  const handleReadyForReview = (run: Run) => { setActiveRun(run); setPhase('review') }
+  const handleReadyForReview = (run: Run) => { setActiveRun(run); setPhase('auto-review') }
   const handleRunComplete    = (run: Run) => { setActiveRun(run); setPhase('results') }
 
   return (
@@ -68,12 +69,22 @@ const App = () => {
           onHome={ () => setPhase('config') }
         />
       ) }
+      { phase === 'auto-review' && activeRun && (
+        <AutoClassifyReview
+          run={ activeRun }
+          modelNames={ modelNames }
+          onComplete={ handleRunComplete }
+          onManualReview={ () => setPhase('review') }
+          onBack={ () => setPhase('running') }
+          onHome={ () => setPhase('config') }
+        />
+      ) }
       { phase === 'review' && activeRun && (
         <ClassifyReview
           run={ activeRun }
           modelNames={ modelNames }
           onComplete={ handleRunComplete }
-          onBack={ () => setPhase('running') }
+          onBack={ () => setPhase('auto-review') }
           onHome={ () => setPhase('config') }
         />
       ) }

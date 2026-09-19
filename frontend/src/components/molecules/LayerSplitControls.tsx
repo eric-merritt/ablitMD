@@ -72,6 +72,8 @@ export const LayerSplitControls = ({ params, lastLayer, onChange }: LayerSplitCo
       onCommit={next => onChange({ ...params, onset: next })} />
     <NumberField label="split layer" value={params.split} min={0} max={lastLayer}
       onCommit={next => onChange({ ...params, split: next })} />
+    <NumberField label="last layer" value={params.lastLayer ?? lastLayer} min={0} max={lastLayer}
+      onCommit={next => onChange({ ...params, lastLayer: next })} />
     <FactorField label="factor A" value={params.factorA}
       onCommit={next => onChange({ ...params, factorA: next })} />
     <FactorField label="factor B" value={params.factorB}

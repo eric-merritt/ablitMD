@@ -48,6 +48,7 @@ export interface SlimRecipe {
 export interface RecipeParams {
   onset: number;
   split: number;
+  lastLayer?: number;
   factorA: number;
   factorB: number;
   // Per-category overrides for phase-A factor. Absent category = uses master factorA.

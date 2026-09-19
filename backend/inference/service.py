@@ -34,7 +34,7 @@ from backend.inference.ablation import (
 )
 from backend.inference.direction import compute_run_directions as compute_directions
 from backend.inference.recipe import latest_recipe_path
-from backend.inference.verify import projection_strength
+from backend.inference.verify import auto_classify_response, looks_like_refusal, projection_strength
 
 _project_root = Path(__file__).resolve().parents[2]
 if str(_project_root) not in sys.path:
@@ -419,9 +419,14 @@ async def ablate_verify(req: VerifyRequest, request: Request):
             yield json.dumps({"type": "load_progress", "progress": 1.0}) + "\n"
             await asyncio.sleep(3.0)
             try:
+                # apply_ablation_in_place returns f32 snapshots of every edited weight —
+                # ~54GB for this model. The verify loop never restores them (the weights
+                # are dirty and get reloaded from disk), so drop the reference immediately.
                 await asyncio.to_thread(apply_ablation_in_place, recipe, get_model())
                 set_model_dirty(True)
-                await asyncio.sleep(3.0)
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
             except RuntimeError:
                 await asyncio.to_thread(load_model, model_id, api_model_id)
             yield (
@@ -439,12 +444,14 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                     await asyncio.to_thread(unload_model)
                     gc.collect()
                     torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
                     return
                 yield chunk
         finally:
             await asyncio.to_thread(unload_model)
             gc.collect()
             torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
             _flush_verify_results(req.run_id, verify_buffer)
 
     async def _verify_loop():
@@ -532,6 +539,13 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                         response_after = ev.get("response", "")
                         break
                 gen_thread.join(timeout=5)
+
+                # Free this prompt's CUDA blocks (activations, KV cache) before the
+                # next one allocates. ipc_collect reclaims IPC handles after GC so
+                # VRAM actually comes back.
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
 
                 yield json.dumps({"type": "generation_done"}) + "\n"
 
@@ -678,6 +692,9 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
             yield json.dumps({"type": "load_progress", "progress": 1.0}) + "\n"
             await asyncio.sleep(0.1)
             try:
+                # apply_classic_in_place returns f32 snapshots of every edited weight —
+                # ~54GB for this model. The verify loop never restores them (the weights
+                # are dirty and get reloaded from disk), so drop the reference immediately.
                 await asyncio.to_thread(
                     apply_classic_in_place,
                     directions,
@@ -687,6 +704,9 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
                     req.disclaimer_factor,
                 )
                 set_model_dirty(True)
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
             except Exception as exc:
                 yield (
                     json.dumps({"type": "error", "message": f"Ablation failed: {exc}"})
@@ -708,12 +728,14 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
                     await asyncio.to_thread(unload_model)
                     gc.collect()
                     torch.cuda.empty_cache()
+                    torch.cuda.ipc_collect()
                     return
                 yield chunk
         finally:
             await asyncio.to_thread(unload_model)
             gc.collect()
             torch.cuda.empty_cache()
+            torch.cuda.ipc_collect()
             _flush_verify_results(req.run_id, classic_verify_buffer)
 
     async def _classic_verify_loop():
@@ -792,6 +814,13 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
                         response_after = ev.get("response", "")
                         break
                 gen_thread.join(timeout=5)
+
+                # Free this prompt's CUDA blocks (activations, KV cache) before the
+                # next one allocates. ipc_collect reclaims IPC handles after GC so
+                # VRAM actually comes back.
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.ipc_collect()
 
                 yield json.dumps({"type": "generation_done"}) + "\n"
 
@@ -881,6 +910,7 @@ async def ablate_bake(req: AblateRequest):
         )
         gc.collect()
         torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
         apply_classic_in_place(
             directions,
             req.factor,
@@ -921,41 +951,9 @@ async def ablate_bake(req: AblateRequest):
 
 @app.post("/classify")
 async def classify_response(req: ClassifyRequest):
-    """Classify a response using local Qwen3.5-27B via atomic chat."""
-    user_message = f"Original prompt: {req.prompt}\n\nModel response: {req.response}"
-
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(
-            CLASSIFIER_URL,
-            headers={"X-API-Key": "ak_AlgLdWCTUESihAnMySQHGGxNEqoRldCIMxy-2YcRbys"},
-            json={
-                "model": "qwen3.5-27b",
-                "messages": [
-                    {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_message},
-                ],
-                "stream": False,
-            },
-        )
-
-        if resp.status_code != 200:
-            raise HTTPException(
-                status_code=502, detail=f"Classifier error: {resp.status_code}"
-            )
-
-        data = resp.json()
-        raw = data.get("message", {}).get("content", "").strip().upper()
-
-        if "HARD_REFUSAL" in raw:
-            classification = "hard_refusal"
-        elif "REDIRECT" in raw:
-            classification = "redirect_refusal"
-        elif "NON_REFUSAL" in raw or "NON-REFUSAL" in raw:
-            classification = "non_refusal"
-        else:
-            classification = "unknown"
-
-        return {"classification": classification, "raw": raw}
+    """Rule-based auto-classification (no LLM)."""
+    result = auto_classify_response(req.response)
+    return {"classification": result, "raw": req.response[:200]}
 
 
 @app.post("/ablate/verify/label")

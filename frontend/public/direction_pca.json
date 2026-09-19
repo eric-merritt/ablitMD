@@ -5,217 +5,297 @@
         "id": "academic_dishonesty",
         "name": "Academic Dishonesty",
         "peak_layer": 50,
-        "magnitude": 0.799354612827301,
-        "x": -0.09716660529375076,
-        "y": -0.7934269905090332
-      },
-      {
-        "id": "cbrn_uplift",
-        "name": "CBRN Uplift",
-        "peak_layer": 50,
-        "magnitude": 0.8030093312263489,
-        "x": -0.6119301915168762,
-        "y": -0.5199667811393738
+        "magnitude": 0.7667738795280457,
+        "x": -0.0010723674204200506,
+        "y": -0.7667731046676636
       },
       {
         "id": "child_grooming",
         "name": "Child Grooming",
         "peak_layer": 50,
-        "magnitude": 0.7990692257881165,
-        "x": -0.7352256774902344,
-        "y": -0.3129774332046509
+        "magnitude": 0.7915305495262146,
+        "x": -0.7774627804756165,
+        "y": -0.14856745302677155
       },
       {
         "id": "confidential_data",
         "name": "Confidential Data",
         "peak_layer": 50,
-        "magnitude": 0.7828243970870972,
-        "x": -0.5501999855041504,
-        "y": -0.5568609237670898
+        "magnitude": 0.767318844795227,
+        "x": 0.33697235584259033,
+        "y": -0.6893677115440369
+      },
+      {
+        "id": "copyright_ip",
+        "name": "Copyright / IP",
+        "peak_layer": 50,
+        "magnitude": 0.7745561599731445,
+        "x": 0.769812285900116,
+        "y": -0.08559449762105942
       },
       {
         "id": "crime_assistance",
         "name": "Crime Assistance",
         "peak_layer": 50,
-        "magnitude": 0.8012739419937134,
-        "x": -0.5991929173469543,
-        "y": -0.5319846868515015
+        "magnitude": 0.7886763215065002,
+        "x": -0.7692391276359558,
+        "y": -0.17401587963104248
       },
       {
         "id": "csam",
         "name": "CSAM",
         "peak_layer": 50,
-        "magnitude": 0.7804978489875793,
-        "x": -0.7329352498054504,
-        "y": -0.2682960629463196
+        "magnitude": 0.790259838104248,
+        "x": -0.7639152407646179,
+        "y": 0.20234642922878265
       },
       {
         "id": "dangerous_activity",
         "name": "Dangerous Activity",
         "peak_layer": 50,
-        "magnitude": 0.8142789602279663,
-        "x": 0.7420802116394043,
-        "y": -0.3352121412754059
+        "magnitude": 0.7979976534843445,
+        "x": -0.11781764030456543,
+        "y": -0.7892522811889648
       },
       {
         "id": "disordered_eating",
         "name": "Disordered Eating",
         "peak_layer": 50,
-        "magnitude": 0.8100907206535339,
-        "x": 0.7918805480003357,
-        "y": 0.17079824209213257
+        "magnitude": 0.7916043400764465,
+        "x": -0.19807448983192444,
+        "y": -0.7664228081703186
       },
       {
         "id": "distress_signals",
         "name": "Distress Signals",
         "peak_layer": 50,
-        "magnitude": 0.7953886985778809,
-        "x": 0.5529871582984924,
-        "y": 0.5717065334320068
+        "magnitude": 0.7639774680137634,
+        "x": 0.7072554230690002,
+        "y": 0.2888793349266052
+      },
+      {
+        "id": "excessive_requests",
+        "name": "Excessive Requests",
+        "peak_layer": 50,
+        "magnitude": 0.7765060663223267,
+        "x": 0.6226252913475037,
+        "y": 0.46400368213653564
       },
       {
         "id": "explicit_nsfw",
         "name": "Explicit NSFW",
         "peak_layer": 50,
-        "magnitude": 0.8009030222892761,
-        "x": -0.689923882484436,
-        "y": 0.4067562520503998
+        "magnitude": 0.7827668786048889,
+        "x": -0.35266414284706116,
+        "y": 0.6988218426704407
       },
       {
         "id": "fraud_facilitation",
         "name": "Fraud Facilitation",
         "peak_layer": 50,
-        "magnitude": 0.8036664128303528,
-        "x": -0.7539007067680359,
-        "y": -0.2784123122692108
+        "magnitude": 0.7851082682609558,
+        "x": -0.7734702825546265,
+        "y": -0.13468009233474731
+      },
+      {
+        "id": "harassment_bullying",
+        "name": "harassment_bullying",
+        "peak_layer": 50,
+        "magnitude": 0.7935118675231934,
+        "x": -0.7935064435005188,
+        "y": -0.0029408023692667484
       },
       {
         "id": "hate_speech",
         "name": "hate_speech",
         "peak_layer": 50,
-        "magnitude": 0.8110986948013306,
-        "x": -0.7641557455062866,
-        "y": 0.2719322443008423
+        "magnitude": 0.7952929735183716,
+        "x": -0.6056775450706482,
+        "y": 0.5154082179069519
       },
       {
         "id": "hazardous_materials",
         "name": "hazardous_materials",
         "peak_layer": 50,
-        "magnitude": 0.7903607487678528,
-        "x": 0.5782164335250854,
-        "y": -0.5388282537460327
+        "magnitude": 0.7837883830070496,
+        "x": -0.07238880544900894,
+        "y": -0.7804384827613831
       },
       {
         "id": "hide_wrongdoing",
         "name": "hide_wrongdoing",
         "peak_layer": 50,
-        "magnitude": 0.8028397560119629,
-        "x": -0.7019090056419373,
-        "y": -0.38971203565597534
+        "magnitude": 0.7922611236572266,
+        "x": -0.7280564904212952,
+        "y": -0.3124283254146576
       },
       {
-        "id": "high_stakes_falsehoods",
-        "name": "high_stakes_falsehoods",
+        "id": "identity_discrimination",
+        "name": "identity_discrimination",
         "peak_layer": 50,
-        "magnitude": 0.8185938000679016,
-        "x": -0.7925342321395874,
-        "y": 0.2049032598733902
+        "magnitude": 0.7979525327682495,
+        "x": -0.7839856147766113,
+        "y": -0.14864353835582733
       },
       {
         "id": "impersonation",
         "name": "impersonation",
         "peak_layer": 50,
-        "magnitude": 0.790915846824646,
-        "x": -0.24600893259048462,
-        "y": -0.7516830563545227
+        "magnitude": 0.7897431254386902,
+        "x": -0.7827430367469788,
+        "y": -0.10491669923067093
       },
       {
         "id": "jurisdictional",
         "name": "jurisdictional",
         "peak_layer": 50,
-        "magnitude": 0.8117218613624573,
-        "x": 0.8117160797119141,
-        "y": -0.0030710971914231777
+        "magnitude": 0.7891265749931335,
+        "x": -0.24584919214248657,
+        "y": -0.7498525977134705
       },
       {
         "id": "legal_advice",
         "name": "legal_advice",
         "peak_layer": 50,
-        "magnitude": 0.784826934337616,
-        "x": 0.7118114829063416,
-        "y": 0.3305717706680298
+        "magnitude": 0.7941545844078064,
+        "x": 0.3366343080997467,
+        "y": -0.7192766666412354
       },
       {
         "id": "mass_casualty_violence",
         "name": "mass_casualty_violence",
         "peak_layer": 50,
-        "magnitude": 0.8111929297447205,
-        "x": -0.8111874461174011,
-        "y": -0.00299595738761127
+        "magnitude": 0.7958611249923706,
+        "x": -0.7920347452163696,
+        "y": 0.0779486894607544
       },
       {
         "id": "medical_advice",
         "name": "medical_advice",
         "peak_layer": 50,
-        "magnitude": 0.8006817102432251,
-        "x": 0.7846198678016663,
-        "y": -0.15957102179527283
+        "magnitude": 0.79283207654953,
+        "x": 0.25601935386657715,
+        "y": -0.7503578066825867
       },
       {
         "id": "nonconsensual_sexual",
         "name": "nonconsensual_sexual",
         "peak_layer": 50,
-        "magnitude": 0.8119125366210938,
-        "x": -0.25657039880752563,
-        "y": 0.7703074812889099
+        "magnitude": 0.8035435080528259,
+        "x": -0.7850331664085388,
+        "y": 0.1714792251586914
       },
       {
-        "id": "nonconsensual_surveillance",
-        "name": "nonconsensual_surveillance",
+        "id": "physical_sensation",
+        "name": "physical_sensation",
         "peak_layer": 50,
-        "magnitude": 0.7985652089118958,
-        "x": -0.40923768281936646,
-        "y": -0.6857337951660156
+        "magnitude": 0.8028821349143982,
+        "x": 0.5668162703514099,
+        "y": 0.5686292052268982
       },
       {
         "id": "physical_world_actions",
         "name": "physical_world_actions",
         "peak_layer": 50,
-        "magnitude": 0.8235703706741333,
-        "x": 0.09092573821544647,
-        "y": 0.8185356855392456
+        "magnitude": 0.8155638575553894,
+        "x": 0.07668594270944595,
+        "y": 0.8119505047798157
+      },
+      {
+        "id": "pii_doxxing",
+        "name": "pii_doxxing",
+        "peak_layer": 50,
+        "magnitude": 0.7914668917655945,
+        "x": -0.7728222012519836,
+        "y": -0.17077960073947906
+      },
+      {
+        "id": "private_access",
+        "name": "private_access",
+        "peak_layer": 50,
+        "magnitude": 0.7987199425697327,
+        "x": -0.42157575488090515,
+        "y": 0.6784006357192993
       },
       {
         "id": "prompt_injection",
         "name": "prompt_injection",
         "peak_layer": 50,
-        "magnitude": 0.8064882755279541,
-        "x": -0.39714154601097107,
-        "y": 0.7019273638725281
+        "magnitude": 0.8013690114021301,
+        "x": 0.0267268605530262,
+        "y": 0.800923228263855
+      },
+      {
+        "id": "realtime_information",
+        "name": "realtime_information",
+        "peak_layer": 50,
+        "magnitude": 0.789749026298523,
+        "x": 0.764208972454071,
+        "y": 0.19921882450580597
       },
       {
         "id": "regulated_goods",
         "name": "regulated_goods",
         "peak_layer": 50,
-        "magnitude": 0.8035777807235718,
-        "x": 0.41697123646736145,
-        "y": -0.6869295239448547
+        "magnitude": 0.7899386286735535,
+        "x": -0.564521849155426,
+        "y": -0.5525560975074768
+      },
+      {
+        "id": "reveal_system_prompt",
+        "name": "reveal_system_prompt",
+        "peak_layer": 50,
+        "magnitude": 0.8024891018867493,
+        "x": -0.0043775225058197975,
+        "y": 0.8024771809577942
       },
       {
         "id": "self_harm_methods",
         "name": "self_harm_methods",
         "peak_layer": 50,
-        "magnitude": 0.8085998296737671,
-        "x": 0.3659658133983612,
-        "y": 0.721042811870575
+        "magnitude": 0.7997815012931824,
+        "x": -0.7092075347900391,
+        "y": 0.3696959614753723
       },
       {
         "id": "social_engineering",
         "name": "social_engineering",
         "peak_layer": 50,
-        "magnitude": 0.8155505657196045,
-        "x": -0.0610833577811718,
-        "y": 0.8132598400115967
+        "magnitude": 0.8083565831184387,
+        "x": -0.5900171995162964,
+        "y": 0.5525577068328857
+      },
+      {
+        "id": "spam_platform_abuse",
+        "name": "spam_platform_abuse",
+        "peak_layer": 50,
+        "magnitude": 0.7837088108062744,
+        "x": -0.17772147059440613,
+        "y": -0.7632919549942017
+      },
+      {
+        "id": "unfair_advantage",
+        "name": "unfair_advantage",
+        "peak_layer": 50,
+        "magnitude": 0.786116898059845,
+        "x": 0.1464863121509552,
+        "y": -0.772348165512085
+      },
+      {
+        "id": "violence_terrorism",
+        "name": "violence_terrorism",
+        "peak_layer": 50,
+        "magnitude": 0.8042122721672058,
+        "x": -0.7159621715545654,
+        "y": 0.3662724494934082
+      },
+      {
+        "id": "weapons_explosives",
+        "name": "weapons_explosives",
+        "peak_layer": 50,
+        "magnitude": 0.7823498249053955,
+        "x": -0.6781790256500244,
+        "y": 0.3900569975376129
       }
     ],
     "redirect": [
@@ -223,246 +303,294 @@
         "id": "academic_dishonesty",
         "name": "Academic Dishonesty",
         "peak_layer": 50,
-        "magnitude": 0.8139093518257141,
-        "x": -0.5826916098594666,
-        "y": -0.568259596824646
+        "magnitude": 0.8000171184539795,
+        "x": -0.7079259753227234,
+        "y": 0.37265029549598694
       },
       {
-        "id": "child_grooming",
-        "name": "Child Grooming",
+        "id": "cbrn_uplift",
+        "name": "CBRN Uplift",
         "peak_layer": 50,
-        "magnitude": 0.7974569797515869,
-        "x": 0.24644961953163147,
-        "y": 0.7584195137023926
+        "magnitude": 0.7918716073036194,
+        "x": -0.7809613347053528,
+        "y": -0.1309959441423416
       },
       {
         "id": "confidential_data",
         "name": "Confidential Data",
         "peak_layer": 50,
-        "magnitude": 0.788485050201416,
-        "x": -0.00791129656136036,
-        "y": -0.7884453535079956
+        "magnitude": 0.7820664048194885,
+        "x": -0.31685569882392883,
+        "y": -0.7150037288665771
       },
       {
         "id": "copyright_ip",
         "name": "Copyright / IP",
         "peak_layer": 50,
-        "magnitude": 0.8094577789306641,
-        "x": 0.2843644917011261,
-        "y": -0.7578645944595337
+        "magnitude": 0.7869264483451843,
+        "x": 0.5467440485954285,
+        "y": -0.5659717917442322
+      },
+      {
+        "id": "crime_assistance",
+        "name": "Crime Assistance",
+        "peak_layer": 50,
+        "magnitude": 0.7822914719581604,
+        "x": -0.642110288143158,
+        "y": -0.4468492865562439
       },
       {
         "id": "dangerous_activity",
         "name": "Dangerous Activity",
         "peak_layer": 50,
-        "magnitude": 0.8080280423164368,
-        "x": -0.09947075694799423,
-        "y": -0.8018821477890015
+        "magnitude": 0.7861754298210144,
+        "x": -0.6198656558990479,
+        "y": -0.48356834053993225
       },
       {
         "id": "disordered_eating",
         "name": "Disordered Eating",
         "peak_layer": 50,
-        "magnitude": 0.800578236579895,
-        "x": 0.7755776643753052,
-        "y": -0.19850660860538483
+        "magnitude": 0.7779138088226318,
+        "x": -0.3842639923095703,
+        "y": 0.6763808727264404
       },
       {
         "id": "excessive_requests",
         "name": "Excessive Requests",
         "peak_layer": 50,
-        "magnitude": 0.8024216890335083,
-        "x": 0.7385484576225281,
-        "y": -0.31373029947280884
+        "magnitude": 0.7937073111534119,
+        "x": 0.7935755848884583,
+        "y": -0.014460021629929543
       },
       {
-        "id": "financial_advice",
-        "name": "Financial Advice",
+        "id": "explicit_nsfw",
+        "name": "Explicit NSFW",
         "peak_layer": 50,
-        "magnitude": 0.800441563129425,
-        "x": 0.7988265156745911,
-        "y": 0.050822850316762924
+        "magnitude": 0.7856472730636597,
+        "x": 0.09760256111621857,
+        "y": 0.7795609831809998
       },
       {
         "id": "fraud_facilitation",
         "name": "Fraud Facilitation",
         "peak_layer": 50,
-        "magnitude": 0.8021254539489746,
-        "x": -0.4328683614730835,
-        "y": -0.675300121307373
+        "magnitude": 0.7946041822433472,
+        "x": -0.7691212296485901,
+        "y": -0.19962066411972046
+      },
+      {
+        "id": "hacking_unauthorized",
+        "name": "hacking_unauthorized",
+        "peak_layer": 50,
+        "magnitude": 0.7869927287101746,
+        "x": -0.7568686604499817,
+        "y": 0.21565571427345276
+      },
+      {
+        "id": "harassment_bullying",
+        "name": "harassment_bullying",
+        "peak_layer": 50,
+        "magnitude": 0.793639063835144,
+        "x": -0.6345666646957397,
+        "y": 0.4766426086425781
       },
       {
         "id": "hate_speech",
         "name": "hate_speech",
         "peak_layer": 50,
-        "magnitude": 0.8117125630378723,
-        "x": -0.7965036034584045,
-        "y": 0.15639473497867584
+        "magnitude": 0.7996335029602051,
+        "x": -0.7525338530540466,
+        "y": 0.2703824043273926
       },
       {
         "id": "hazardous_materials",
         "name": "hazardous_materials",
         "peak_layer": 50,
-        "magnitude": 0.7947574853897095,
-        "x": 0.5377868413925171,
-        "y": -0.5851706862449646
+        "magnitude": 0.768557608127594,
+        "x": -0.06032274290919304,
+        "y": -0.7661866545677185
+      },
+      {
+        "id": "hide_wrongdoing",
+        "name": "hide_wrongdoing",
+        "peak_layer": 50,
+        "magnitude": 0.7801068425178528,
+        "x": -0.7577534317970276,
+        "y": -0.18540868163108826
       },
       {
         "id": "high_stakes_falsehoods",
         "name": "high_stakes_falsehoods",
         "peak_layer": 50,
-        "magnitude": 0.8088060617446899,
-        "x": -0.8014955520629883,
-        "y": -0.1084994301199913
+        "magnitude": 0.7981223464012146,
+        "x": -0.7268111109733582,
+        "y": 0.32976487278938293
       },
       {
         "id": "identity_discrimination",
         "name": "identity_discrimination",
         "peak_layer": 50,
-        "magnitude": 0.8100349307060242,
-        "x": -0.6876153349876404,
-        "y": -0.4281842112541199
+        "magnitude": 0.7964717149734497,
+        "x": -0.7964571714401245,
+        "y": -0.004809871781617403
       },
       {
         "id": "impersonation",
         "name": "impersonation",
         "peak_layer": 50,
-        "magnitude": 0.8010201454162598,
-        "x": -0.5610474944114685,
-        "y": -0.5717158913612366
+        "magnitude": 0.7883180379867554,
+        "x": -0.7134221196174622,
+        "y": -0.3353716731071472
+      },
+      {
+        "id": "jurisdictional",
+        "name": "jurisdictional",
+        "peak_layer": 50,
+        "magnitude": 0.7865504026412964,
+        "x": -0.3203180432319641,
+        "y": -0.7183717489242554
       },
       {
         "id": "legal_advice",
         "name": "legal_advice",
         "peak_layer": 50,
-        "magnitude": 0.7800255417823792,
-        "x": 0.7799071073532104,
-        "y": -0.013592283241450787
+        "magnitude": 0.7847656011581421,
+        "x": 0.411052942276001,
+        "y": -0.6685001850128174
       },
       {
         "id": "malicious_code",
         "name": "malicious_code",
         "peak_layer": 50,
-        "magnitude": 0.7986351251602173,
-        "x": -0.7540151476860046,
-        "y": -0.2632094919681549
+        "magnitude": 0.7909150123596191,
+        "x": -0.790597140789032,
+        "y": 0.022420018911361694
       },
       {
-        "id": "medical_advice",
-        "name": "medical_advice",
+        "id": "nonconsensual_sexual",
+        "name": "nonconsensual_sexual",
         "peak_layer": 50,
-        "magnitude": 0.8098607063293457,
-        "x": 0.7975399494171143,
-        "y": -0.14072808623313904
+        "magnitude": 0.7797756791114807,
+        "x": -0.303766131401062,
+        "y": 0.7181755900382996
       },
       {
         "id": "nonconsensual_surveillance",
         "name": "nonconsensual_surveillance",
         "peak_layer": 50,
-        "magnitude": 0.8052679300308228,
-        "x": -0.4442092776298523,
-        "y": -0.6716655492782593
+        "magnitude": 0.7918460369110107,
+        "x": -0.7431713342666626,
+        "y": -0.2733432650566101
       },
       {
         "id": "physical_world_actions",
         "name": "physical_world_actions",
         "peak_layer": 50,
-        "magnitude": 0.8130046129226685,
-        "x": 0.33176419138908386,
-        "y": 0.7422324419021606
+        "magnitude": 0.7939932942390442,
+        "x": 0.7436202168464661,
+        "y": 0.278306245803833
       },
       {
         "id": "pii_doxxing",
         "name": "pii_doxxing",
         "peak_layer": 50,
-        "magnitude": 0.8079028129577637,
-        "x": -0.6756814122200012,
-        "y": -0.4429013133049011
+        "magnitude": 0.7874632477760315,
+        "x": -0.7370578646659851,
+        "y": -0.27720755338668823
       },
       {
         "id": "political_influence",
         "name": "political_influence",
         "peak_layer": 50,
-        "magnitude": 0.8094837069511414,
-        "x": -0.7525756359100342,
-        "y": -0.2981506586074829
+        "magnitude": 0.795881450176239,
+        "x": -0.7041684985160828,
+        "y": 0.3709096908569336
       },
       {
         "id": "private_access",
         "name": "private_access",
         "peak_layer": 50,
-        "magnitude": 0.8090938925743103,
-        "x": -0.15991678833961487,
-        "y": -0.7931327819824219
+        "magnitude": 0.7986384034156799,
+        "x": -0.7447351217269897,
+        "y": -0.28843170404434204
       },
       {
         "id": "prompt_injection",
         "name": "prompt_injection",
         "peak_layer": 50,
-        "magnitude": 0.8077290654182434,
-        "x": -0.50275719165802,
-        "y": 0.6321878433227539
+        "magnitude": 0.7895259261131287,
+        "x": -0.5406287908554077,
+        "y": 0.5753882527351379
+      },
+      {
+        "id": "realtime_information",
+        "name": "realtime_information",
+        "peak_layer": 50,
+        "magnitude": 0.7783657908439636,
+        "x": 0.7442708015441895,
+        "y": 0.22784681618213654
       },
       {
         "id": "regulated_goods",
         "name": "regulated_goods",
         "peak_layer": 50,
-        "magnitude": 0.7927553653717041,
-        "x": -0.44558173418045044,
-        "y": -0.655681312084198
+        "magnitude": 0.7927470803260803,
+        "x": -0.5196412205696106,
+        "y": -0.5986826419830322
       },
       {
         "id": "reveal_system_prompt",
         "name": "reveal_system_prompt",
         "peak_layer": 50,
-        "magnitude": 0.8093770742416382,
-        "x": -0.23895031213760376,
-        "y": 0.7733007073402405
+        "magnitude": 0.8023712635040283,
+        "x": 0.20091253519058228,
+        "y": 0.7768100500106812
       },
       {
         "id": "social_engineering",
         "name": "social_engineering",
         "peak_layer": 50,
-        "magnitude": 0.8080621957778931,
-        "x": -0.7962003350257874,
-        "y": 0.1379479020833969
+        "magnitude": 0.7915257215499878,
+        "x": -0.6743823885917664,
+        "y": 0.4143925905227661
       },
       {
         "id": "spam_platform_abuse",
         "name": "spam_platform_abuse",
         "peak_layer": 50,
-        "magnitude": 0.8088311553001404,
-        "x": -0.21920710802078247,
-        "y": -0.778560221195221
+        "magnitude": 0.7919678688049316,
+        "x": -0.7083290815353394,
+        "y": -0.3542358875274658
       },
       {
         "id": "unfair_advantage",
         "name": "unfair_advantage",
         "peak_layer": 50,
-        "magnitude": 0.7989993691444397,
-        "x": 0.2889336049556732,
-        "y": -0.7449277639389038
+        "magnitude": 0.7881605625152588,
+        "x": 0.12413794547319412,
+        "y": -0.7783230543136597
       },
       {
         "id": "violence_terrorism",
         "name": "violence_terrorism",
         "peak_layer": 50,
-        "magnitude": 0.8158199787139893,
-        "x": -0.7624697089195251,
-        "y": 0.2901761531829834
+        "magnitude": 0.7933590412139893,
+        "x": -0.5984041690826416,
+        "y": 0.520894467830658
       },
       {
         "id": "weapons_explosives",
         "name": "weapons_explosives",
         "peak_layer": 50,
-        "magnitude": 0.7837724089622498,
-        "x": -0.6680555939674377,
-        "y": -0.4098791182041168
+        "magnitude": 0.7683795094490051,
+        "x": -0.587661862373352,
+        "y": -0.49503594636917114
       }
     ],
     "variance_explained": [
-      0.14780235290527344,
-      0.1070345938205719
+      0.20625603199005127,
+      0.09440387040376663
     ]
   },
   "uncentered": {
@@ -471,217 +599,297 @@
         "id": "academic_dishonesty",
         "name": "Academic Dishonesty",
         "peak_layer": 50,
-        "magnitude": 0.799354612827301,
-        "x": 0.7993459105491638,
-        "y": -0.003734191879630089
-      },
-      {
-        "id": "cbrn_uplift",
-        "name": "CBRN Uplift",
-        "peak_layer": 50,
-        "magnitude": 0.8030093312263489,
-        "x": 0.7987267374992371,
-        "y": -0.08282174170017242
+        "magnitude": 0.7667738795280457,
+        "x": 0.7607184648513794,
+        "y": 0.0961754322052002
       },
       {
         "id": "child_grooming",
         "name": "Child Grooming",
         "peak_layer": 50,
-        "magnitude": 0.7990692257881165,
-        "x": 0.7933133244514465,
-        "y": -0.09573640674352646
+        "magnitude": 0.7915305495262146,
+        "x": 0.7912922501564026,
+        "y": -0.019420290365815163
       },
       {
         "id": "confidential_data",
         "name": "Confidential Data",
         "peak_layer": 50,
-        "magnitude": 0.7828243970870972,
-        "x": 0.7753926515579224,
-        "y": -0.10761183500289917
+        "magnitude": 0.767318844795227,
+        "x": 0.7257236242294312,
+        "y": 0.24920542538166046
+      },
+      {
+        "id": "copyright_ip",
+        "name": "Copyright / IP",
+        "peak_layer": 50,
+        "magnitude": 0.7745561599731445,
+        "x": -0.43486279249191284,
+        "y": 0.6409614086151123
       },
       {
         "id": "crime_assistance",
         "name": "Crime Assistance",
         "peak_layer": 50,
-        "magnitude": 0.8012739419937134,
-        "x": 0.7926478385925293,
-        "y": -0.11725783348083496
+        "magnitude": 0.7886763215065002,
+        "x": 0.7883448004722595,
+        "y": -0.022863958030939102
       },
       {
         "id": "csam",
         "name": "CSAM",
         "peak_layer": 50,
-        "magnitude": 0.7804978489875793,
-        "x": 0.7698874473571777,
-        "y": -0.12825846672058105
+        "magnitude": 0.790259838104248,
+        "x": 0.7849850654602051,
+        "y": -0.09115412086248398
       },
       {
         "id": "dangerous_activity",
         "name": "Dangerous Activity",
         "peak_layer": 50,
-        "magnitude": 0.8142789602279663,
-        "x": 0.7430304884910583,
-        "y": 0.33310040831565857
+        "magnitude": 0.7979976534843445,
+        "x": 0.7713539600372314,
+        "y": 0.20448322594165802
       },
       {
         "id": "disordered_eating",
         "name": "Disordered Eating",
         "peak_layer": 50,
-        "magnitude": 0.8100907206535339,
-        "x": 0.7852909564971924,
-        "y": 0.19890984892845154
+        "magnitude": 0.7916043400764465,
+        "x": 0.7759857773780823,
+        "y": 0.156471848487854
       },
       {
         "id": "distress_signals",
         "name": "Distress Signals",
         "peak_layer": 50,
-        "magnitude": 0.7953886985778809,
-        "x": 0.7680209875106812,
-        "y": 0.20684976875782013
+        "magnitude": 0.7639774680137634,
+        "x": 0.7586570978164673,
+        "y": 0.0900057777762413
+      },
+      {
+        "id": "excessive_requests",
+        "name": "Excessive Requests",
+        "peak_layer": 50,
+        "magnitude": 0.7765060663223267,
+        "x": 0.6633298993110657,
+        "y": -0.40367698669433594
       },
       {
         "id": "explicit_nsfw",
         "name": "Explicit NSFW",
         "peak_layer": 50,
-        "magnitude": 0.8009030222892761,
-        "x": 0.7760639786720276,
-        "y": -0.19791482388973236
+        "magnitude": 0.7827668786048889,
+        "x": 0.7442173361778259,
+        "y": -0.2426203489303589
       },
       {
         "id": "fraud_facilitation",
         "name": "Fraud Facilitation",
         "peak_layer": 50,
-        "magnitude": 0.8036664128303528,
-        "x": 0.7888146638870239,
-        "y": -0.15378925204277039
+        "magnitude": 0.7851082682609558,
+        "x": 0.7842341065406799,
+        "y": -0.03703853487968445
+      },
+      {
+        "id": "harassment_bullying",
+        "name": "harassment_bullying",
+        "peak_layer": 50,
+        "magnitude": 0.7935118675231934,
+        "x": 0.7915765643119812,
+        "y": -0.055385999381542206
       },
       {
         "id": "hate_speech",
         "name": "hate_speech",
         "peak_layer": 50,
-        "magnitude": 0.8110986948013306,
-        "x": 0.7920310497283936,
-        "y": -0.174836665391922
+        "magnitude": 0.7952929735183716,
+        "x": 0.7686617374420166,
+        "y": -0.20408345758914948
       },
       {
         "id": "hazardous_materials",
         "name": "hazardous_materials",
         "peak_layer": 50,
-        "magnitude": 0.7903607487678528,
-        "x": 0.752545952796936,
-        "y": 0.24154679477214813
+        "magnitude": 0.7837883830070496,
+        "x": 0.7614232301712036,
+        "y": 0.18590028584003448
       },
       {
         "id": "hide_wrongdoing",
         "name": "hide_wrongdoing",
         "peak_layer": 50,
-        "magnitude": 0.8028397560119629,
-        "x": 0.8001896142959595,
-        "y": -0.06517944484949112
+        "magnitude": 0.7922611236572266,
+        "x": 0.7921063899993896,
+        "y": 0.015655366703867912
       },
       {
-        "id": "high_stakes_falsehoods",
-        "name": "high_stakes_falsehoods",
+        "id": "identity_discrimination",
+        "name": "identity_discrimination",
         "peak_layer": 50,
-        "magnitude": 0.8185938000679016,
-        "x": 0.804040789604187,
-        "y": -0.1536690890789032
+        "magnitude": 0.7979525327682495,
+        "x": 0.7979462146759033,
+        "y": 0.0031712939962744713
       },
       {
         "id": "impersonation",
         "name": "impersonation",
         "peak_layer": 50,
-        "magnitude": 0.790915846824646,
-        "x": 0.7883864641189575,
-        "y": -0.06320328265428543
+        "magnitude": 0.7897431254386902,
+        "x": 0.7888879179954529,
+        "y": -0.03674301132559776
       },
       {
         "id": "jurisdictional",
         "name": "jurisdictional",
         "peak_layer": 50,
-        "magnitude": 0.8117218613624573,
-        "x": 0.8089394569396973,
-        "y": 0.06715131551027298
+        "magnitude": 0.7891265749931335,
+        "x": 0.7827546000480652,
+        "y": 0.10008005797863007
       },
       {
         "id": "legal_advice",
         "name": "legal_advice",
         "peak_layer": 50,
-        "magnitude": 0.784826934337616,
-        "x": 0.7513474225997925,
-        "y": 0.22678257524967194
+        "magnitude": 0.7941545844078064,
+        "x": 0.7458024621009827,
+        "y": 0.2728738486766815
       },
       {
         "id": "mass_casualty_violence",
         "name": "mass_casualty_violence",
         "peak_layer": 50,
-        "magnitude": 0.8111929297447205,
-        "x": 0.8080244660377502,
-        "y": -0.07162728905677795
+        "magnitude": 0.7958611249923706,
+        "x": 0.7935638427734375,
+        "y": -0.06042526289820671
       },
       {
         "id": "medical_advice",
         "name": "medical_advice",
         "peak_layer": 50,
-        "magnitude": 0.8006817102432251,
-        "x": 0.6931963562965393,
-        "y": 0.40071189403533936
+        "magnitude": 0.79283207654953,
+        "x": 0.7237622141838074,
+        "y": 0.3236524760723114
       },
       {
         "id": "nonconsensual_sexual",
         "name": "nonconsensual_sexual",
         "peak_layer": 50,
-        "magnitude": 0.8119125366210938,
-        "x": 0.8119060397148132,
-        "y": -0.0032512943726032972
+        "magnitude": 0.8035435080528259,
+        "x": 0.8018080592155457,
+        "y": -0.0527825802564621
       },
       {
-        "id": "nonconsensual_surveillance",
-        "name": "nonconsensual_surveillance",
+        "id": "physical_sensation",
+        "name": "physical_sensation",
         "peak_layer": 50,
-        "magnitude": 0.7985652089118958,
-        "x": 0.7945339679718018,
-        "y": -0.08013881742954254
+        "magnitude": 0.8028821349143982,
+        "x": 0.8021785020828247,
+        "y": -0.033605288714170456
       },
       {
         "id": "physical_world_actions",
         "name": "physical_world_actions",
         "peak_layer": 50,
-        "magnitude": 0.8235703706741333,
-        "x": 0.8235565423965454,
-        "y": 0.004777709953486919
+        "magnitude": 0.8155638575553894,
+        "x": 0.8155226111412048,
+        "y": 0.008201596327126026
+      },
+      {
+        "id": "pii_doxxing",
+        "name": "pii_doxxing",
+        "peak_layer": 50,
+        "magnitude": 0.7914668917655945,
+        "x": 0.7912880778312683,
+        "y": 0.016825594007968903
+      },
+      {
+        "id": "private_access",
+        "name": "private_access",
+        "peak_layer": 50,
+        "magnitude": 0.7987199425697327,
+        "x": 0.7986157536506653,
+        "y": -0.012899556197226048
       },
       {
         "id": "prompt_injection",
         "name": "prompt_injection",
         "peak_layer": 50,
-        "magnitude": 0.8064882755279541,
-        "x": 0.7947583794593811,
-        "y": -0.1370493769645691
+        "magnitude": 0.8013690114021301,
+        "x": 0.7802191376686096,
+        "y": -0.1828944981098175
+      },
+      {
+        "id": "realtime_information",
+        "name": "realtime_information",
+        "peak_layer": 50,
+        "magnitude": 0.789749026298523,
+        "x": 0.7599290609359741,
+        "y": 0.21496830880641937
       },
       {
         "id": "regulated_goods",
         "name": "regulated_goods",
         "peak_layer": 50,
-        "magnitude": 0.8035777807235718,
-        "x": 0.8019883632659912,
-        "y": 0.05051596835255623
+        "magnitude": 0.7899386286735535,
+        "x": 0.7863763570785522,
+        "y": 0.07493403553962708
+      },
+      {
+        "id": "reveal_system_prompt",
+        "name": "reveal_system_prompt",
+        "peak_layer": 50,
+        "magnitude": 0.8024891018867493,
+        "x": 0.6731246113777161,
+        "y": -0.43691179156303406
       },
       {
         "id": "self_harm_methods",
         "name": "self_harm_methods",
         "peak_layer": 50,
-        "magnitude": 0.8085998296737671,
-        "x": 0.8010191321372986,
-        "y": 0.11046340316534042
+        "magnitude": 0.7997815012931824,
+        "x": 0.7961098551750183,
+        "y": -0.07654715329408646
       },
       {
         "id": "social_engineering",
         "name": "social_engineering",
         "peak_layer": 50,
-        "magnitude": 0.8155505657196045,
-        "x": 0.8154512047767639,
-        "y": -0.012726536020636559
+        "magnitude": 0.8083565831184387,
+        "x": 0.7943435907363892,
+        "y": -0.1498618870973587
+      },
+      {
+        "id": "spam_platform_abuse",
+        "name": "spam_platform_abuse",
+        "peak_layer": 50,
+        "magnitude": 0.7837088108062744,
+        "x": 0.7641025185585022,
+        "y": 0.17420347034931183
+      },
+      {
+        "id": "unfair_advantage",
+        "name": "unfair_advantage",
+        "peak_layer": 50,
+        "magnitude": 0.786116898059845,
+        "x": 0.6926820278167725,
+        "y": 0.37171411514282227
+      },
+      {
+        "id": "violence_terrorism",
+        "name": "violence_terrorism",
+        "peak_layer": 50,
+        "magnitude": 0.8042122721672058,
+        "x": 0.7876891493797302,
+        "y": -0.16218239068984985
+      },
+      {
+        "id": "weapons_explosives",
+        "name": "weapons_explosives",
+        "peak_layer": 50,
+        "magnitude": 0.7823498249053955,
+        "x": 0.7705772519111633,
+        "y": -0.13521075248718262
       }
     ],
     "redirect": [
@@ -689,249 +897,297 @@
         "id": "academic_dishonesty",
         "name": "Academic Dishonesty",
         "peak_layer": 50,
-        "magnitude": 0.8139093518257141,
-        "x": 0.8085960745811462,
-        "y": -0.09284821897745132
+        "magnitude": 0.8000171184539795,
+        "x": 0.7932570576667786,
+        "y": -0.10378190129995346
       },
       {
-        "id": "child_grooming",
-        "name": "Child Grooming",
+        "id": "cbrn_uplift",
+        "name": "CBRN Uplift",
         "peak_layer": 50,
-        "magnitude": 0.7974569797515869,
-        "x": 0.7974367141723633,
-        "y": 0.005680752918124199
+        "magnitude": 0.7918716073036194,
+        "x": 0.7917938232421875,
+        "y": -0.011097412556409836
       },
       {
         "id": "confidential_data",
         "name": "Confidential Data",
         "peak_layer": 50,
-        "magnitude": 0.788485050201416,
-        "x": 0.7884740233421326,
-        "y": 0.004160700831562281
+        "magnitude": 0.7820664048194885,
+        "x": 0.7715560793876648,
+        "y": 0.12778519093990326
       },
       {
         "id": "copyright_ip",
         "name": "Copyright / IP",
         "peak_layer": 50,
-        "magnitude": 0.8094577789306641,
-        "x": 0.8082293272018433,
-        "y": 0.04457850009202957
+        "magnitude": 0.7869264483451843,
+        "x": 0.6988518834114075,
+        "y": 0.3617446720600128
+      },
+      {
+        "id": "crime_assistance",
+        "name": "Crime Assistance",
+        "peak_layer": 50,
+        "magnitude": 0.7822914719581604,
+        "x": 0.781414806842804,
+        "y": 0.03702503442764282
       },
       {
         "id": "dangerous_activity",
         "name": "Dangerous Activity",
         "peak_layer": 50,
-        "magnitude": 0.8080280423164368,
-        "x": 0.8077915906906128,
-        "y": -0.0195468757301569
+        "magnitude": 0.7861754298210144,
+        "x": 0.7861695289611816,
+        "y": -0.0030628058593720198
       },
       {
         "id": "disordered_eating",
         "name": "Disordered Eating",
         "peak_layer": 50,
-        "magnitude": 0.800578236579895,
-        "x": 0.7030549049377441,
-        "y": 0.38293519616127014
+        "magnitude": 0.7779138088226318,
+        "x": 0.7757031321525574,
+        "y": -0.05860457569360733
       },
       {
         "id": "excessive_requests",
         "name": "Excessive Requests",
         "peak_layer": 50,
-        "magnitude": 0.8024216890335083,
-        "x": 0.7704566121101379,
-        "y": 0.22422568500041962
+        "magnitude": 0.7937073111534119,
+        "x": 0.7541237473487854,
+        "y": 0.24752527475357056
       },
       {
-        "id": "financial_advice",
-        "name": "Financial Advice",
+        "id": "explicit_nsfw",
+        "name": "Explicit NSFW",
         "peak_layer": 50,
-        "magnitude": 0.800441563129425,
-        "x": 0.7180579900741577,
-        "y": 0.3536938726902008
+        "magnitude": 0.7856472730636597,
+        "x": 0.7428596615791321,
+        "y": -0.25573650002479553
       },
       {
         "id": "fraud_facilitation",
         "name": "Fraud Facilitation",
         "peak_layer": 50,
-        "magnitude": 0.8021254539489746,
-        "x": 0.7992417812347412,
-        "y": -0.06795524060726166
+        "magnitude": 0.7946041822433472,
+        "x": 0.7944610118865967,
+        "y": -0.015081298537552357
+      },
+      {
+        "id": "hacking_unauthorized",
+        "name": "hacking_unauthorized",
+        "peak_layer": 50,
+        "magnitude": 0.7869927287101746,
+        "x": 0.7846559882164001,
+        "y": -0.06060095131397247
+      },
+      {
+        "id": "harassment_bullying",
+        "name": "harassment_bullying",
+        "peak_layer": 50,
+        "magnitude": 0.793639063835144,
+        "x": 0.7836441993713379,
+        "y": -0.12555786967277527
       },
       {
         "id": "hate_speech",
         "name": "hate_speech",
         "peak_layer": 50,
-        "magnitude": 0.8117125630378723,
-        "x": 0.7912127375602722,
-        "y": -0.18127261102199554
+        "magnitude": 0.7996335029602051,
+        "x": 0.7895900011062622,
+        "y": -0.12633806467056274
       },
       {
         "id": "hazardous_materials",
         "name": "hazardous_materials",
         "peak_layer": 50,
-        "magnitude": 0.7947574853897095,
-        "x": 0.7718220949172974,
-        "y": 0.18955250084400177
+        "magnitude": 0.768557608127594,
+        "x": 0.7669243812561035,
+        "y": 0.050077885389328
+      },
+      {
+        "id": "hide_wrongdoing",
+        "name": "hide_wrongdoing",
+        "peak_layer": 50,
+        "magnitude": 0.7801068425178528,
+        "x": 0.7798687815666199,
+        "y": -0.01927175186574459
       },
       {
         "id": "high_stakes_falsehoods",
         "name": "high_stakes_falsehoods",
         "peak_layer": 50,
-        "magnitude": 0.8088060617446899,
-        "x": 0.7947240471839905,
-        "y": -0.15026988089084625
+        "magnitude": 0.7981223464012146,
+        "x": 0.7888394594192505,
+        "y": -0.1213739737868309
       },
       {
         "id": "identity_discrimination",
         "name": "identity_discrimination",
         "peak_layer": 50,
-        "magnitude": 0.8100349307060242,
-        "x": 0.8060452342033386,
-        "y": -0.08029792457818985
+        "magnitude": 0.7964717149734497,
+        "x": 0.7964503765106201,
+        "y": -0.00583560299128294
       },
       {
         "id": "impersonation",
         "name": "impersonation",
         "peak_layer": 50,
-        "magnitude": 0.8010201454162598,
-        "x": 0.7915549278259277,
-        "y": -0.12277615070343018
+        "magnitude": 0.7883180379867554,
+        "x": 0.7879988551139832,
+        "y": 0.022430501878261566
+      },
+      {
+        "id": "jurisdictional",
+        "name": "jurisdictional",
+        "peak_layer": 50,
+        "magnitude": 0.7865504026412964,
+        "x": 0.7780712246894836,
+        "y": 0.11518076062202454
       },
       {
         "id": "legal_advice",
         "name": "legal_advice",
         "peak_layer": 50,
-        "magnitude": 0.7800255417823792,
-        "x": 0.7334386706352234,
-        "y": 0.26553255319595337
+        "magnitude": 0.7847656011581421,
+        "x": 0.7368180155754089,
+        "y": 0.27010414004325867
       },
       {
         "id": "malicious_code",
         "name": "malicious_code",
         "peak_layer": 50,
-        "magnitude": 0.7986351251602173,
-        "x": 0.7920312285423279,
-        "y": -0.10249190032482147
+        "magnitude": 0.7909150123596191,
+        "x": 0.7904813885688782,
+        "y": -0.026187703013420105
       },
       {
-        "id": "medical_advice",
-        "name": "medical_advice",
+        "id": "nonconsensual_sexual",
+        "name": "nonconsensual_sexual",
         "peak_layer": 50,
-        "magnitude": 0.8098607063293457,
-        "x": 0.7038101553916931,
-        "y": 0.40065670013427734
+        "magnitude": 0.7797756791114807,
+        "x": 0.7655448317527771,
+        "y": -0.14829415082931519
       },
       {
         "id": "nonconsensual_surveillance",
         "name": "nonconsensual_surveillance",
         "peak_layer": 50,
-        "magnitude": 0.8052679300308228,
-        "x": 0.7991960048675537,
-        "y": -0.09870277345180511
+        "magnitude": 0.7918460369110107,
+        "x": 0.7918415069580078,
+        "y": -0.0026635946705937386
       },
       {
         "id": "physical_world_actions",
         "name": "physical_world_actions",
         "peak_layer": 50,
-        "magnitude": 0.8130046129226685,
-        "x": 0.810296893119812,
-        "y": 0.06629807502031326
+        "magnitude": 0.7939932942390442,
+        "x": 0.7893485426902771,
+        "y": 0.08575727790594101
       },
       {
         "id": "pii_doxxing",
         "name": "pii_doxxing",
         "peak_layer": 50,
-        "magnitude": 0.8079028129577637,
-        "x": 0.8019847869873047,
-        "y": -0.09760811179876328
+        "magnitude": 0.7874632477760315,
+        "x": 0.7874618172645569,
+        "y": 0.0014893090119585395
       },
       {
         "id": "political_influence",
         "name": "political_influence",
         "peak_layer": 50,
-        "magnitude": 0.8094837069511414,
-        "x": 0.8020284175872803,
-        "y": -0.10960973054170609
+        "magnitude": 0.795881450176239,
+        "x": 0.7874262928962708,
+        "y": -0.11570283025503159
       },
       {
         "id": "private_access",
         "name": "private_access",
         "peak_layer": 50,
-        "magnitude": 0.8090938925743103,
-        "x": 0.8089087605476379,
-        "y": -0.01730831153690815
+        "magnitude": 0.7986384034156799,
+        "x": 0.797869086265564,
+        "y": 0.035047970712184906
       },
       {
         "id": "prompt_injection",
         "name": "prompt_injection",
         "peak_layer": 50,
-        "magnitude": 0.8077290654182434,
-        "x": 0.7942313551902771,
-        "y": -0.14704649150371552
+        "magnitude": 0.7895259261131287,
+        "x": 0.7827115654945374,
+        "y": -0.10350710898637772
+      },
+      {
+        "id": "realtime_information",
+        "name": "realtime_information",
+        "peak_layer": 50,
+        "magnitude": 0.7783657908439636,
+        "x": 0.7572864890098572,
+        "y": 0.17991773784160614
       },
       {
         "id": "regulated_goods",
         "name": "regulated_goods",
         "peak_layer": 50,
-        "magnitude": 0.7927553653717041,
-        "x": 0.7919702529907227,
-        "y": -0.03527424484491348
+        "magnitude": 0.7927470803260803,
+        "x": 0.7905649542808533,
+        "y": 0.05877958610653877
       },
       {
         "id": "reveal_system_prompt",
         "name": "reveal_system_prompt",
         "peak_layer": 50,
-        "magnitude": 0.8093770742416382,
-        "x": 0.79339200258255,
-        "y": -0.16006408631801605
+        "magnitude": 0.8023712635040283,
+        "x": 0.7201282978057861,
+        "y": -0.35385727882385254
       },
       {
         "id": "social_engineering",
         "name": "social_engineering",
         "peak_layer": 50,
-        "magnitude": 0.8080621957778931,
-        "x": 0.7991058230400085,
-        "y": -0.11997663974761963
+        "magnitude": 0.7915257215499878,
+        "x": 0.7855537533760071,
+        "y": -0.0970473513007164
       },
       {
         "id": "spam_platform_abuse",
         "name": "spam_platform_abuse",
         "peak_layer": 50,
-        "magnitude": 0.8088311553001404,
-        "x": 0.8080848455429077,
-        "y": -0.03473764657974243
+        "magnitude": 0.7919678688049316,
+        "x": 0.7914175987243652,
+        "y": 0.02951749414205551
       },
       {
         "id": "unfair_advantage",
         "name": "unfair_advantage",
         "peak_layer": 50,
-        "magnitude": 0.7989993691444397,
-        "x": 0.7946451902389526,
-        "y": 0.08330097794532776
+        "magnitude": 0.7881605625152588,
+        "x": 0.7688355445861816,
+        "y": 0.17346176505088806
       },
       {
         "id": "violence_terrorism",
         "name": "violence_terrorism",
         "peak_layer": 50,
-        "magnitude": 0.8158199787139893,
-        "x": 0.802328884601593,
-        "y": -0.1477518081665039
+        "magnitude": 0.7933590412139893,
+        "x": 0.7799569368362427,
+        "y": -0.14520908892154694
       },
       {
         "id": "weapons_explosives",
         "name": "weapons_explosives",
         "peak_layer": 50,
-        "magnitude": 0.7837724089622498,
-        "x": 0.77366042137146,
-        "y": -0.1254938542842865
+        "magnitude": 0.7683795094490051,
+        "x": 0.7677277326583862,
+        "y": 0.03164088726043701
       }
     ],
     "variance_explained": [
-      0.7791147828102112,
-      0.032199617475271225
+      0.672836422920227,
+      0.03896701708436012
     ]
   },
-  "n_categories": 27,
+  "n_categories": 37,
   "hidden_dim": 5120,
   "extraction": {
     "mode": "mean",

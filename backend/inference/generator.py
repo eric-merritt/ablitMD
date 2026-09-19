@@ -66,7 +66,9 @@ def _capture_and_save_hidden_states(input_ids, hidden_states_key: str, runs_dir:
     for layer_idx in range(n_layers + 1)
   ], dtype=np.float32)
   del output
+  gc.collect()
   torch.cuda.empty_cache()
+  torch.cuda.ipc_collect()
 
   state_dir = runs_dir / run_id
   state_dir.mkdir(parents=True, exist_ok=True)
@@ -99,7 +101,9 @@ def _capture_response_hidden_states(input_ids, response_text: str, hidden_states
     ], dtype=np.float32)
     np.save(str(state_dir / f"{hidden_states_key}__{suffix}.npy"), hidden_states)
   del output
+  gc.collect()
   torch.cuda.empty_cache()
+  torch.cuda.ipc_collect()
 
 
 def _claim_abort_event() -> threading.Event:
@@ -165,8 +169,11 @@ def stream_prompt(
     with _worker_lock:
       if _active_worker is worker:
         _active_worker = None
-    torch.cuda.empty_cache()
+    # Free this prompt's CUDA blocks (activations, KV cache). ipc_collect reclaims
+    # IPC handles after GC so VRAM actually comes back for the next prompt.
     gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.ipc_collect()
 
   stripped = THINKING_STRIP_RE.sub('', collected).strip()
   if not skip_hidden_states and not abort_event.is_set():

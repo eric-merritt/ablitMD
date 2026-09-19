@@ -23,7 +23,41 @@ export const buildRecipe = (
   fetch(`/api/ablation/${runId}/recipe`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      onset: params.onset,
+      split: params.split,
+      lastLayer: params.lastLayer,
+      factorA: params.factorA,
+      factorB: params.factorB,
+      factorAByCategory: params.factorAByCategory,
+    }),
+  }).then(jsonOrThrow);
+
+export interface SomMdRecipe {
+  run_id: string;
+  model_id: string;
+  gen_mode: string;
+  method: "som_md";
+  k: number;
+  grid_shape: [number, number];
+  best_layer: number;
+  factor: number;
+  n_layers: number;
+  built_at: string;
+}
+
+export const buildSomMdRecipe = (
+  runId: string,
+  params: { k: number; grid: [number, number]; factor: number },
+): Promise<SomMdRecipe> =>
+  fetch(`/api/ablation/${runId}/recipe/som-md`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      k: params.k,
+      grid: `${params.grid[0]},${params.grid[1]}`,
+      factor: params.factor,
+    }),
   }).then(jsonOrThrow);
 
 export const bakeModel = (

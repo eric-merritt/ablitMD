@@ -7,6 +7,7 @@ import { LLM } from '../models/llm.js'
 import { Prompt } from '../models/prompt.js'
 import { qwenSeed } from './seeds/llms/qwen.js'
 import { qwen359bSeed } from './seeds/llms/qwen35_9b.js'
+import { qwen3827bSeed } from './seeds/llms/qwen38_27b.js'
 import { gemmaSeed } from './seeds/llms/gemma.js'
 import { llamaSeed } from './seeds/llms/llama.js'
 // deepseek parked — MoE, ~1.3TB bf16, infeasible pre-abliteration
@@ -47,7 +48,7 @@ const seedLLMs = async () => {
     if (removed.deletedCount) console.log(`  - removed stale: ${staleId}`)
   }
 
-  const seeds = [qwenSeed, qwen359bSeed, gemmaSeed, llamaSeed]
+  const seeds = [qwenSeed, qwen359bSeed, qwen3827bSeed, gemmaSeed, llamaSeed]
   let inserted = 0
 
   for (const seed of seeds) {

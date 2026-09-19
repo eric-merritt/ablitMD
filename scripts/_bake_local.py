@@ -31,11 +31,10 @@ MODELS_ROOT = Path.home() / "models"
 
 
 def model_dirs(model_id: str) -> tuple[str, str]:
-  """Map an org/name model id to its on-disk (base, abliterated) dirs:
-  ~/models/<family>/<name>-BaseModel and ~/models/<family>/<name>-Ablit."""
+  """Map an org/name model id to its on-disk (base, abliterated) dirs."""
   family, _, name = model_id.rpartition("/")
   family_dir = MODELS_ROOT / family if family else MODELS_ROOT
-  return str(family_dir / f"{name}-BaseModel"), str(family_dir / f"{name}-Ablit")
+  return str(family_dir / f"{name}-Base"), str(family_dir / f"{name}-Ablit")
 
 
 def ablate(recipe: dict, model) -> None:

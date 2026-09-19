@@ -197,8 +197,8 @@ export const PromptWalkthrough = ({ initialRun, models, onReadyForReview, onBack
 
   if (!modelReady && pendingPrompts.length > 0) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', maxWidth: '480px', width: '100%', margin: '0 auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '48px' }}>
           { loadError
             ? <div style={{ color: '#ef4444', fontSize: '13px' }}>{ loadError }</div>
             : <ModelLoadingBar modelName={ currentModel.name } />
@@ -214,18 +214,18 @@ export const PromptWalkthrough = ({ initialRun, models, onReadyForReview, onBack
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto', maxWidth: '720px', width: '100%', margin: '0 auto' }}>
-        <RunProgress
-          modelName={ currentModel.name }
-          mode={ currentStep.mode }
-          currentIndex={ stepPosition }
-          total={ pendingPrompts.length + stepPosition }
-        />
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div style={{ width: 'fit-content', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <RunProgress
+            modelName={ currentModel.name }
+            mode={ currentStep.mode }
+            currentIndex={ stepPosition }
+            total={ pendingPrompts.length + stepPosition }
+          />
           <PromptCard prompt={ currentPrompt } />
           <ResponsePanel generating={ generating } response={ response } error={ genError } />
-          <div style={{ padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center' }}>
+          <div style={{ padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center' }}>
             Autorunning — classification deferred to review screen
           </div>
         </div>

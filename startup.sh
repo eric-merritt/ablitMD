@@ -38,11 +38,17 @@ else
 fi
 # Atlas allowlist propagates while deps install below — no explicit wait needed.
 
-echo "==> Fetching flash_attn wheel (pyproject path dep — uv sync fails without it)..."
-FLASH_ATTN_WHEEL="flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
+echo "==> Checking wheels (rsync from home box — run scripts/sync_wheels.sh there)..."
 mkdir -p "$PROJECT_DIR/pkgs"
-[ -f "$PROJECT_DIR/pkgs/$FLASH_ATTN_WHEEL" ] || curl -fL -o "$PROJECT_DIR/pkgs/$FLASH_ATTN_WHEEL" \
-  "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/$FLASH_ATTN_WHEEL"
+for whl in \
+  "flash_attn_3-3.0.0+20260609.cu130torch2120cxx11abitrue.bc58ab-cp310-abi3-linux_x86_64.whl" \
+  "causal_conv1d-1.6.1-cp310-cp310-linux_x86_64.whl"; do
+  if [ ! -f "$PROJECT_DIR/pkgs/$whl" ]; then
+    echo "ERROR: pkgs/$whl not found." >&2
+    echo "Run from home box: bash scripts/sync_wheels.sh" >&2
+    exit 1
+  fi
+done
 
 echo "==> Installing dependencies..."
 which uv &>/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -55,7 +61,7 @@ npm run seed --workspace=backend
 echo "==> Pre-fetching model weights from HuggingFace..."
 export HF_HOME=/workspace/models
 mkdir -p /workspace/models
-uv run hf download Qwen/Qwen3.6-27B --local-dir /workspace/models/Qwen3.6-27B \
+uv run hf download Qwen/Qwen3.8-27B --local-dir /workspace/models/Qwen3.8-27B \
   || echo "    Warning: HF download failed — model will download on first load"
 
 echo "==> Starting services..."

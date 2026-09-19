@@ -1,6 +1,6 @@
 import numpy as np
 
-from backend.inference.recipe import phase_a_direction, phase_b_direction, directions_for_layer
+from backend.inference.recipe import directions_for_layer, phase_a_direction, phase_b_direction
 
 
 class TestPhaseADirection:
@@ -64,7 +64,8 @@ class TestBuildRecipe:
     assert recipe["onset"] == 2 and recipe["split"] == 6
     assert recipe["last_layer"] == N_LAYERS - 1
     assert recipe["factor_a"] == 0.1 and recipe["factor_b"] == 0.2
-    assert set(recipe["modes"].keys()) == {"hard", "redirect"}
+    # build_recipe now returns merged mode
+    assert "merged" in recipe["modes"]
 
   def test_phase_directions_have_hidden_dim(self, tmp_path):
     meta = make_mini_run(tmp_path)

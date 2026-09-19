@@ -33,9 +33,9 @@ export const ResultsGrid = ({ run, modelNames, models, onVerify, onBack, onHome 
     })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div style={{ width: 'fit-content', margin: '0 auto' }}>
           <div style={{ marginBottom: '24px' }}>
             <DirectionVectorChart run={run} />
           </div>

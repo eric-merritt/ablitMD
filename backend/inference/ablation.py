@@ -162,13 +162,20 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         if device.type == "cuda":
             torch.cuda.synchronize(device)
 
-    print(
-        f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
-        f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
-        f"factor_a={recipe['factor_a']} factor_b={recipe['factor_b']} "
-        f"modes={list(recipe['modes'].keys())}",
-        flush=True,
-    )
+    if recipe.get("method") == "som_md":
+        print(
+            f"[ablation] apply_in_place (SOM-MD): edited {len(snapshots)} projections, "
+            f"k={recipe['k']} factor={recipe['factor']} best_layer={recipe['best_layer']}",
+            flush=True,
+        )
+    else:
+        print(
+            f"[ablation] apply_in_place: edited {len(snapshots)} projections across "
+            f"onset={recipe['onset']} split={recipe['split']} last={recipe['last_layer']} "
+            f"factor_a={recipe['factor_a']} factor_b={recipe['factor_b']} "
+            f"modes={list(recipe['modes'].keys())}",
+            flush=True,
+        )
     return snapshots
 
 
@@ -176,6 +183,9 @@ def restore_model_weights(snapshots: dict) -> None:
   with torch.no_grad():
     for proj, original_f32 in snapshots.values():
       _set_weight(proj, original_f32, original_f32.dtype)
+    # Snapshots hold f32 copies of every edited weight — the biggest transient after
+    # the weights themselves. Drop them now that they've served their purpose.
+    del snapshots
 
 
 def compute_classic_directions(

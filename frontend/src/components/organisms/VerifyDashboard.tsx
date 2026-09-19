@@ -277,9 +277,9 @@ export const VerifyDashboard = ({ runId, genMode, mode, classicFactor, disclaime
   }, [started, runId, genMode, mode, classicFactor, samplesPerCategory])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+        <div style={{ width: 'fit-content', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text)' }}>
