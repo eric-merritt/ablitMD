@@ -62,8 +62,10 @@ BAKE_DIR = os.environ.get("ABLIT_BAKE_DIR", MODELS_DIR)
 def _resolve_model_path(model_id: str, api_model_id: str) -> str:
     """Resolve the on-disk path for model_id.
 
-    Prefers a local checkout under MODELS_DIR (keyed by api_model_id, falling
-    back to model_id); otherwise downloads from Hugging Face into MODELS_DIR."""
+    If it's already a directory (or resolves under MODELS_DIR), use it;
+    otherwise treat it as an HF repo id and download into MODELS_DIR."""
+    if os.path.isdir(model_id):
+        return model_id
     candidates = [
         os.path.join(MODELS_DIR, api_model_id),
         os.path.join(MODELS_DIR, model_id),
@@ -71,7 +73,7 @@ def _resolve_model_path(model_id: str, api_model_id: str) -> str:
     for candidate in candidates:
         if os.path.isfile(os.path.join(candidate, "config.json")):
             return candidate
-    print(f"[model_loader] {model_id} not found locally, downloading from HF", flush=True)
+    print(f"[model_loader] downloading {model_id} from HF", flush=True)
     return snapshot_download(model_id, local_dir=os.path.join(MODELS_DIR, model_id))
 
 
