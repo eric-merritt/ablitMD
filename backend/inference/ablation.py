@@ -188,6 +188,64 @@ def restore_model_weights(snapshots: dict) -> None:
     del snapshots
 
 
+def counter_apply_ablation_in_place(recipe: dict, model) -> int:
+    """Undo a previously-applied ablation by inverting the orthogonalization.
+
+    The forward edit is  W' = W - f * d (d @ W)^T   (o_proj / down_proj).
+    Its exact inverse is  W = W' + f * d (d @ W')^T, because the projection
+    (I - f d d^T) is idempotent: applying it twice equals applying it once.
+
+    The lm_head edit uses orthogonalize_input (W' = W - f (W @ d) d^T), whose
+    inverse is  W = W' + f (W' @ d) d^T.
+
+    Returns the number of projections restored."""
+    device = next(model.parameters()).device
+    dtype = next(model.parameters()).dtype
+    layers = _decoder_layers(model)
+    n_edited = 0
+
+    with torch.no_grad():
+        for decoder_idx in range(len(layers)):
+            raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
+            if not raw:
+                continue
+            for proj in _projection_modules(layers[decoder_idx]):
+                W = _get_weight_f32(proj)
+                for vector, factor in raw:
+                    direction = torch.tensor(vector, device=device, dtype=torch.float32)
+                    # Inverse of orthogonalize_weight: add back the projected component.
+                    W.addr_(direction, direction @ W, alpha=float(factor))
+                _set_weight(proj, W, dtype)
+                n_edited += 1
+
+        lm_head = getattr(model, "lm_head", None)
+        if lm_head is not None and hasattr(lm_head, "weight"):
+            all_directions = [
+                (torch.tensor(v, device=device, dtype=torch.float32), float(f))
+                for layer_dirs in (
+                    directions_for_layer(recipe, hidden_index=i + 1)
+                    for i in range(len(layers))
+                )
+                for v, f in layer_dirs
+            ]
+            if all_directions:
+                W = _get_weight_f32(lm_head)
+                for direction, factor in all_directions:
+                    # Inverse of orthogonalize_input.
+                    W.addr_(W @ direction, direction, alpha=factor)
+                _set_weight(lm_head, W, dtype)
+                n_edited += 1
+
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+
+    print(
+        f"[audit] counter-applied recipe: restored {n_edited} projections",
+        flush=True,
+    )
+    return n_edited
+
+
 def compute_classic_directions(
     run_data: dict,
     state_dir: Path,

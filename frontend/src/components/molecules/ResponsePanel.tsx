@@ -13,17 +13,21 @@ const Spinner = () => (
 
 export const ResponsePanel = ({ generating, response, error }: ResponsePanelProps) => (
   <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '20px', minHeight: '80px' }}>
-    {generating && (
+    {generating && !response && (
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
         <Spinner />
         Generating response…
       </div>
     )}
-    {!generating && error && (
+    {error && (
       <div style={{ color: '#ef4444' }}>{error}</div>
     )}
-    {!generating && !error && response && (
-      <p style={{ color: 'var(--text-dim)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>{response}</p>
+    {response && (
+      <p style={{ color: 'var(--text-dim)', whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
+        {response}
+        {generating && <span style={{ display: 'inline-block', width: '2px', height: '1em', background: 'var(--accent)', marginLeft: '1px', verticalAlign: 'text-bottom', animation: 'blink 1s step-end infinite' }} />}
+      </p>
     )}
+    <style>{`@keyframes blink { 50% { opacity: 0; } }`}</style>
   </div>
 )
