@@ -219,8 +219,8 @@ def build_som_md_recipe(
     run: dict,
     model_id: str,
     gen_mode: str,
-    k: int = 7,
-    grid_shape: tuple[int, int] = (4, 4),
+    k: int = 44,
+    grid_shape: tuple[int, int] = (7, 12),
     factor: float = 1.0,
     state_dir=None,
 ) -> dict:
@@ -466,7 +466,9 @@ def build_som_md_recipe_bo(
                     p["text"], gen_mode, run_id, "bo_trial", runs_dir,
                     skip_hidden_states=True,
                 )
-                if auto_classify_response(text) == "none":
+                # Use the LLM judge, not the rule-based classifier.
+                from backend.inference import classifier_llm
+                if classifier_llm.classify_one(prompt_text=p["text"], response=text) == "none":
                     n_ok += 1
         finally:
             restore_model_weights(snapshots)
