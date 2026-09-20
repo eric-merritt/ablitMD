@@ -1,27 +1,20 @@
 import { useState, useMemo } from 'react'
 import './App.css'
 import { RunConfigPanel } from './components/organisms/RunConfigPanel'
+import { RunModeChoice } from './components/molecules/RunModeChoice'
 import { PromptWalkthrough } from './components/organisms/PromptWalkthrough'
 import { AutoClassifyReview } from './components/organisms/AutoClassifyReview'
 import { ClassifyReview } from './components/organisms/ClassifyReview'
 import { ResultsGrid } from './components/organisms/ResultsGrid'
 import { VerifyDashboard } from './components/organisms/VerifyDashboard'
 import { AuditPanel } from './components/organisms/AuditPanel'
-import { OverlapWorkspace } from './components/organisms/OverlapWorkspace'
 import { useModels } from './hooks/useModels'
 import type { Run } from './types/run'
 
-type Phase = 'config' | 'running' | 'auto-review' | 'review' | 'results' | 'verify' | 'audit'
+type Phase = 'config' | 'running' | 'auto-review' | 'review' | 'choose-mode' | 'results' | 'verify' | 'audit'
 
 type AblationMode = 'ablitmd' | 'classic'
 interface VerifyContext { genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
-
-const hasUnclassified = (run: Run): boolean =>
-  run.prompts.some(prompt =>
-    Object.values(prompt.model_results || {}).some(modeMap =>
-      Object.values(modeMap || {}).some(result => result && result.refusal_mode === undefined)
-    )
-  )
 
 const App = () => {
   const { models } = useModels()
@@ -54,7 +47,8 @@ const App = () => {
       return
     }
     if (run.incomplete) { setPhase('running'); return }
-    setPhase(hasUnclassified(run) ? 'auto-review' : 'results')
+    // Completed run: let the user pick how to abliterate it.
+    setPhase('choose-mode')
   }
   const handleReadyForReview = (run: Run) => { setActiveRun(run); setPhase('auto-review') }
   const handleRunComplete    = (run: Run) => { setActiveRun(run); setPhase('results') }
@@ -92,6 +86,9 @@ const App = () => {
           onHome={ () => setPhase('config') }
         />
       ) }
+      { phase === 'choose-mode' && activeRun && (
+        <RunModeChoice onManual={() => setPhase('results')} onAudit={handleAuditStart} />
+      ) }
       { phase === 'results' && activeRun && (
         <ResultsGrid
           run={ activeRun }
@@ -104,20 +101,15 @@ const App = () => {
         />
       ) }
       { phase === 'audit' && activeRun && (
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-          <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
-            <AuditPanel run={ activeRun } />
-            <OverlapWorkspace run={ activeRun } />
-          </div>
-          <div>
+					<>
+          	<AuditPanel run={ activeRun } />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: 0 }} />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 32px' }}>
               <span onClick={() => setPhase('results')} style={{ color: 'var(--text)', fontSize: '19px', cursor: 'pointer', userSelect: 'none' }}>← Back</span>
               <span onClick={() => setPhase('config')} style={{ color: 'var(--text)', fontSize: '19px', cursor: 'pointer', userSelect: 'none' }}>Home</span>
-            </div>
-          </div>
-        </div>
-      ) }
+						</div>
+					</>
+      )}
       { phase === 'verify' && activeRun && verifyContext && (
         <VerifyDashboard
           runId={ activeRun.run_id }

@@ -10,8 +10,10 @@
   --text:       #e2e8f5;
   --text-dim:   #8896b3;
   --text-muted: #4a5470;
-  --accent:     #5b9cf6;
-  --accent-dim: rgba(91, 156, 246, 0.1);
+  --accent:     #11563d;
+  --accent-dim: rgba(46, 12, 94, 0.866);
+  --ok:         #3fb950;
+  --danger:     #f87171;
   --radius:     8px;
   --font:       system-ui, 'Segoe UI', Roboto, sans-serif;
 }
@@ -23,14 +25,18 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+	padding: 1.5rem;
+	width: 100vw;
+	height: 100vw;
 }
 
 #root {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100%;
   background-color: var(--surface);
-  border: 1px solid var(--border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -44,3 +50,34 @@ body {
 button { cursor: pointer; font-family: inherit; font-size: inherit; }
 input[type="checkbox"] { accent-color: var(--accent); }
 input[type="radio"] { accent-color: var(--accent); }
+
+
+a:hover {
+	margin: 0;
+	border: 1px solid var(--text-muted);
+	border-radius: var(--radius);
+	cursor: pointer;
+	box-sizing: border-box;
+}
+
+#audit-panel {
+  display: grid;
+  grid-template-columns: 1.33fr 5fr 2fr;
+  grid-template-rows: 1fr 5fr;
+  gap: 16px;
+  grid-auto-flow: row;
+  grid-template-areas:
+    ". audit-controls ."
+    "experiment-list overlap-workspace saved-audits-block";
+  flex: 1;
+  width: 100%;
+  padding: 1.5rem;
+}
+
+#experiment-list { grid-area: experiment-list; }
+
+#audit-controls { grid-area: audit-controls; }
+
+#overlap-workspace { grid-area: overlap-workspace; }
+
+#saved-audits-block { grid-area: saved-audits-block; }

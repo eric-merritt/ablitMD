@@ -17,7 +17,9 @@ import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const RUNS_DIR = process.env.RUNS_DIR || join(__dirname, "..", "data", "runs");
+// Repo root — data/, pkgs/, and the .env.keys files all live here.
+const REPO_ROOT = join(__dirname, "..");
+const RUNS_DIR = process.env.RUNS_DIR || join(REPO_ROOT, "data", "runs");
 const DATA_KEY = process.env.DATA_KEY;
 const PORT = Number(process.env.DATA_PORT || 8240);
 const SSH_DIR = join(homedir(), ".ssh");
@@ -188,6 +190,53 @@ const server = http.createServer(async (req, res) => {
     console.log(`[data-server] instance ${alias} -> ${ip}:${port} (ssh-config updated, atlas ${atlas.status})`);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ ok: true, alias, ip, port, atlas }));
+    return;
+  }
+
+  // Instance bootstrap payloads — the fresh vast.ai box pulls its local state from
+  // here instead of rsyncing. Each is a tarball streamed straight off disk. All are
+  // key-gated: .envkeys.tar in particular ships the dotenvx private keys, so nothing
+  // below serves without a valid DATA_KEY.
+  if (url.searchParams.get("key") !== DATA_KEY) {
+    res.writeHead(403);
+    res.end("forbidden");
+    return;
+  }
+
+  // The whole data/ directory (runs, npy hidden states, sidecars).
+  if (url.pathname === "/data.tar") {
+    res.writeHead(200, { "Content-Type": "application/x-tar" });
+    const tar = spawn("tar", ["-cf", "-", "-C", REPO_ROOT, "data"]);
+    tar.stdout.pipe(res);
+    tar.stderr.on("data", (chunk) => console.error(`[data-server] tar: ${chunk}`));
+    tar.on("error", () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+    res.on("close", () => tar.kill());
+    return;
+  }
+
+  // The two locally-built wheels (flash_attn, causal_conv1d) from pkgs/.
+  if (url.pathname === "/pkgs.tar") {
+    res.writeHead(200, { "Content-Type": "application/x-tar" });
+    const tar = spawn("tar", ["-cf", "-", "-C", REPO_ROOT, "pkgs"]);
+    tar.stdout.pipe(res);
+    tar.stderr.on("data", (chunk) => console.error(`[data-server] tar: ${chunk}`));
+    tar.on("error", () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+    res.on("close", () => tar.kill());
+    return;
+  }
+
+  // The three dotenvx private-key files (root, frontend, backend) — needed to decrypt
+  // the .env files that ship in the image.
+  if (url.pathname === "/envkeys.tar") {
+    res.writeHead(200, { "Content-Type": "application/x-tar" });
+    const tar = spawn("tar", [
+      "-cf", "-", "-C", REPO_ROOT,
+      ".env.keys", "frontend/.env.keys", "backend/.env.keys",
+    ]);
+    tar.stdout.pipe(res);
+    tar.stderr.on("data", (chunk) => console.error(`[data-server] tar: ${chunk}`));
+    tar.on("error", () => { if (!res.headersSent) res.writeHead(500); res.end(); });
+    res.on("close", () => tar.kill());
     return;
   }
 

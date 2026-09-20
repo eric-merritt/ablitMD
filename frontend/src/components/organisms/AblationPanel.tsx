@@ -6,6 +6,7 @@ import { RecipeReuseWarning } from "../molecules/RecipeReuseWarning";
 import { RecipePanel } from "../molecules/RecipePanel";
 import { SomMdPanel } from "../molecules/SomMdPanel";
 import { getDivergence, buildRecipe, bakeModel } from "../../api/ablation";
+import { CATEGORIES } from "../../types/categories";
 import type {
   ModeDivergence,
   SlimRecipe,
@@ -320,7 +321,7 @@ export const AblationPanel = ({
             factorA={params.factorA}
             factorB={params.factorB}
           />
-          <SomMdPanel runId={runId} />
+          <SomMdPanel runId={runId} nCategories={CATEGORIES.length} />
           <div
             style={{
               display: "flex",

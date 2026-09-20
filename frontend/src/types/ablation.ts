@@ -109,7 +109,9 @@ export interface AuditTrial {
 }
 
 // Live NDJSON events from POST /audit/run (streaming audit).
+// `stage` is emitted by the self-contained /audit/run/full flow before each step.
 export type AuditEvent =
+  | { type: "stage"; stage: string }
   | { type: "audit_start"; run_id: string; n_categories: number; rounds: number; total: number }
   | { type: "trial_start"; index: number; round: number; category: string; prompt: string }
   | { type: "token"; text: string }

@@ -66,6 +66,20 @@ const readRunSlim = async (run_id) => {
   return JSON.parse(content)
 }
 
+// A run is complete when every prompt in the run has a result for every (model, mode)
+// step in its sequence. The stored `incomplete` flag is only ever set false by the
+// review flow, so a run that finished generating but never went through review reads
+// as incomplete forever — derive completion from the results instead.
+export const runIsComplete = (run) => {
+  if (!Array.isArray(run.prompts) || !Array.isArray(run.sequence)) return false
+  return run.prompts.every(prompt =>
+    run.sequence.every(step => {
+      const modes = prompt.model_results?.[step.model]
+      return modes && Object.hasOwn(modes, step.mode)
+    })
+  )
+}
+
 export const createRun = async ({ models, mode_selection, prompt_scope, sequence, prompts }) => {
   await mkdir(RUNS_DIR, { recursive: true })
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -183,6 +197,14 @@ export const readRun = async (run_id) => {
   } else {
     run.direction_results = await readDirectionsSidecar(run_id)
   }
+
+  // derive completion from results — the stored flag is only set by the review flow,
+  // so a finished run that skipped it would otherwise read as incomplete forever.
+  if (runIsComplete(run)) {
+    run.incomplete = false
+    run.completed_at ??= new Date().toISOString()
+  }
+
   return run
 }
 
@@ -201,6 +223,11 @@ export const writePromptResult = async (run_id, prompt_id, model_id, mode, resul
 
   prompt.model_results[model_id] ??= {}
   prompt.model_results[model_id][mode] = result
+
+  if (runIsComplete(run)) {
+    run.incomplete = false
+    run.completed_at = new Date().toISOString()
+  }
 
   await writeRun(run)
   return run
@@ -223,6 +250,11 @@ export const updateRunField = async (run_id, fields) => {
     run.direction_results = await readDirectionsSidecar(run_id)
   }
 
+  if (runIsComplete(run)) {
+    run.incomplete = false
+    run.completed_at = new Date().toISOString()
+  }
+
   await writeRun(run)
   return run
 }
@@ -241,12 +273,17 @@ export const listRuns = async () => {
   const summaries = []
   for (const file of runFiles) {
     const content = await readFile(join(RUNS_DIR, file), 'utf-8')
-    const { prompts, direction_results, ...summary } = JSON.parse(content)
+    const doc = JSON.parse(content)
+    const { prompts, direction_results, ...summary } = doc
+    // derive completion from the results — a finished run that skipped review still
+    // has `incomplete: true` stored (see runIsComplete). needs prompts, so check the
+    // full doc before destructuring them away.
+    const complete = runIsComplete(doc)
     summaries.push({
       run_id: summary.run_id ?? file.replace(/\.json$/, ''),
       started_at: summary.started_at ?? null,
-      completed_at: summary.completed_at ?? null,
-      incomplete: summary.incomplete ?? true,
+      completed_at: complete ? (summary.completed_at ?? new Date().toISOString()) : (summary.completed_at ?? null),
+      incomplete: !complete,
       models: Array.isArray(summary.models) ? summary.models : [],
       mode_selection: summary.mode_selection ?? null,
       prompt_count: prompts?.length ?? 0,

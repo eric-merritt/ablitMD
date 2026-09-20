@@ -26,14 +26,17 @@ interface ChartGridProps {
 }
 
 const tabBtnStyle = (active: boolean): CSSProperties => ({
-  padding: '4px 12px',
+  padding: '6px 12px',
   borderRadius: '4px',
   border: '1px solid var(--border)',
   background: active ? 'var(--accent)' : 'var(--surface)',
   color: active ? '#fff' : 'var(--text-dim)',
-  fontSize: '12px',
+  fontSize: '18px',
   fontWeight: 600,
   cursor: 'pointer',
+	margin: 0,
+	boxSizing: "border-box",
+
 })
 
 const TabBar = ({ availableModes, activeTab, onTabChange }: TabBarProps) => (

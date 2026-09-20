@@ -1,7 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { CSSProperties } from "react";
+import { NavBarTabbed } from "../molecules/NavBarTabbed";
+import { PageFooter } from "../molecules/PageFooter";
+import { RunCard } from "../molecules/RunCard";
+import { ModelCard } from "../molecules/ModelCard";
+import { StartButton } from "../molecules/StartButton";
 import { ModeRadioGroup } from "../molecules/ModeRadioGroup";
-import { ModelCheckboxList } from "../molecules/ModelCheckboxList";
 import { CategoryList } from "../molecules/CategoryList";
 import { RunSyncModal } from "../molecules/RunSyncModal";
 import { createRun, fetchRuns, fetchRun, fetchRemoteRunIds, syncRuns } from "../../api/runs";
@@ -15,9 +19,17 @@ interface RunConfigPanelProps {
   onRunOpen: (run: Run) => void;
 }
 
+type Tab = "new" | "partial" | "completed";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "new", label: "New Run" },
+  { id: "partial", label: "Continue Partial Run" },
+  { id: "completed", label: "Completed Runs" },
+];
+
 const PanelStyle: CSSProperties = {
   display: "flex",
-  flexDirection: "column",
+  flexDirection: "row",
   alignItems: "center",
 };
 
@@ -26,8 +38,10 @@ const ColumnCardStyle: CSSProperties = {
   background: "var(--surface-2)",
   border: "1px solid var(--border)",
   borderRadius: "var(--radius)",
-  padding: "12px",
-  overflow: "hidden",
+  overflow: "scroll",
+  width: "360px",
+  height: "360px",
+  padding: "1.5rem",
 };
 
 const ColumnsStyle: CSSProperties = {
@@ -40,112 +54,53 @@ const ColumnsStyle: CSSProperties = {
   alignItems: "flex-start",
 };
 
-const HeaderCardStyle: CSSProperties = {
-  width: "fit-content",
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-  background: "var(--thirty-six)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  padding: "12px 16px",
-  margin: "24px 0 12px",
-};
-
-const PrevRunsPopoverStyle: CSSProperties = {
-  background: "var(--surface-2)",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  display: "flex",
-  flexDirection: "column",
-  gap: "4px",
-  padding: "8px",
-  minWidth: "320px",
-  maxHeight: "50vh",
+const TabContentStyle: CSSProperties = {
+  padding: "16px 32px 24px",
   overflowY: "auto",
 };
 
-const PagesIcon = () => (
-  <svg
-    width="13"
-    height="13"
-    viewBox="0 0 13 13"
-    fill="none"
-    style={{ display: "inline-block", verticalAlign: "-2px", marginRight: "5px" }}
-  >
-    <rect x="2.5" y="0.5" width="8" height="10" rx="1" stroke="currentColor" strokeWidth="1.1" />
-    <rect x="0.5" y="2.5" width="8" height="10" rx="1" stroke="currentColor" strokeWidth="1.1" fill="var(--surface)" />
-  </svg>
-);
-
-interface MergeRunDataButtonProps {
-  hovered: boolean;
-  loading: boolean;
-  onClick: () => void;
-  onHoverChange: (hovered: boolean) => void;
-}
-
-const MergeRunDataButton = ({ hovered, loading, onClick, onHoverChange }: MergeRunDataButtonProps) => (
-  <span
-    onClick={onClick}
-    onMouseEnter={() => onHoverChange(true)}
-    onMouseLeave={() => onHoverChange(false)}
-    style={{
-      color: hovered ? "var(--accent)" : "var(--text)",
-      fontSize: "15px",
-      cursor: "pointer",
-      userSelect: "none",
-      transition: "color 0.15s",
-      textDecoration: hovered ? "underline" : "none",
-    }}
-  >
-    {loading ? "Loading…" : "Merge Run Data"}
-  </span>
-);
-
-const MergeError = ({ message }: { message: string }) => (
-  <span style={{ color: "#ef4444", fontSize: "12px" }}>{message}</span>
-);
-
 const missingLabel = (noModels: boolean, noCategories: boolean) => {
-  if (noModels && noCategories)
-    return "Select at least one model and one category";
+  if (noModels && noCategories) return "Select at least one model and one category";
   if (noModels) return "Select at least one model";
   return "Select at least one category";
 };
 
-export const RunConfigPanel = ({
-  models,
-  onRunStart,
-  onRunOpen,
-}: RunConfigPanelProps) => {
+export const RunConfigPanel = ({ models, onRunStart, onRunOpen }: RunConfigPanelProps) => {
+  const modelNames: Record<string, string> = {};
+  for (const m of models) modelNames[m.modelId] = m.name;
+
+  const [tab, setTab] = useState<Tab>("new");
   const [mode, setMode] = useState("non_thinking");
-  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     new Set(CATEGORIES.map((cat) => cat.id)),
   );
-  const [existingRuns, setExistingRuns] = useState<RunSummary[] | null>(null);
+  const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [loadingRuns, setLoadingRuns] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [startHovered, setStartHovered] = useState(false);
-  const [prevRunsHovered, setPrevRunsHovered] = useState(false);
-  const [mergeHovered, setMergeHovered] = useState(false);
   const [remoteRunIds, setRemoteRunIds] = useState<string[] | null>(null);
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  const [tooltipVisible, setTooltipVisible] = useState(false);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canStart = selectedModels.size > 0 && selectedCategories.size > 0;
+  const canStart = selectedCard !== null && selectedCategories.size > 0;
 
-  const handleModelToggle = (modelId: string, checked: boolean) =>
-    setSelectedModels((prev) => {
-      const next = new Set(prev);
-      checked ? next.add(modelId) : next.delete(modelId);
-      return next;
-    });
+  // Load the run list once — both the partial and completed tabs read from it.
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingRuns(true);
+    fetchRuns()
+      .then((r) => { if (!cancelled) setRuns(r) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingRuns(false) });
+    return () => { cancelled = true };
+  }, []);
+
+  // Single-select, owned here so only one card can be marked at a time. A second
+  // click on the same card does not unset it — clicking always selects.
+  const selectModel = (modelId: string) => setSelectedCard(modelId);
 
   const handleCategoryToggle = (categoryId: string, checked: boolean) =>
     setSelectedCategories((prev) => {
@@ -155,9 +110,7 @@ export const RunConfigPanel = ({
     });
 
   const handleGroupToggle = (groupId: string, checked: boolean) => {
-    const groupCatIds = CATEGORIES.filter((cat) => cat.group === groupId).map(
-      (cat) => cat.id,
-    );
+    const groupCatIds = CATEGORIES.filter((cat) => cat.group === groupId).map((cat) => cat.id);
     setSelectedCategories((prev) => {
       const next = new Set(prev);
       groupCatIds.forEach((id) => (checked ? next.add(id) : next.delete(id)));
@@ -168,10 +121,7 @@ export const RunConfigPanel = ({
   const handleStart = async () => {
     if (starting) return;
     if (!canStart) {
-      const msg = missingLabel(
-        selectedModels.size === 0,
-        selectedCategories.size === 0,
-      );
+      const msg = missingLabel(selectedCard === null, selectedCategories.size === 0);
       setStartError(msg);
       if (errorTimer.current) clearTimeout(errorTimer.current);
       errorTimer.current = setTimeout(() => setStartError(null), 3000);
@@ -180,7 +130,7 @@ export const RunConfigPanel = ({
     setStarting(true);
     try {
       const run = await createRun({
-        models: [...selectedModels],
+        models: [selectedCard],
         mode_selection: mode as RunMode,
         prompt_scope: { categories: [...selectedCategories] },
       });
@@ -190,20 +140,7 @@ export const RunConfigPanel = ({
     }
   };
 
-  const handleOpenExisting = async () => {
-    if (existingRuns) {
-      setExistingRuns(null);
-      return;
-    }
-    setLoadingRuns(true);
-    try {
-      const runs = await fetchRuns();
-      setExistingRuns(runs);
-    } finally {
-      setLoadingRuns(false);
-    }
-  };
-
+  // Resume a run at its current step (partial) or open it to results (complete).
   const handleSelectRun = async (summary: RunSummary) => {
     const run = await fetchRun(summary.run_id);
     onRunOpen(run);
@@ -228,7 +165,7 @@ export const RunConfigPanel = ({
     try {
       await syncRuns(selectedRunIds);
       setRemoteRunIds(null);
-      if (existingRuns) setExistingRuns(await fetchRuns());
+      setRuns(await fetchRuns());
     } catch {
       setMergeError("Sync failed — see backend log");
       setTimeout(() => setMergeError(null), 3000);
@@ -237,235 +174,70 @@ export const RunConfigPanel = ({
     }
   };
 
-  return (
-    <div style={{ position: "relative", flex: 1, minHeight: 0, overflow: 'auto' }}>
-      <div style={PanelStyle}>
-        <div style={HeaderCardStyle}>
-          <span
-            style={{
-              fontSize: "28px",
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              color: "var(--text-dim)",
-            }}
-          >
-            Configuration
-          </span>
-          <div
-            style={{ position: "relative", display: "inline-flex" }}
-            onMouseEnter={() => setTooltipVisible(true)}
-            onMouseLeave={() => setTooltipVisible(false)}
-          >
-            <span
-              style={{
-                fontSize: "12px",
-                color: "var(--text-muted)",
-                cursor: "default",
-                userSelect: "none",
-              }}
-            >
-              ⓘ
-            </span>
-            {tooltipVisible && (
-              <div
-                style={{
-                  position: "absolute",
-                  left: "20px",
-                  top: "-4px",
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "var(--radius)",
-                  padding: "6px 10px",
-                  fontSize: "12px",
-                  color: "var(--text-dim)",
-                  whiteSpace: "nowrap",
-                  zIndex: 20,
-                  pointerEvents: "none",
-                }}
-              >
-                Select models, categories, and run mode before starting.
-              </div>
-            )}
-          </div>
-        </div>
-        <div style={ColumnsStyle}>
-          <div style={{ ...ColumnCardStyle, flexShrink: 1 }}>
-            <ModeRadioGroup selected={mode} onChange={setMode} />
-          </div>
-          <div style={{ ...ColumnCardStyle, flex: 2, minWidth: "160px" }}>
-            <ModelCheckboxList
-              models={models}
-              selectedModels={selectedModels}
-              onModelToggle={handleModelToggle}
-            />
-          </div>
-          <div
-            style={{
-              ...ColumnCardStyle,
-              flex: 2,
-              minWidth: "220px",
-              maxHeight: '100%',
-              overflowY: "auto",
-            }}
-          >
-            <CategoryList
-              selectedCategories={selectedCategories}
-              onCategoryToggle={handleCategoryToggle}
-              onGroupToggle={handleGroupToggle}
-            />
-          </div>
-        </div>
-      </div>
+  const partialRuns = (runs ?? []).filter((r) => r.incomplete);
+  const completedRuns = (runs ?? []).filter((r) => !r.incomplete);
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-        }}
-      >
-        <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: 0 }} />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "10px 32px",
-          }}
-        >
-          <div
-            style={{
-              position: "relative",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-start",
-              gap: "6px",
-            }}
-          >
-            <span
-              onClick={handleOpenExisting}
-              onMouseEnter={() => setPrevRunsHovered(true)}
-              onMouseLeave={() => setPrevRunsHovered(false)}
-              style={{
-                color: prevRunsHovered ? "var(--accent)" : "var(--text)",
-                fontSize: "19px",
-                cursor: "pointer",
-                userSelect: "none",
-                transition: "color 0.15s",
-              }}
-            >
-              <PagesIcon />
-              <span style={{ textDecoration: prevRunsHovered ? "underline" : "none" }}>
-                {loadingRuns ? "Loading…" : "Previous Runs"}
-              </span>
-            </span>
-            {existingRuns && (
-              <div style={{ ...PrevRunsPopoverStyle, position: "absolute", bottom: "calc(100% + 8px)", left: 0 }}>
-                {existingRuns.length === 0 && (
-                  <div style={{ color: "var(--text-muted)", padding: "4px", fontSize: "12px" }}>
-                    No runs yet.
-                  </div>
-                )}
-                {existingRuns.map((run) => (
-                  <ul
-                    key={run.run_id}
-                    onClick={() => handleSelectRun(run)}
-                    style={{
-                      padding: "8px 10px",
-                      background: "var(--surface-3)",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius)",
-                      cursor: "pointer",
-                      listStyle: "none",
-                    }}
-                  >
-                    <li
-                      style={{
-                        color: "var(--text-dim)",
-                        fontSize: "12px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span>{new Date(run.started_at).toLocaleString()}</span>
-                      <span style={{ color: run.incomplete ? "#eab308" : "#10b981" }}>
-                        {run.incomplete ? "Incomplete" : "Complete"}
-                      </span>
-                    </li>
-                    <li>
-                      <ul
-                        style={{
-                          paddingLeft: "16px",
-                          marginTop: "4px",
-                          listStyle: "disc",
-                          color: "var(--text-dim)",
-                          fontSize: "11px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "2px",
-                        }}
-                      >
-                        <li>Mode: {run.mode_selection ?? "—"}</li>
-                        <li>Models: {(run.models ?? []).join(", ") || "—"}</li>
-                        <li>{run.prompt_count ?? 0} prompts</li>
-                      </ul>
-                    </li>
-                  </ul>
+  return (
+    <NavBarTabbed tabs={TABS} active={tab} onSelect={(id) => setTab(id as Tab)}>
+      <div style={{ ...PanelStyle, alignItems: "center", border: "1px solid var(--border)", gap: "0px", margin: "0 1.5rem 1.5rem 1.5rem", borderRadius: "var(--radius)", position: "relative", top: "calc(1.5rem - 1px)", zIndex: 0, height: "100%", padding: "1.5rem" }}>
+        {tab === "new" && (
+          <div style={ColumnsStyle}>
+            <div style={{ ...ColumnCardStyle, flexShrink: 1 }}>
+              <ModeRadioGroup selected={mode} onChange={setMode} />
+            </div>
+            <div style={{ ...ColumnCardStyle, flex: 2, minWidth: "160px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", background: "var(--surface-3)", border: "1px solid var(--border-2)", borderRadius: "var(--radius)", padding: "7px 10px", color: "var(--text-muted)" }}>
+                Models
+              </div>
+              {models.map((model) => (
+                <ModelCard
+                  key={model.modelId}
+                  label={model.name}
+                  selected={selectedCard === model.modelId}
+                  onClick={() => selectModel(model.modelId)}
+                />
+              ))}
+            </div>
+            <div style={{ ...ColumnCardStyle, flex: 2, minWidth: "220px", maxHeight: "25%", overflowY: "auto" }}>
+              <CategoryList
+                selectedCategories={selectedCategories}
+                onCategoryToggle={handleCategoryToggle}
+                onGroupToggle={handleGroupToggle}
+              />
+            </div>
+            <StartButton starting={starting} error={startError} onClick={handleStart} />
+          </div>
+        )}
+
+        {tab === "partial" && (
+          <div style={{ ...TabContentStyle, overflow: "scroll", height: "100%", width: "100%" }}>
+            {loadingRuns && <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading…</div>}
+            {!loadingRuns && partialRuns.length === 0 && (
+              <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>No partial runs.</div>
+            )}
+            <div style={{ display: "flex", flexWrap: "wrap", margin: "1rem", gap: "0.5rem" }}>
+              {partialRuns.map((run) => (
+                <RunCard key={run.run_id} summary={run} onOpen={handleSelectRun} modelNames={modelNames} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === "completed" && (
+          <div style={TabContentStyle}>
+            {loadingRuns && <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>Loading…</div>}
+            {!loadingRuns && completedRuns.length === 0 && (
+              <div style={{ fontSize: "13px", color: "var(--text-muted)" }}>No completed runs yet.</div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: "24px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {completedRuns.map((run) => (
+                  <RunCard key={run.run_id} summary={run} onOpen={handleSelectRun} modelNames={modelNames} />
                 ))}
               </div>
-            )}
-            <MergeRunDataButton
-              hovered={mergeHovered}
-              loading={loadingRemote}
-              onClick={handleMergeOpen}
-              onHoverChange={setMergeHovered}
-            />
-            {mergeError && <MergeError message={mergeError} />}
+            </div>
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
-            {startError && (
-              <div
-                style={{
-                  border: "1px solid #ef4444",
-                  borderRadius: "var(--radius)",
-                  padding: "5px 10px",
-                  fontSize: "12px",
-                  color: "#ef4444",
-                  background: "var(--surface)",
-                  animation: "fadeIn 0.15s ease",
-                }}
-              >
-                {startError}
-              </div>
-            )}
-            <span
-              onClick={handleStart}
-              onMouseEnter={() => setStartHovered(true)}
-              onMouseLeave={() => setStartHovered(false)}
-              style={{
-                color: startHovered ? "var(--accent)" : "var(--text)",
-                fontSize: "19px",
-                cursor: "pointer",
-                userSelect: "none",
-                transition: "color 0.15s",
-              }}
-            >
-              {starting ? (
-                "Starting…"
-              ) : (
-                <>
-                  <span style={{ textDecoration: startHovered ? "underline" : "none" }}>
-                    Start
-                  </span>{" "}
-                  →
-                </>
-              )}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {remoteRunIds && (
@@ -476,6 +248,12 @@ export const RunConfigPanel = ({
           onCancel={() => setRemoteRunIds(null)}
         />
       )}
-    </div>
+
+      <PageFooter
+        onMerge={handleMergeOpen}
+        merging={loadingRemote}
+        mergeError={mergeError}
+      />
+    </NavBarTabbed>
   );
 };

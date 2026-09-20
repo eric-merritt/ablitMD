@@ -94,6 +94,34 @@ describe('updateRunField', () => {
   })
 })
 
+describe('runIsComplete', () => {
+  it('is true when every prompt has a result for every sequence step', async () => {
+    const { createRun, writePromptResult, runIsComplete } = await getRuns()
+    const run = await createRun(sampleRun())
+    expect(runIsComplete(run)).toBe(false)
+    await writePromptResult(run.run_id, 'abc123', 'Qwen/Qwen3.6-27B', 'non_thinking', { response: 'ok' })
+    const updated = await (await import('../lib/runs.js')).readRun(run.run_id)
+    expect(runIsComplete(updated)).toBe(true)
+  })
+
+  it('marks the run complete when the last prompt result lands', async () => {
+    const { createRun, writePromptResult, readRun } = await getRuns()
+    const run = await createRun(sampleRun())
+    await writePromptResult(run.run_id, 'abc123', 'Qwen/Qwen3.6-27B', 'non_thinking', { response: 'ok' })
+    const updated = await readRun(run.run_id)
+    expect(updated.incomplete).toBe(false)
+    expect(updated.completed_at).toBeTruthy()
+  })
+
+  it('listRuns reports a finished run as complete even if the stored flag says otherwise', async () => {
+    const { createRun, writePromptResult, listRuns } = await getRuns()
+    const run = await createRun(sampleRun())
+    await writePromptResult(run.run_id, 'abc123', 'Qwen/Qwen3.6-27B', 'non_thinking', { response: 'ok' })
+    const runs = await listRuns()
+    expect(runs[0].incomplete).toBe(false)
+  })
+})
+
 describe('listRuns', () => {
   it('returns runs sorted newest first', async () => {
     const { createRun, listRuns } = await getRuns()

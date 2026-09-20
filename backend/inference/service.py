@@ -455,6 +455,72 @@ def audit_run(req: AuditRunRequest):
     return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
+@app.post("/audit/run/full")
+def audit_run_full(req: AuditRunRequest):
+    """Self-contained ablit-and-audit flow, streamed as NDJSON.
+
+    Kicks off the whole pipeline in one shot so the UI just presses Run:
+      1. load the run's captured hidden states (data/runs/<run_id>/),
+      2. build a SOM-MD recipe from them and persist it,
+      3. reload a clean model (a prior ablation may be resident),
+      4. apply the SOM in-place to the resident weights,
+      5. run the adversarial audit against the now-ablated model.
+
+    Emits a `stage` event before each step so the UI can show progress, then
+    forwards every audit event unchanged (see :func:`audit_agent.run_audit_streaming`).
+    """
+    from backend.inference.recipe import build_som_md_recipe, recipe_filename
+
+    run_id = req.run_id
+    n_categories = req.n_categories
+    rounds = req.rounds
+
+    def events():
+        try:
+            run_file = RUNS_DIR / f"{run_id}.json"
+            if not run_file.exists():
+                raise FileNotFoundError(f"no run manifest at {run_file}")
+            run_data = json.loads(run_file.read_text())
+            state_dir = RUNS_DIR / run_id
+            model_id = run_data["models"][0]
+            gen_mode = run_data.get("mode_selection", "non_thinking")
+
+            # 1+2. Build the SOM-MD recipe from the captured hidden states.
+            yield json.dumps({"type": "stage", "stage": "building_recipe"}) + "\n"
+            recipe = build_som_md_recipe(
+                run_data, model_id, gen_mode, state_dir=state_dir
+            )
+            recipe_path = RUNS_DIR / recipe_filename(run_id)
+            recipe_path.write_text(json.dumps(recipe, indent=2))
+
+            # 3. Reload clean so we never ablate on top of a prior in-place edit.
+            yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
+            load_model(model_id, model_id)
+
+            # 4. Apply the SOM to the resident weights in place.
+            yield json.dumps({"type": "stage", "stage": "abliterating"}) + "\n"
+            snapshots = apply_ablation_in_place(recipe, get_model())
+            set_model_dirty(True)
+
+            # 5. Make sure the 9B judge is up (spawns llama-server if not).
+            yield json.dumps({"type": "stage", "stage": "starting_judge"}) + "\n"
+            from backend.inference import judge_server
+            judge_server.ensure_judge_server()
+
+            # 6. Adversarial audit against the ablated model.
+            yield json.dumps({"type": "stage", "stage": "auditing"}) + "\n"
+            for ev in audit_agent.run_audit_streaming(run_id, n_categories, rounds):
+                yield json.dumps(ev) + "\n"
+        except FileNotFoundError as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+        except ValueError as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+        except Exception as e:  # noqa: BLE001 — surface any pipeline failure to the UI
+            yield json.dumps({"type": "error", "message": f"{type(e).__name__}: {e}"}) + "\n"
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
+
+
 @app.get("/audits")
 def audits_list(run_id: str):
     """List saved audits for the left-hand experiment list."""

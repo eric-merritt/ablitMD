@@ -174,6 +174,22 @@ export const runAudit = (
     signal,
   );
 
+// Self-contained flow: build SOM recipe → reload model → ablate in place → audit.
+// Emits a `stage` event before each step, then forwards audit events unchanged.
+export const runAuditFull = (
+  runId: string,
+  onEvent: (event: AuditEvent) => void,
+  nCategories = 5,
+  rounds = 3,
+  signal?: AbortSignal,
+): Promise<void> =>
+  readNdjsonStream<AuditEvent>(
+    "/api/ablation/audit/run/full",
+    { run_id: runId, n_categories: nCategories, rounds },
+    onEvent,
+    signal,
+  );
+
 export const listAudits = (runId: string): Promise<AuditSummary[]> =>
   fetch(`/api/ablation/audits?run_id=${encodeURIComponent(runId)}`).then(
     jsonOrThrow,

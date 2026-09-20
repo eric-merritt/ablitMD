@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { listAudits, directionOverlap } from '../../api/ablation'
-import type { AuditSummary, DirectionOverlapResponse } from '../../types/ablation'
+import { directionOverlap } from '../../api/ablation'
+import type { DirectionOverlapResponse } from '../../types/ablation'
 import { CATEGORIES } from '../../types/categories'
+import { SectionTitle } from '../atoms/SectionTitle'
+import { ErrorText } from '../atoms/ErrorText'
+import { OverlapLegend } from './OverlapLegend'
+import { OverlapNote } from './OverlapNote'
+import { OverlapStats } from './OverlapStats'
 
 interface OverlapWorkspaceProps {
   run: { run_id: string; sequence?: { model: string; mode: string }[] }
+  selected: Set<string>
 }
 
 const CATEGORY_NAMES: Record<string, string> = {}
@@ -21,12 +27,6 @@ const PRIMARIES: [number, number, number][] = [
   [160, 32, 240],  // purple
   [0, 200, 200],   // teal
 ]
-
-const fmtTime = (iso: string | null | undefined): string => {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
-}
 
 // --- SVG geometry -----------------------------------------------------------
 
@@ -78,27 +78,10 @@ const blend = (colors: [number, number, number][]): string => {
 
 // --- Component --------------------------------------------------------------
 
-export const OverlapWorkspace = ({ run }: OverlapWorkspaceProps) => {
-  const [audits, setAudits] = useState<AuditSummary[]>([])
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const [data, setData] = useState<DirectionOverlapResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const refreshAudits = useCallback(() => {
-    listAudits(run.run_id).then(setAudits).catch(() => setAudits([]))
-  }, [run.run_id])
-
-  useEffect(refreshAudits, [refreshAudits])
-
-  const toggle = (path: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }
 
   // Fetch the overlap geometry whenever the selection changes.
   useEffect(() => {
@@ -195,73 +178,34 @@ export const OverlapWorkspace = ({ run }: OverlapWorkspaceProps) => {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-      {/* Left column: experiment list with checkboxes */}
-      <div style={{ width: '300px', flexShrink: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-          Experiments ({selected.size}/{audits.length})
-        </div>
-        {audits.length === 0 && (
-          <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-            No audits saved yet. Run an audit first.
+    <div id="overlap-workspace" style={{ background: 'var(--bg)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: '16px' }}>
+      <SectionTitle>Direction-overlap workspace</SectionTitle>
+      {error && <ErrorText message={error} />}
+      {loading && <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Computing overlap…</div>}
+      {!data && !loading && selected.size > 0 && (
+        <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Select experiments to project.</div>
+      )}
+
+      {data && layout && (
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
+            style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+            {/* axes */}
+            <line x1={MARGIN.left} y1={layout.cy} x2={W - MARGIN.right} y2={layout.cy} stroke="var(--border, #444)" strokeWidth={0.5} />
+            <line x1={layout.cx} y1={MARGIN.top} x2={layout.cx} y2={H - MARGIN.bottom} stroke="var(--border, #444)" strokeWidth={0.5} />
+
+            {/* Refused section */}
+            {renderSection(refusedCats, 'refused')}
+            {/* Non-refused section */}
+            {renderSection(okCats, 'ok')}
+          </svg>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '140px' }}>
+            <OverlapStats data={data} />
+            <OverlapLegend refusedCats={refusedCats} okCats={okCats} />
           </div>
-        )}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {audits.map(audit => (
-            <label key={audit.path} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: 'var(--text-dim)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={selected.has(audit.path)} onChange={() => toggle(audit.path)} />
-              <span style={{ flex: 1 }}>
-                {fmtTime(audit.created_at)}<br />
-                <span style={{ color: 'var(--text-dim)' }}>{audit.n_trials} trials · {audit.n_refused} refused</span>
-              </span>
-            </label>
-          ))}
         </div>
-      </div>
-
-      {/* Visual workspace */}
-      <div style={{ flex: 1, minWidth: '320px' }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-          Direction-overlap workspace
-        </div>
-        {error && <div style={{ fontSize: '12px', color: '#ef4444', marginBottom: '10px' }}>{error}</div>}
-        {loading && <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Computing overlap…</div>}
-        {!data && !loading && selected.size > 0 && (
-          <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Select experiments to project.</div>
-        )}
-
-        {data && layout && (
-          <>
-            <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-              style={{ background: 'var(--surface, #111)', borderRadius: '8px', border: '1px solid var(--border, #333)' }}>
-              {/* axes */}
-              <line x1={MARGIN.left} y1={layout.cy} x2={W - MARGIN.right} y2={layout.cy} stroke="var(--border, #444)" strokeWidth={0.5} />
-              <line x1={layout.cx} y1={MARGIN.top} x2={layout.cx} y2={H - MARGIN.bottom} stroke="var(--border, #444)" strokeWidth={0.5} />
-
-              {/* Refused section */}
-              {renderSection(refusedCats, 'refused')}
-              {/* Non-refused section */}
-              {renderSection(okCats, 'ok')}
-            </svg>
-
-            <div style={{ display: 'flex', gap: '24px', marginTop: '10px', fontSize: '12px' }}>
-              <div>
-                <span style={{ color: '#ef4444', fontWeight: 600 }}>Refused ({refusedCats.length})</span>{' '}
-                <span style={{ color: 'var(--text-dim)' }}>{refusedCats.map(labelOf).join(', ') || '—'}</span>
-              </div>
-              <div>
-                <span style={{ color: '#22c55e', fontWeight: 600 }}>Non-refused ({okCats.length})</span>{' '}
-                <span style={{ color: 'var(--text-dim)' }}>{okCats.map(labelOf).join(', ') || '—'}</span>
-              </div>
-            </div>
-            <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '8px', lineHeight: 1.5 }}>
-              Each cone is a direction's projected PCA arrow swept into a sector. Overlapping cones
-              blend their primaries (red + blue → purple); every fill is at alpha 0.30. This is the
-              <em>projected</em> overlap in the shared 2D basis, not a full subspace intersection.
-            </p>
-          </>
-        )}
-      </div>
+      )}
     </div>
   )
 }
