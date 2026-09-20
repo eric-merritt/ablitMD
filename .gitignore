@@ -35,3 +35,6 @@ CLAUDE.md
 docs/superpowers/
 .pids
 STATUS.md
+
+# local source checkouts
+causal-conv1d/
