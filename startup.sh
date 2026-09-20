@@ -4,8 +4,8 @@ set -e
 # Install nvm if the image didn't ship it, via the official wget | sh flow.
 if [ ! -s /opt/nvm/nvm.sh ]; then
   echo "==> Installing nvm (wget | sh)..."
-  wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh \
-    | bash --noprofile-function --no-use-colors --src-dir /opt/nvm || true
+  export NVM_DIR=/opt/nvm
+  wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash || true
 fi
 [ -f /opt/nvm/nvm.sh ] && source /opt/nvm/nvm.sh
 
