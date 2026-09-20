@@ -261,4 +261,13 @@ router.post('/:runId/verify', async (req, res) => {
 
 router.post('/:runId/verify/classic', proxyNdjsonStream('/ablate/verify/classic'))
 
+// Post-ablation adversarial audit: run it, list saved audits, and fetch the 2D
+// overlap geometry for the visual workspace.
+router.post('/audit/run', proxyToInference('/audit/run', req => req.body))
+router.get('/audits', async (req, res) => {
+  const response = await fetch(`${INFERENCE_BASE}/audits?run_id=${encodeURIComponent(req.query.run_id)}`)
+  res.status(response.status).json(await safeJson(response))
+})
+router.post('/direction_overlap', proxyToInference('/direction_overlap', req => req.body))
+
 export default router

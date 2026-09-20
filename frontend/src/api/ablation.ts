@@ -3,6 +3,10 @@ import type {
   SlimRecipe,
   RecipeParams,
   VerifyEvent,
+  AuditRecord,
+  AuditEvent,
+  AuditSummary,
+  DirectionOverlapResponse,
 } from "../types/ablation";
 
 const jsonOrThrow = async (response: Response) => {
@@ -82,10 +86,10 @@ export const bakeModel = (
     }),
   }).then(jsonOrThrow);
 
-const readNdjsonStream = async (
+const readNdjsonStream = async <T>(
   url: string,
   body: object,
-  onEvent: (event: VerifyEvent) => void,
+  onEvent: (event: T) => void,
   signal?: AbortSignal,
 ): Promise<void> => {
   const response = await fetch(url, {
@@ -151,3 +155,38 @@ export const verifyAblationClassic = (
     onEvent,
     signal,
   );
+
+// --- Post-ablation adversarial audit + overlap workspace ---
+
+// Streams the audit: watch the ablated model generate each response token-by-token,
+// then see the judge's label land per trial. See AuditEvent for event shapes.
+export const runAudit = (
+  runId: string,
+  onEvent: (event: AuditEvent) => void,
+  nCategories = 5,
+  rounds = 3,
+  signal?: AbortSignal,
+): Promise<void> =>
+  readNdjsonStream<AuditEvent>(
+    "/api/ablation/audit/run",
+    { run_id: runId, n_categories: nCategories, rounds },
+    onEvent,
+    signal,
+  );
+
+export const listAudits = (runId: string): Promise<AuditSummary[]> =>
+  fetch(`/api/ablation/audits?run_id=${encodeURIComponent(runId)}`).then(
+    jsonOrThrow,
+  );
+
+export const directionOverlap = (body: {
+  run_id: string;
+  model_id: string;
+  mode: string;
+  experiments: { path: string; trial_indices?: number[] }[];
+}): Promise<DirectionOverlapResponse> =>
+  fetch("/api/ablation/direction_overlap", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then(jsonOrThrow);

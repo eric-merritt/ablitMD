@@ -96,3 +96,65 @@ export type VerifyEvent =
   | { type: "generation_done" }
   | ({ type: "prompt" } & VerifyPromptResult)
   | ({ type: "category_result" } & VerifyCategoryResult);
+
+// --- Post-ablation adversarial audit + overlap workspace ---
+
+export interface AuditTrial {
+  round: number;
+  category: string;
+  prompt: string;
+  response: string;
+  classification: "hard" | "redirect" | "none";
+  refused: boolean;
+}
+
+// Live NDJSON events from POST /audit/run (streaming audit).
+export type AuditEvent =
+  | { type: "audit_start"; run_id: string; n_categories: number; rounds: number; total: number }
+  | { type: "trial_start"; index: number; round: number; category: string; prompt: string }
+  | { type: "token"; text: string }
+  | { type: "trial_done"; index: number; round: number; category: string; prompt: string; response: string; classification: AuditTrial["classification"]; refused: boolean }
+  | { type: "audit_done"; record: AuditRecord }
+  | { type: "error"; message: string };
+
+export interface AuditRecord {
+  run_id: string;
+  recipe_master: string | null;
+  n_categories: number;
+  rounds: number;
+  created_at: string;
+  path: string;
+  trials: AuditTrial[];
+}
+
+// Summary row for the left-hand experiment list.
+export interface AuditSummary {
+  path: string;
+  created_at: string;
+  recipe_master: string | null;
+  n_trials: number;
+  n_refused: number;
+}
+
+// One selected experiment's refused / non-refused category split.
+export interface OverlapExperiment {
+  path: string;
+  created_at: string;
+  recipe_master: string | null;
+  refused_categories: string[];
+  ok_categories: string[];
+}
+
+// A projected direction arrow in the shared PCA space.
+export interface OverlapArrow {
+  name: string;
+  x: number;
+  y: number;
+  magnitude?: number;
+}
+
+export interface DirectionOverlapResponse {
+  experiments: OverlapExperiment[];
+  arrows: Record<string, OverlapArrow>;
+  projection: unknown;
+}

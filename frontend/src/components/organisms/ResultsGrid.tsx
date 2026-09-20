@@ -11,6 +11,7 @@ interface ResultsGridProps {
   modelNames: Record<string, string>
   models: { modelId: string; apiModelId: string; name: string }[]
   onVerify: (genMode: string, mode: 'ablitmd' | 'classic', classicFactor: number, disclaimerAblate: boolean, disclaimerFactor: number) => void
+  onAudit?: () => void
   onBack: () => void
   onHome: () => void
 }
@@ -21,7 +22,7 @@ const HomeIcon = () => (
   </svg>
 )
 
-export const ResultsGrid = ({ run, modelNames, models, onVerify, onBack, onHome }: ResultsGridProps) => {
+export const ResultsGrid = ({ run, modelNames, models, onVerify, onAudit, onBack, onHome }: ResultsGridProps) => {
   const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(GROUPS))
   const [backHovered, setBackHovered] = useState(false)
   const [homeHovered, setHomeHovered] = useState(false)
@@ -93,6 +94,15 @@ export const ResultsGrid = ({ run, modelNames, models, onVerify, onBack, onHome 
             ←{' '}
             <span style={{ textDecoration: backHovered ? 'underline' : 'none' }}>Back</span>
           </span>
+
+          {onAudit && (
+            <span
+              onClick={onAudit}
+              style={{ color: 'var(--text)', fontSize: '19px', cursor: 'pointer', userSelect: 'none' }}
+            >
+              Audit
+            </span>
+          )}
 
           <span
             onClick={onHome}

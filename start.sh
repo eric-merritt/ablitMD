@@ -58,6 +58,7 @@ fi
 # Belt-and-suspenders: clear the ports regardless of what .pids said.
 free_port 8237   # backend
 free_port 8238   # inference
+free_port 8239   # classifier (9B judge)
 free_port 5400   # frontend
 sleep 1
 
@@ -67,8 +68,15 @@ echo $! >> "$PID_FILE"
 uv run python -m backend.inference.service > /tmp/ablitmd-inference.log 2>&1 &
 echo $! >> "$PID_FILE"
 
+# 9B LLM-as-judge for the post-ablation audit. CPU-only (-ngl 0): it must not fight
+# the resident 57 GB model for VRAM. Bump to -ngl 999 if you free up the GPU.
+/usr/local/bin/llama-server \
+  -m "$HOME/models/Qwen/Qwen3.5-9B-Ablit/Qwen3.5-9B-Ablit-IQ4_XS.gguf" \
+  --port 8239 -c 4096 -ngl 0 > /tmp/ablitmd-classifier.log 2>&1 &
+echo $! >> "$PID_FILE"
+
 npm run dev --workspace=frontend > /tmp/ablitmd-frontend.log 2>&1 &
 echo $! >> "$PID_FILE"
 
 echo "started — PIDs: $(tr '\n' ' ' < "$PID_FILE")"
-echo "logs: /tmp/ablitmd-{backend,inference,frontend}.log"
+echo "logs: /tmp/ablitmd-{backend,inference,classifier,frontend}.log"

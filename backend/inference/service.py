@@ -434,13 +434,25 @@ def direction_pca(req: PcaRequest):
 
 @app.post("/audit/run")
 def audit_run(req: AuditRunRequest):
-    """Run the post-ablation adversarial audit against the resident (ablated) model."""
-    try:
-        return audit_agent.run_audit(req.run_id, req.n_categories, req.rounds)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    """Stream the post-ablation adversarial audit.
+
+    NDJSON so the UI can watch the ablated model generate each response token-by-token
+    and see the judge's label land per trial (see :func:`audit_agent.run_audit_streaming`).
+    """
+    run_id = req.run_id
+    n_categories = req.n_categories
+    rounds = req.rounds
+
+    def events():
+        try:
+            for ev in audit_agent.run_audit_streaming(run_id, n_categories, rounds):
+                yield json.dumps(ev) + "\n"
+        except FileNotFoundError as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+        except ValueError as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
 @app.get("/audits")

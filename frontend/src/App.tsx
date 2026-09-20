@@ -6,10 +6,12 @@ import { AutoClassifyReview } from './components/organisms/AutoClassifyReview'
 import { ClassifyReview } from './components/organisms/ClassifyReview'
 import { ResultsGrid } from './components/organisms/ResultsGrid'
 import { VerifyDashboard } from './components/organisms/VerifyDashboard'
+import { AuditPanel } from './components/organisms/AuditPanel'
+import { OverlapWorkspace } from './components/organisms/OverlapWorkspace'
 import { useModels } from './hooks/useModels'
 import type { Run } from './types/run'
 
-type Phase = 'config' | 'running' | 'auto-review' | 'review' | 'results' | 'verify'
+type Phase = 'config' | 'running' | 'auto-review' | 'review' | 'results' | 'verify' | 'audit'
 
 type AblationMode = 'ablitmd' | 'classic'
 interface VerifyContext { genMode: string; samplesPerCategory: number; mode: AblationMode; classicFactor: number; disclaimerAblate: boolean; disclaimerFactor: number }
@@ -31,6 +33,8 @@ const App = () => {
     setVerifyContext({ genMode, samplesPerCategory: 2, mode, classicFactor, disclaimerAblate, disclaimerFactor })
     setPhase('verify')
   }
+
+  const handleAuditStart = () => setPhase('audit')
 
   const modelNames = useMemo(
     () => Object.fromEntries(models.map(model => [model.modelId, model.name])),
@@ -94,9 +98,25 @@ const App = () => {
           modelNames={ modelNames }
           models={ walkthroughModels }
           onVerify={ handleVerifyStart }
+          onAudit={ handleAuditStart }
           onBack={ () => setPhase('review') }
           onHome={ () => setPhase('config') }
         />
+      ) }
+      { phase === 'audit' && activeRun && (
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+            <AuditPanel run={ activeRun } />
+            <OverlapWorkspace run={ activeRun } />
+          </div>
+          <div>
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: 0 }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 32px' }}>
+              <span onClick={() => setPhase('results')} style={{ color: 'var(--text)', fontSize: '19px', cursor: 'pointer', userSelect: 'none' }}>← Back</span>
+              <span onClick={() => setPhase('config')} style={{ color: 'var(--text)', fontSize: '19px', cursor: 'pointer', userSelect: 'none' }}>Home</span>
+            </div>
+          </div>
+        </div>
       ) }
       { phase === 'verify' && activeRun && verifyContext && (
         <VerifyDashboard
