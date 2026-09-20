@@ -92,7 +92,7 @@ def ensure_judge_server(model_path: str | None = None) -> None:
             # A classifier reads one prompt and answers a word; no big context needed.
             # Run on CPU (-ngl 0) — the 27B already owns the entire GPU.
             "-c", "4096",
-            "-ngl", "0",
+            "-ngl", "999",
             "--parallel", "1",
             "--threads", "8",
             "--temp", "0",

@@ -75,10 +75,10 @@ a:hover {
   padding: 1.5rem;
 }
 
-#experiment-list { grid-area: experiment-list; overflow-y: auto; }
+#experiment-list { grid-area: experiment-list; overflow-y: auto; position: relative; z-index: 2; }
 
 #audit-controls { grid-area: audit-controls; }
 
-#overlap-workspace { grid-area: overlap-workspace; overflow-y: auto; }
+#overlap-workspace { grid-area: overlap-workspace; overflow-y: auto; position: relative; z-index: 2; }
 
-#saved-audits-block { grid-area: saved-audits-block; min-height: 0; display: flex; flex-direction: column; }
+#saved-audits-block { grid-area: saved-audits-block; min-height: 0; display: flex; flex-direction: column; position: relative; z-index: 2; }

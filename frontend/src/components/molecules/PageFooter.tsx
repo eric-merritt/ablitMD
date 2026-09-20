@@ -21,6 +21,7 @@ const FooterStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
+  zIndex: 10,
 };
 
 const MergeError = ({ message }: { message: string }) => (
