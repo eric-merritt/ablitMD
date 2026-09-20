@@ -26,6 +26,7 @@ from backend.inference.model_loader import (
     unload_model,
     set_model_dirty,
     BAKE_DIR,
+    MODELS_DIR,
 )
 from backend.inference.ablation import (
     apply_ablation_in_place,
@@ -494,8 +495,11 @@ def audit_run_full(req: AuditRunRequest):
             recipe_path.write_text(json.dumps(recipe, indent=2))
 
             # 3. Reload clean so we never ablate on top of a prior in-place edit.
+            #    Load from MODELS_DIR directly — the manifest's model id may be
+            #    stale or point at an HF repo that doesn't exist. The weights are
+            #    already on disk where we put them.
             yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
-            load_model(model_id, model_id)
+            load_model(MODELS_DIR, MODELS_DIR)
 
             # 4. Apply the SOM to the resident weights in place.
             yield json.dumps({"type": "stage", "stage": "abliterating"}) + "\n"

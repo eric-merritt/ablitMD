@@ -90,9 +90,9 @@ def ensure_judge_server(model_path: str | None = None) -> None:
             "-m", model,
             "--port", str(CLASSIFIER_PORT),
             # A classifier reads one prompt and answers a word; no big context needed.
+            # Run on CPU (-ngl 0) — the 27B already owns the entire GPU.
             "-c", "4096",
-            "-ngl", "99",
-            "-fa", "on",
+            "-ngl", "0",
             "--parallel", "1",
             "--threads", "8",
             "--temp", "0",

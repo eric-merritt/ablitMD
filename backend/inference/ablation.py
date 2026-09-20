@@ -9,11 +9,27 @@ from backend.inference.recipe import directions_for_layer
 
 
 def _get_weight_f32(proj) -> torch.Tensor:
+  """Return a fp32 view for math. Caller must write back via _set_weight."""
   return proj.weight.data.to(torch.float32)
 
 
 def _set_weight(proj, weight_f32: torch.Tensor, target_dtype: torch.dtype) -> None:
   proj.weight.copy_(weight_f32.to(target_dtype))
+
+
+def orthogonalize_weight_inplace(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> None:
+    """Orthogonalize `weight` in-place (bf16) using an fp32 direction.
+    W -= factor * outer(d @ W^T, d). Only small vectors are fp32."""
+    d = direction.to(torch.float32)
+    coeff = (d @ weight.t()).to(weight.dtype)  # (out,)
+    weight.sub_(torch.outer(coeff, d.to(weight.dtype)) * factor)
+
+
+def orthogonalize_input_inplace(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> None:
+    """Orthogonalize lm_head in-place. W -= factor * outer(W @ d, d)."""
+    d = direction.to(torch.float32)
+    coeff = (weight @ d).to(weight.dtype)  # (out,)
+    weight.sub_(torch.outer(coeff, d.to(weight.dtype)) * factor)
 
 
 def ablate_hidden(
@@ -91,7 +107,7 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
     snapshots: dict = {}
 
     _first_logged = False
-    with torch.no_grad():
+    with torch.inference_mode():
         # Layer 0 (embed_tokens / MTP head) is not ablated: even factor=0.1 destroys output entirely.
         # raw_emb = directions_for_layer(recipe, hidden_index=0)
         # if raw_emb:
@@ -108,30 +124,45 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         #     W = W - float(factor) * proj_out
         #   emb.weight.copy_(W.to(dtype))
 
-        for decoder_idx in range(len(layers)):
-            raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
-            if not raw:
-                continue
-            for proj in _projection_modules(layers[decoder_idx]):
-                if id(proj) not in snapshots:
-                    snapshots[id(proj)] = (proj, _get_weight_f32(proj).clone())
-                W = _get_weight_f32(proj)
-                for vector, factor in raw:
-                    direction = torch.tensor(vector, device=device, dtype=torch.float32)
-                    W = orthogonalize_weight(W, direction, float(factor))
-                _set_weight(proj, W, dtype)
-                if not _first_logged:
-                    _first_logged = True
-                    delta = float(
-                        (_get_weight_f32(proj) - snapshots[id(proj)][1]).norm()
-                    )
-                    print(
-                        f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
-                        f"proj={type(proj).__name__} shape={tuple(proj.weight.shape)}",
-                        flush=True,
-                    )
-        lm_head = getattr(model, "lm_head", None)
-        if lm_head is not None and hasattr(lm_head, "weight"):
+				for decoder_idx in range(len(layers)):
+					raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
+				if not raw:
+						continue
+				
+				# Assume _projection_modules yields pairs of (name, module) or just inspect the name attribute
+				for proj in _projection_modules(layers[decoder_idx]):
+						if id(proj) not in snapshots:
+								snapshots[id(proj)] = (proj, proj.weight.data.cpu().clone())
+						
+						W = proj.weight.data
+						proj_name = getattr(proj, "name", type(proj).__name__).lower()
+						
+						for vector, factor in raw:
+								direction = torch.tensor(vector, device=device, dtype=torch.float32)
+								
+								# 1. Columns/Input space ablation (Hidden dim 5120)
+								if any(x in proj_name for x in ["o_proj", "down_proj"]):
+										orthogonalize_input_inplace(W, direction, float(factor))
+										
+								# 2. Rows/Output space ablation (Intermediate dim 6144)
+								elif any(x in proj_name for x in ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]):
+										# If your direction vector is 5120 but this layer expects 6144 outputs, 
+										# you shouldn't directly orthogonalize weights by row using a 5120-dim vector.
+										# Either skip these layers, or transform the vector first.
+										orthogonalize_weight_inplace(W, direction, float(factor)) 
+						
+						if not _first_logged:
+								_first_logged = True
+								delta = float((W.cpu() - snapshots[id(proj)][1]).norm())
+								print(
+										f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
+										f"proj={type(proj).__name__} shape={tuple(W.shape)}",
+										flush=True,
+								)
+      	
+				lm_head = getattr(model, "lm_head", None)
+        
+				if lm_head is not None and hasattr(lm_head, "weight"):
             all_directions = [
                 (torch.tensor(v, device=device, dtype=torch.float32), float(f))
                 for layer_dirs in (
@@ -142,11 +173,10 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
             ]
             if all_directions:
                 if id(lm_head) not in snapshots:
-                    snapshots[id(lm_head)] = (lm_head, _get_weight_f32(lm_head).clone())
-                W = _get_weight_f32(lm_head)
+                    snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.cpu().clone())
+                W = lm_head.weight.data
                 for direction, factor in all_directions:
-                    W = orthogonalize_input(W, direction, factor)
-                _set_weight(lm_head, W, dtype)
+                    orthogonalize_input_inplace(W, direction, factor)
 
         # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.
         # mtp_projs = _mtp_projections(model)
@@ -180,11 +210,10 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
 
 
 def restore_model_weights(snapshots: dict) -> None:
-  with torch.no_grad():
-    for proj, original_f32 in snapshots.values():
-      _set_weight(proj, original_f32, original_f32.dtype)
-    # Snapshots hold f32 copies of every edited weight — the biggest transient after
-    # the weights themselves. Drop them now that they've served their purpose.
+  with torch.inference_mode():
+    for proj, original in snapshots.values():
+      proj.weight.data.copy_(original.to(proj.weight.device))
+    # Snapshots hold CPU copies of every edited weight. Drop them now.
     del snapshots
 
 
@@ -204,7 +233,7 @@ def counter_apply_ablation_in_place(recipe: dict, model) -> int:
     layers = _decoder_layers(model)
     n_edited = 0
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for decoder_idx in range(len(layers)):
             raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
             if not raw:
@@ -349,7 +378,7 @@ def apply_classic_in_place(
             else:
                 effective_disclaimer[layer_idx] = d_disc
 
-    with torch.no_grad():
+    with torch.inference_mode():
         for layer_idx, direction in directions.items():
             direction_t = torch.tensor(direction, device=device, dtype=dtype)
             if layer_idx == 0:

@@ -108,10 +108,14 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
         raise ValueError(f"run {run_id} has no prompts to audit")
 
     mode = run_data.get("mode_selection", "non_thinking")
+    # Only audit harmful prompts — the point is to check whether the ablated model
+    # still refuses content it should refuse.
     by_category: dict[str, list[dict]] = {}
     for p in prompts:
+        if p.get("type") != "harmful":
+            continue
         by_category.setdefault(p.get("category"), []).append(p)
-    categories = list(by_category.keys())
+    categories = [c for c, ps in by_category.items() if ps]
 
     total = rounds * min(n_categories, len(categories))
     yield {"type": "audit_start", "run_id": run_id, "n_categories": n_categories,

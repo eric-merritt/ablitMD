@@ -3,10 +3,10 @@ import { CAT } from '../../../constants/Categories.js'
 
 export const qwen3827bSeed = new LLM({
   name: 'Qwen3.8 27B Base',
-  modelId: 'Qwen/Qwen3.8-27B-Base',
+  modelId: 'Qwen/Qwen3.8-27B',
   vendor: 'Alibaba Qwen',
   apiProvider: 'self_hosted',
-  apiModelId: 'Qwen/Qwen3.8-27B-Base',
+  apiModelId: 'Qwen/Qwen3.8-27B',
   architecture: {
     numLayers: 64,
     hiddenSize: 5120,
@@ -33,5 +33,5 @@ export const qwen3827bSeed = new LLM({
       CAT.self_referential_paradoxes, CAT.social_engineering, CAT.unfair_advantage,
     ],
   },
-  notes: 'Local box. Base (non-instruct) weights at ~/models/Qwen/Qwen3.8-27B-Base/ — BF16 safetensors + GGUF present. Current abliteration target.',
+  notes: 'Local box. Base (non-instruct) weights at ~/models/Qwen/Qwen3.8-27B/ — BF16 safetensors + GGUF present. Current abliteration target.',
 })

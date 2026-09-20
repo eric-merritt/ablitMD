@@ -17,15 +17,14 @@ def get_model(model_path: str | None = None):
             raise RuntimeError("No model loaded")
         return _model
 
-
-
+    # Load directly onto GPU — no CPU intermediate. device_map="cuda:0" makes
+    # accelerate stream each safetensors shard straight to the card.
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
         torch_dtype=torch.float16,
-        device_map="auto",
+        device_map="cuda:0",
         attn_implementation="flash_attention_2",
     )
-
     return model
 
 
