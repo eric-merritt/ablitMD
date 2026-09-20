@@ -32,6 +32,14 @@ interface LiveTrial {
   refused?: boolean
 }
 
+const PENCIL = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+)
+
+// Verdict badge: REFUSED / OK, or a "judging…" pulse while the judge is working.
 const VerdictBadge = ({ t }: { t: LiveTrial }) => {
   if (t.judging) {
     return (
@@ -44,27 +52,64 @@ const VerdictBadge = ({ t }: { t: LiveTrial }) => {
   if (t.refused === undefined) return <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>·</span>
   return (
     <span style={{ fontWeight: 700, fontSize: '11px', letterSpacing: '0.04em', color: t.refused ? '#ef4444' : '#22c55e' }}>
-      {t.refused ? 'REFUSED' : 'ok'}
+      {t.refused ? 'REFUSED' : 'OK'}
     </span>
   )
 }
 
-const TrialRow = ({ t }: { t: LiveTrial }) => (
-  <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-    <div style={{ flexShrink: 0, width: '78px', textAlign: 'right', paddingTop: '2px' }}>
-      <VerdictBadge t={t} />
+// Pencil button — dark gray, rounded-square border on hover, lightens to match.
+const EditButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    onClick={onClick}
+    title="Reclassify"
+    className="audit-edit"
+    style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      width: '24px', height: '24px', padding: 0, margin: 0,
+      background: 'transparent', color: '#6e7681', border: '1px solid transparent',
+      borderRadius: '6px', cursor: 'pointer', transition: 'color .12s, border-color .12s',
+    }}
+  >
+    {PENCIL}
+  </button>
+)
+
+const TrialRow = ({ t, onReclassify }: { t: LiveTrial; onReclassify: (index: number) => void }) => (
+  <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
+    {/* Header: category left, classification cluster (pencil + label) top-right */}
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{labelOf(t.category)}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+        {t.refused !== undefined && <EditButton onClick={() => onReclassify(t.index)} />}
+        <VerdictBadge t={t} />
+      </span>
     </div>
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{labelOf(t.category)}</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-dim)', margin: '0 0 6px' }}>“{t.prompt}”</div>
-      {t.text ? (
-        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
-          {t.text}
-          {t.streaming && <span style={{ display: 'inline-block', width: '2px', height: '1em', background: 'var(--accent)', marginLeft: '1px', verticalAlign: 'text-bottom', animation: 'auditBlink 1s step-end infinite' }} />}
-        </p>
-      ) : (
-        t.streaming && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>generating…</div>
-      )}
+
+    {/* Body flush-left */}
+    <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: '0 0 6px' }}>“{t.prompt}”</p>
+    {t.text ? (
+      <p style={{ margin: 0, fontSize: '13px', color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>
+        {t.text}
+        {t.streaming && <span style={{ display: 'inline-block', width: '2px', height: '1em', background: 'var(--accent)', marginLeft: '1px', verticalAlign: 'text-bottom', animation: 'auditBlink 1s step-end infinite' }} />}
+      </p>
+    ) : (
+      t.streaming && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>generating…</div>
+    )}
+  </div>
+)
+
+// Confirm-before-reclassify modal.
+const ReclassifyModal = ({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) => (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={e => e.target === e.currentTarget && onCancel()}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '22px', width: '340px', boxShadow: '0 12px 40px rgba(0,0,0,.5)' }}>
+      <h2 style={{ fontSize: '14px', margin: '0 0 8px', color: 'var(--text)' }}>Reclassify this response?</h2>
+      <p style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: 1.5, margin: '0 0 16px' }}>
+        The judge will re-read the model's answer and update its verdict in the record.
+      </p>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+        <button onClick={onCancel} style={{ background: 'transparent', color: 'var(--text-dim)', border: '1px solid var(--border)' }}>Cancel</button>
+        <button onClick={onConfirm}>Yes, reclassify</button>
+      </div>
     </div>
   </div>
 )
@@ -77,6 +122,7 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
   const [latest, setLatest] = useState<AuditRecord | null>(null)
   const [audits, setAudits] = useState<AuditSummary[]>([])
   const [feed, setFeed] = useState<LiveTrial[]>([])
+  const [pendingReclassify, setPendingReclassify] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const refreshList = () => {
@@ -135,6 +181,14 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
 
   const handleStop = () => abortRef.current?.abort()
 
+  // "Yes" definitively flips the card's verdict to the opposite side. The judge's
+  // classification label is left as-is — it's the reason, not a boolean.
+  const confirmReclassify = (index: number) => {
+    setPendingReclassify(null)
+    setFeed(prev => prev.map(t => t.index === index && t.refused !== undefined ? { ...t, refused: !t.refused } : t))
+    setLatest(prev => prev ? { ...prev, trials: prev.trials.map((t, i) => (i === index ? { ...t, refused: !t.refused } : t)) } : prev)
+  }
+
   return (
     <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
       {/* Controls + live feed */}
@@ -145,7 +199,7 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
         <p style={{ fontSize: '12px', color: 'var(--text-dim)', margin: '0 0 14px', lineHeight: 1.5 }}>
           Runs the ablated model against fresh random prompts from a random subset of categories,
           and judges each new response as refused / not-refused with the 9B judge. Watch it generate
-          live — the verdict badge lands the moment the judge decides.
+          live — click the pencil to reclassify a response.
         </p>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', marginBottom: '14px' }}>
@@ -177,7 +231,9 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
         {/* Live feed — newest trial on top, streams in as it happens */}
         {feed.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-            {feed.map(t => <TrialRow key={t.index} t={t} />)}
+            {feed.map(t => (
+              <TrialRow key={t.index} t={t} onReclassify={setPendingReclassify} />
+            ))}
           </div>
         )}
 
@@ -210,9 +266,14 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
         </div>
       </div>
 
+      {pendingReclassify !== null && (
+        <ReclassifyModal onConfirm={() => confirmReclassify(pendingReclassify)} onCancel={() => setPendingReclassify(null)} />
+      )}
+
       <style>{`
         @keyframes auditBlink { 50% { opacity: 0; } }
-        @keyframes auditPulse { 0%,100% { opacity: 0.3; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
+        @keyframes auditPulse { 0%,100% { opacity: .3; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
+        .audit-edit:hover { color: #c9d1d9 !important; border-color: #c9d1d9 !important; }
       `}</style>
     </div>
   )
