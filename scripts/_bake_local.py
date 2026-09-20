@@ -95,9 +95,14 @@ def main():
   if recipe_path is None:
     raise SystemExit("no recipe found for run")
   recipe = json.loads(recipe_path.read_text())
-  print(f"[bake] recipe {recipe_path.name}: onset={recipe['onset']} split={recipe['split']} "
-        f"last={recipe['last_layer']} factor_a={recipe['factor_a']} factor_b={recipe['factor_b']}",
-        flush=True)
+  if recipe.get("method") == "som_md":
+    print(f"[bake] recipe {recipe_path.name}: method=som_md k={recipe['k']} "
+          f"grid={recipe['grid_shape']} best_layer={recipe['best_layer']} "
+          f"factor={recipe['factor']} n_layers={recipe['n_layers']}", flush=True)
+  else:
+    print(f"[bake] recipe {recipe_path.name}: onset={recipe['onset']} split={recipe['split']} "
+          f"last={recipe['last_layer']} factor_a={recipe['factor_a']} factor_b={recipe['factor_b']}",
+          flush=True)
 
   ablate(recipe, model)
   print(f"[bake] saving to {ablit_dir}", flush=True)
