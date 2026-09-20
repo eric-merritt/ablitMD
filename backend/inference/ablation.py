@@ -18,18 +18,21 @@ def _set_weight(proj, weight_f32: torch.Tensor, target_dtype: torch.dtype) -> No
 
 
 def orthogonalize_weight_inplace(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> None:
-    """Orthogonalize `weight` in-place (bf16) using an fp32 direction.
-    W -= factor * outer(d @ W^T, d). Only small vectors are fp32."""
+    """Orthogonalize `weight` in-place. All math in fp32; cast only for .sub_().
+    W -= factor * outer(d @ W^T, d)."""
     d = direction.to(torch.float32)
-    coeff = (d @ weight.t()).to(weight.dtype)  # (out,)
-    weight.sub_(torch.outer(coeff, d.to(weight.dtype)) * factor)
+    coeff = d @ weight.to(torch.float32).t()  # (out,) fp32
+    update = (torch.outer(coeff, d) * factor).to(weight.dtype)
+    weight.sub_(update)
 
 
 def orthogonalize_input_inplace(weight: torch.Tensor, direction: torch.Tensor, factor: float) -> None:
-    """Orthogonalize lm_head in-place. W -= factor * outer(W @ d, d)."""
+    """Orthogonalize lm_head in-place. All math in fp32; cast only for .sub_().
+    W -= factor * outer(W @ d, d)."""
     d = direction.to(torch.float32)
-    coeff = (weight @ d).to(weight.dtype)  # (out,)
-    weight.sub_(torch.outer(coeff, d.to(weight.dtype)) * factor)
+    coeff = weight.to(torch.float32) @ d  # (out,) fp32
+    update = (torch.outer(coeff, d) * factor).to(weight.dtype)
+    weight.sub_(update)
 
 
 def ablate_hidden(
@@ -124,45 +127,45 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
         #     W = W - float(factor) * proj_out
         #   emb.weight.copy_(W.to(dtype))
 
-				for decoder_idx in range(len(layers)):
-					raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
-				if not raw:
-						continue
-				
-				# Assume _projection_modules yields pairs of (name, module) or just inspect the name attribute
-				for proj in _projection_modules(layers[decoder_idx]):
-						if id(proj) not in snapshots:
-								snapshots[id(proj)] = (proj, proj.weight.data.cpu().clone())
-						
-						W = proj.weight.data
-						proj_name = getattr(proj, "name", type(proj).__name__).lower()
-						
-						for vector, factor in raw:
-								direction = torch.tensor(vector, device=device, dtype=torch.float32)
-								
-								# 1. Columns/Input space ablation (Hidden dim 5120)
-								if any(x in proj_name for x in ["o_proj", "down_proj"]):
-										orthogonalize_input_inplace(W, direction, float(factor))
-										
-								# 2. Rows/Output space ablation (Intermediate dim 6144)
-								elif any(x in proj_name for x in ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]):
-										# If your direction vector is 5120 but this layer expects 6144 outputs, 
-										# you shouldn't directly orthogonalize weights by row using a 5120-dim vector.
-										# Either skip these layers, or transform the vector first.
-										orthogonalize_weight_inplace(W, direction, float(factor)) 
-						
-						if not _first_logged:
-								_first_logged = True
-								delta = float((W.cpu() - snapshots[id(proj)][1]).norm())
-								print(
-										f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
-										f"proj={type(proj).__name__} shape={tuple(W.shape)}",
-										flush=True,
-								)
-      	
-				lm_head = getattr(model, "lm_head", None)
+        for decoder_idx in range(len(layers)):
+            raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
+            if not raw:
+                continue
+
+            # Assume _projection_modules yields pairs of (name, module) or just inspect the name attribute
+            for proj in _projection_modules(layers[decoder_idx]):
+                if id(proj) not in snapshots:
+                    snapshots[id(proj)] = (proj, proj.weight.data.cpu().clone())
+
+                W = proj.weight.data
+                proj_name = getattr(proj, "name", type(proj).__name__).lower()
+
+                for vector, factor in raw:
+                    direction = torch.tensor(vector, device=device, dtype=torch.float32)
+
+                    # 1. Columns/Input space ablation (Hidden dim 5120)
+                    if any(x in proj_name for x in ["o_proj", "down_proj"]):
+                        orthogonalize_input_inplace(W, direction, float(factor))
+
+                    # 2. Rows/Output space ablation (Intermediate dim 6144)
+                    elif any(x in proj_name for x in ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]):
+                        # If your direction vector is 5120 but this layer expects 6144 outputs,
+                        # you shouldn't directly orthogonalize weights by row using a 5120-dim vector.
+                        # Either skip these layers, or transform the vector first.
+                        orthogonalize_weight_inplace(W, direction, float(factor))
+
+                if not _first_logged:
+                    _first_logged = True
+                    delta = float((W.cpu() - snapshots[id(proj)][1]).norm())
+                    print(
+                        f"[ablation] first proj edit delta L2={delta:.6f} layer={decoder_idx} "
+                        f"proj={type(proj).__name__} shape={tuple(W.shape)}",
+                        flush=True,
+                    )
+
+        lm_head = getattr(model, "lm_head", None)
         
-				if lm_head is not None and hasattr(lm_head, "weight"):
+        if lm_head is not None and hasattr(lm_head, "weight"):
             all_directions = [
                 (torch.tensor(v, device=device, dtype=torch.float32), float(f))
                 for layer_dirs in (
