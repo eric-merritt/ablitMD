@@ -62,6 +62,11 @@ def _resolve_model_path(model_id: str, api_model_id: str) -> str:
     otherwise treat it as an HF repo id and download into MODELS_DIR."""
     if os.path.isdir(model_id):
         return model_id
+    # A model may live loose directly in MODELS_DIR (files at the top level, no
+    # subdirectory). Check that first so we never fall through to a needless
+    # HF download when the weights are already on disk.
+    if os.path.isfile(os.path.join(MODELS_DIR, "config.json")):
+        return MODELS_DIR
     candidates = [
         os.path.join(MODELS_DIR, api_model_id),
         os.path.join(MODELS_DIR, model_id),

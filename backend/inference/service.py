@@ -1,6 +1,7 @@
 import asyncio
 import gc
 import json
+import logging
 import sys
 import threading
 from datetime import datetime
@@ -8,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import httpx
 import torch
@@ -54,6 +55,23 @@ if _scripts_dir not in sys.path:
 import compute_direction_pca as pca_script
 
 app = FastAPI(title="ablitMD inference service")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("inference")
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    """Log any uncaught exception with a full traceback and return a debuggable 500.
+
+    Previously a raised error in an endpoint (e.g. load_model) became a bare 500
+    with nothing written anywhere — this is what made the /load failure invisible."""
+    logger.exception("unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": f"internal error: {exc}"})
+
 
 RUNS_DIR = Path("./data/runs")
 LAYER_HASH_PATH = Path("./data/layerHash.json")

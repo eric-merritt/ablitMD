@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { inferenceLoad, inferenceGenerateStream, inferenceCompute } from '../api/inference'
 import type { Run, ModeDirectionResult } from '../types/run'
 
@@ -8,15 +8,22 @@ export const useInference = () => {
   const [generating, setGenerating] = useState(false)
   const [computing, setComputing] = useState(false)
 
+  // Synchronous dedupe guard. The old loadedModel === modelId check read React
+  // state, which is stale across two rapid calls (StrictMode double-invoke / re-render),
+  // so both fired and we saw two POSTs to /load. A ref updates synchronously, so a
+  // second call for the same in-flight or already-loaded model is a no-op.
+  const loadGuard = useRef<{ id: string; promise: Promise<void> } | null>(null)
+
   const ensureModelLoaded = async (modelId: string, apiModelId: string) => {
-    if (loadedModel === modelId) return
-    setModelLoading(true)
-    try {
-      await inferenceLoad({ model_id: modelId, api_model_id: apiModelId })
-      setLoadedModel(modelId)
-    } finally {
-      setModelLoading(false)
+    if (loadGuard.current && loadGuard.current.id === modelId) {
+      return loadGuard.current.promise
     }
+    setModelLoading(true)
+    const promise = inferenceLoad({ model_id: modelId, api_model_id: apiModelId })
+      .then(() => setLoadedModel(modelId))
+      .finally(() => setModelLoading(false))
+    loadGuard.current = { id: modelId, promise }
+    return promise
   }
 
   const generate = async (
