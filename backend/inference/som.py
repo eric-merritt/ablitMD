@@ -11,6 +11,40 @@ Reference: "Multi-Directional Ablation" (SOM-MD) arXiv paper.
 import numpy as np
 
 
+def hex_grid_neighbors(rows: int, cols: int) -> list[list[int]]:
+    """Precompute the 6-neighborhood of every neuron on a hexagonal lattice.
+
+    The lattice is laid out on a (rows, cols) rectangular array where even rows
+    are shifted right by half a cell — the standard "odd-r" offset coordinate
+    system for hex grids. Each neuron gets up to 6 neighbors; toroidal wrap in
+    both axes so edge neurons still have full neighborhoods.
+
+    Returns:
+        List of length rows*cols, entry i is the list of neighbor indices for
+        neuron i (row-major order).
+    """
+    # Axial offsets for an odd-r offset hex grid (even rows unshifted).
+    # For even row r: neighbors are (r-1,c-1),(r-1,c),(r,c-1),(r,c+1),(r+1,c-1),(r+1,c)
+    # For odd  row r: neighbors are (r-1,c),(r-1,c+1),(r,c-1),(r,c+1),(r+1,c),(r+1,c+1)
+    def _even_offsets():
+        return [(-1, -1), (-1, 0), (0, -1), (0, 1), (1, -1), (1, 0)]
+
+    def _odd_offsets():
+        return [(-1, 0), (-1, 1), (0, -1), (0, 1), (1, 0), (1, 1)]
+
+    neighbors: list[list[int]] = []
+    for r in range(rows):
+        offsets = _even_offsets() if r % 2 == 0 else _odd_offsets()
+        for c in range(cols):
+            nbrs = []
+            for dr, dc in offsets:
+                nr = (r + dr) % rows
+                nc = (c + dc) % cols
+                nbrs.append(nr * cols + nc)
+            neighbors.append(nbrs)
+    return neighbors
+
+
 def train_som(
     data: np.ndarray,
     grid_shape: tuple[int, int] = (4, 4),
@@ -18,6 +52,7 @@ def train_som(
     lr_init: float = 0.5,
     sigma_init: float = 2.0,
     seed: int = 42,
+    hexagonal: bool = True,
 ) -> np.ndarray:
     """Train a Kohonen SOM on data using the standard sequential algorithm.
 
@@ -28,6 +63,8 @@ def train_som(
         lr_init: initial learning rate (decays linearly to 0).
         sigma_init: initial neighbourhood radius (in grid units), decays to 0.
         seed: RNG seed for weight initialization.
+        hexagonal: use a hexagonal lattice (6 neighbors) instead of the old
+            rectangular toroidal grid (4 neighbors). Default True.
 
     Returns:
         weights: (rows*cols, dim) SOM weight matrix.
@@ -35,6 +72,23 @@ def train_som(
     n_rows, n_cols = grid_shape
     n_neurons = n_rows * n_cols
     rng = np.random.default_rng(seed)
+
+    # Precompute the neighborhood structure once — this is what makes hex fast:
+    # each iteration only touches the BMU's neighbors instead of scanning all neurons.
+    if hexagonal:
+        neighbor_lists = hex_grid_neighbors(n_rows, n_cols)
+    else:
+        # Rectangular toroidal 4-neighborhood (up/down/left/right).
+        neighbor_lists = []
+        for i in range(n_rows):
+            for j in range(n_cols):
+                idx = i * n_cols + j
+                neighbor_lists.append([
+                    ((i - 1) % n_rows) * n_cols + j,
+                    ((i + 1) % n_rows) * n_cols + j,
+                    i * n_cols + ((j - 1) % n_cols),
+                    i * n_cols + ((j + 1) % n_cols),
+                ])
 
     # Initialize weights by sampling from the data (gives better coverage than random).
     indices = rng.choice(len(data), size=n_neurons, replace=len(data) < n_neurons)
@@ -50,20 +104,13 @@ def train_som(
         dists = np.linalg.norm(weights - sample, axis=1)
         bmu = int(np.argmin(dists))
 
-        # Update all neurons in the neighbourhood.
-        for i in range(n_rows):
-            for j in range(n_cols):
-                neuron_idx = i * n_cols + j
-                # Toroidal distance to BMU.
-                bi, bj = divmod(bmu, n_cols)
-                di = min(abs(i - bi), n_rows - abs(i - bi))
-                dj = min(abs(j - bj), n_cols - abs(j - bj))
-                dist_sq = di * di + dj * dj
-                if dist_sq > max(sigma * sigma, 1e-8):
-                    continue
-                # Gaussian neighbourhood.
-                h = np.exp(-dist_sq / (2.0 * max(sigma * sigma, 1e-8)))
-                weights[neuron_idx] += alpha * h * (sample - weights[neuron_idx])
+        # Update only the BMU's neighbors (Gaussian kernel over lattice distance).
+        for nbr in neighbor_lists[bmu]:
+            # Lattice distance: 0 for self, 1 for direct neighbors.
+            # For a hex grid with precomputed neighbors, all listed neighbors are
+            # exactly one step away, so use a single decay constant.
+            h = np.exp(-1.0 / (2.0 * max(sigma * sigma, 1e-8)))
+            weights[nbr] += alpha * h * (sample - weights[nbr])
 
     return weights.astype(np.float32)
 
@@ -72,35 +119,46 @@ def compute_som_directions(
     harmful_states: np.ndarray,
     harmless_centroid: np.ndarray,
     grid_shape: tuple[int, int] = (4, 4),
-    k: int = 7,
+    k: int | None = None,
     seed: int = 42,
+    hexagonal: bool = True,
 ) -> list[np.ndarray]:
-    """Train a SOM on harmful states and return k unit directions from the best
-    neurons toward the harmless centroid.
+    """Train a SOM on harmful states and return unit directions from neurons toward
+    the harmless centroid.
 
     Args:
         harmful_states: (n_harmful, dim) hidden states at layer l*.
         harmless_centroid: (dim,) mean of harmless-prompt hidden states at l*.
         grid_shape: SOM lattice dimensions.
-        k: number of directions to return (top-k neurons by activation).
+        k: if given, return only the top-k neurons by BMU activation count
+            (most representative of the harmful data). If None, return a
+            direction for every neuron — the full candidate pool for BO search.
         seed: RNG seed for SOM initialization.
+        hexagonal: use a hexagonal lattice (default True).
 
     Returns:
-        List of k unit vectors (dim,), each pointing from a SOM neuron toward
-        the harmless centroid.
+        List of unit vectors (dim,), each pointing from a SOM neuron toward
+        the harmless centroid. Length is min(k, n_neurons) if k given, else n_neurons.
     """
-    weights = train_som(harmful_states, grid_shape=grid_shape, seed=seed)
+    weights = train_som(
+        harmful_states, grid_shape=grid_shape, seed=seed, hexagonal=hexagonal
+    )
     n_neurons = len(weights)
 
     # Activation: how many harmful samples have this neuron as BMU.
     dists = np.linalg.norm(harmful_states[:, None, :] - weights[None, :, :], axis=2)
     bmu_counts = np.bincount(np.argmin(dists, axis=1), minlength=n_neurons)
 
-    # Pick top-k neurons by activation count (most representative of harmful data).
-    top_k = np.argsort(bmu_counts)[::-1][:k]
+    if k is not None:
+        # Old behavior: top-k neurons by activation count.
+        order = np.argsort(bmu_counts)[::-1][:k]
+    else:
+        # Full candidate pool: all neurons, ordered by activation so the most
+        # representative ones come first (useful for logging / debugging).
+        order = np.argsort(bmu_counts)[::-1]
 
     directions = []
-    for neuron_idx in top_k:
+    for neuron_idx in order:
         direction = harmless_centroid - weights[neuron_idx]
         norm = float(np.linalg.norm(direction))
         if norm > 1e-8:

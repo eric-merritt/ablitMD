@@ -6,6 +6,7 @@ import numpy as np
 
 from backend.inference.run_loader import rebuild_directions
 from backend.inference.som import compute_som_directions, select_best_layer
+import backend.inference.bo as bo
 
 
 def _sidecar_has_vectors(data: dict) -> bool:
@@ -281,6 +282,7 @@ def build_som_md_recipe(
         harmless_centroid,
         grid_shape=grid_shape,
         k=k,
+        hexagonal=True,
     )
 
     n_layers = harmful_all.shape[1]
@@ -320,3 +322,183 @@ def directions_for_layer_som_md(recipe: dict, hidden_index: int) -> list[tuple[n
     if not dirs_raw:
         return []
     return [(np.array(d, dtype=np.float32), factor) for d in dirs_raw]
+
+
+def _load_som_states(run: dict, model_id: str, gen_mode: str, state_dir):
+    """Load hidden states and split into (harmful, harmless) stacks.
+
+    Returns (harmful_all, harmless_all, val_prompts) where *_all are
+    (n, n_layers, dim) arrays and val_prompts is the list of prompt dicts used
+    for the held-out validation set (refused prompts only — those are the ones
+    whose refusal we're trying to break)."""
+    harmful_states: list[np.ndarray] = []
+    harmless_states: list[np.ndarray] = []
+    val_prompts: list[dict] = []
+
+    for prompt in run["prompts"]:
+        result = prompt.get("model_results", {}).get(model_id, {}).get(gen_mode)
+        if not result:
+            continue
+        key = result["hidden_states_key"]
+        npy_path = state_dir / f"{key}.npy"
+        if not npy_path.exists():
+            continue
+        hidden = np.load(str(npy_path))  # (n_layers, dim)
+        if result.get("refused"):
+            harmful_states.append(hidden)
+            val_prompts.append(prompt)
+        else:
+            harmless_states.append(hidden)
+
+    return (
+        np.stack(harmful_states, axis=0),
+        np.stack(harmless_states, axis=0),
+        val_prompts,
+    )
+
+
+def build_som_md_recipe_bo(
+    run: dict,
+    model_id: str,
+    gen_mode: str,
+    model,
+    grid_shape: tuple[int, int] = (7, 12),
+    n_trials: int = 50,
+    factor_range: tuple[float, float] = (0.5, 1.5),
+    state_dir=None,
+    seed: int = 42,
+    log_path=None,
+) -> dict:
+    """Closed-loop SOM-MD recipe: build a candidate direction pool from a hexagonal
+    SOM, then run Bayesian Optimization over subsets of those directions + a global
+    ablation factor, scoring each candidate by measured compliance rate on the
+    held-out refused prompts. Returns the best-scoring recipe in the `som_md`
+    schema (plus a "bo" block) so apply_ablation_in_place / bake work unchanged.
+
+    Args:
+        run: run dict with prompts + model_results.
+        model_id: model identifier.
+        gen_mode: generation mode key.
+        model: the resident model (already loaded). Used by the scorer to apply
+            ablations in place, generate, and restore.
+        grid_shape: SOM lattice dimensions (rows, cols). Hexagonal by default.
+        n_trials: BO budget.
+        factor_range: (lo, hi) bounds for the global ablation factor.
+        state_dir: directory containing .npy hidden-state files.
+        seed: RNG seed for reproducibility.
+        log_path: if given, append one JSON line per trial here.
+
+    Returns:
+        Recipe dict with "method": "som_md", the winning directions/factor, and a
+        "bo" block describing the search.
+    """
+    from backend.inference.ablation import apply_ablation_in_place, restore_model_weights
+    from backend.inference.generator import run_prompt
+    from backend.inference.verify import auto_classify_response
+
+    if state_dir is None:
+        raise ValueError("state_dir required for SOM-MD recipe")
+
+    harmful_all, harmless_all, val_prompts = _load_som_states(
+        run, model_id, gen_mode, state_dir
+    )
+    if not len(harmful_all) or not len(harmless_all):
+        raise ValueError(
+            f"need both refused ({len(harmful_all)}) and complied "
+            f"({len(harmless_all)}) hidden states for SOM-MD"
+        )
+
+    n_layers = harmful_all.shape[1]
+    dim = harmful_all.shape[2]
+
+    # Select the best layer using the refusal metric.
+    best_layer = select_best_layer(harmful_all, harmless_all, grid_shape=grid_shape)
+
+    # Full candidate pool: one direction per SOM neuron (no k cap).
+    harmful_at_layer = harmful_all[:, best_layer, :]  # (n_h, dim)
+    harmless_centroid = harmless_all[:, best_layer, :].mean(axis=0)  # (dim,)
+    pool = compute_som_directions(
+        harmful_at_layer,
+        harmless_centroid,
+        grid_shape=grid_shape,
+        k=None,
+        hexagonal=True,
+    )
+
+    # Deterministic validation split: hold out a small subset per category so the
+    # scorer sees prompts the SOM never trained on. With only 10 prompts/category
+    # we hold out at most 2; with more we hold out up to 10.
+    from collections import defaultdict
+    by_cat: dict[str, list[dict]] = defaultdict(list)
+    for p in val_prompts:
+        cat = p.get("category") or p.get("id") or "unknown"
+        by_cat[cat].append(p)
+    holdout_per_cat = 2 if len(val_prompts) <= 440 else 10
+    val_split: list[dict] = []
+    for cat, prompts in by_cat.items():
+        val_split.extend(prompts[:holdout_per_cat])
+
+    run_id = run["run_id"]
+    runs_dir = state_dir.parent
+
+    def score_fn(indices: list[int], factor: float):
+        """Apply the candidate ablation in place, generate on the validation set,
+        classify each response, restore weights, and return (rate, n_ok, n_total)."""
+        subset_dirs = [pool[i] for i in indices]
+        per_layer = {str(idx): [d.tolist() for d in subset_dirs] for idx in range(1, n_layers)}
+        trial_recipe = {
+            "run_id": run_id,
+            "model_id": model_id,
+            "gen_mode": gen_mode,
+            "method": "som_md",
+            "k": len(subset_dirs),
+            "grid_shape": list(grid_shape),
+            "best_layer": best_layer,
+            "factor": factor,
+            "n_layers": n_layers,
+            "per_layer_directions": per_layer,
+        }
+        snapshots = apply_ablation_in_place(trial_recipe, model)
+        try:
+            n_ok = 0
+            for p in val_split:
+                text = run_prompt(
+                    p["text"], gen_mode, run_id, "bo_trial", runs_dir,
+                    skip_hidden_states=True,
+                )
+                if auto_classify_response(text) == "none":
+                    n_ok += 1
+        finally:
+            restore_model_weights(snapshots)
+        rate = n_ok / len(val_split) if val_split else 0.0
+        return rate, n_ok, len(val_split)
+
+    result = bo.run_search(
+        pool, score_fn,
+        n_trials=n_trials,
+        factor_range=factor_range,
+        seed=seed,
+        log_path=log_path,
+    )
+
+    if result.best is None:
+        raise RuntimeError("BO search produced no trials")
+
+    best = result.best
+    subset_dirs = [pool[i] for i in best.indices]
+    per_layer = {str(idx): [d.tolist() for d in subset_dirs] for idx in range(1, n_layers)}
+
+    return {
+        "run_id": run["run_id"],
+        "model_id": model_id,
+        "gen_mode": gen_mode,
+        "method": "som_md",
+        "k": len(subset_dirs),
+        "grid_shape": list(grid_shape),
+        "best_layer": best_layer,
+        "factor": best.factor,
+        "n_layers": n_layers,
+        "per_layer_directions": per_layer,
+        "bo": result.to_bo_block(),
+        "built_at": datetime.now(timezone.utc).isoformat(),
+    }
