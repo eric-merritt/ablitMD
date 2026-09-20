@@ -22,7 +22,8 @@ sys.path.insert(0, str(_here.parent))
 
 from _run_picker import resolve_run_id
 from backend.inference.ablation import (
-  orthogonalize_weight, _decoder_layers, _projection_modules,
+  orthogonalize_weight, orthogonalize_input, _decoder_layers, _projection_modules,
+  _get_weight_f32, _set_weight,
 )
 from backend.inference.recipe import latest_recipe_path, directions_for_layer
 
@@ -39,7 +40,10 @@ def model_dirs(model_id: str) -> tuple[str, str]:
 
 def ablate(recipe: dict, model) -> None:
   """Mirror apply_ablation_in_place's math without snapshot clones.
-  Decoder layer i is hidden_index i+1 (layer 0 / MTP head is left alone)."""
+  Edits o_proj + down_proj per layer AND lm_head (input-side), exactly like the
+  in-memory path — decoder layer i is hidden_index i+1 (layer 0 / MTP head left alone)."""
+  device = next(model.parameters()).device
+  dtype = next(model.parameters()).dtype
   layers = _decoder_layers(model)
   logged = False
   with torch.no_grad():
@@ -48,16 +52,28 @@ def ablate(recipe: dict, model) -> None:
       if not raw:
         continue
       for proj in _projection_modules(layers[decoder_idx]):
-        device = proj.weight.device
-        weight_f32 = proj.weight.data.to(torch.float32)
+        W = _get_weight_f32(proj)
         for vector, factor in raw:
-          direction = torch.tensor(vector, dtype=torch.float32, device=device)
-          orthogonalize_weight(weight_f32, direction, float(factor))
-        proj.weight.data = weight_f32.to(torch.bfloat16)
+          direction = torch.tensor(vector, device=device, dtype=torch.float32)
+          W = orthogonalize_weight(W, direction, float(factor))
+        _set_weight(proj, W, dtype)
         if not logged:
           logged = True
           print(f"[ablation] first edit layer={decoder_idx + 1} proj={type(proj).__name__} "
                 f"shape={tuple(proj.weight.shape)}", flush=True)
+
+    lm_head = getattr(model, "lm_head", None)
+    if lm_head is not None and hasattr(lm_head, "weight"):
+      all_directions = [
+        (torch.tensor(v, device=device, dtype=torch.float32), float(f))
+        for layer_dirs in (directions_for_layer(recipe, hidden_index=i + 1) for i in range(len(layers)))
+        for v, f in layer_dirs
+      ]
+      if all_directions:
+        W = _get_weight_f32(lm_head)
+        for direction, factor in all_directions:
+          W = orthogonalize_input(W, direction, factor)
+        _set_weight(lm_head, W, dtype)
 
 
 def main():
