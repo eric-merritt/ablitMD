@@ -23,6 +23,7 @@ def get_model(model_path: str | None = None):
         model_path,
         torch_dtype=torch.float16,
         device_map="auto",
+        attn_implementation="flash_attention_2",
     )
 
     return model

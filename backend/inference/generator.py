@@ -144,7 +144,7 @@ def stream_prompt(
       model.generate(
         input_ids,
         attention_mask=attention_mask,
-        max_new_tokens=1024,
+        max_new_tokens=128,
         do_sample=False,
         pad_token_id=pad_token_id,
         streamer=streamer,
