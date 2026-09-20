@@ -28,8 +28,8 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
-flash-attn = { path = "pkgs/flash_attn-2.8.3-cp312-cp312-linux_x86_64.whl" }
-causal-conv1d = { path = "pkgs/causal_conv1d-1.7.0-cp312-cp312-linux_x86_64.whl" }
+flash-attn = { path = "pkgs/flash_attn-2.8.3.whl" }
+causal-conv1d = { path = "pkgs/causal_conv1d-1.7.0.whl" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
