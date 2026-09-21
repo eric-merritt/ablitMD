@@ -104,12 +104,12 @@ def train_som(
         dists = np.linalg.norm(weights - sample, axis=1)
         bmu = int(np.argmin(dists))
 
-        # Update only the BMU's neighbors (Gaussian kernel over lattice distance).
-        for nbr in neighbor_lists[bmu]:
-            # Lattice distance: 0 for self, 1 for direct neighbors.
-            # For a hex grid with precomputed neighbors, all listed neighbors are
-            # exactly one step away, so use a single decay constant.
-            h = np.exp(-1.0 / (2.0 * max(sigma * sigma, 1e-8)))
+        # Update BMU + its neighbors (Gaussian kernel over lattice distance).
+        # Include the BMU itself (distance 0) so it actually moves toward the sample.
+        update_targets = [bmu] + neighbor_lists[bmu]
+        for nbr in update_targets:
+            lattice_dist = 0 if nbr == bmu else 1
+            h = np.exp(-(lattice_dist ** 2) / (2.0 * max(sigma * sigma, 1e-8)))
             weights[nbr] += alpha * h * (sample - weights[nbr])
 
     return weights.astype(np.float32)
