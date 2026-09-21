@@ -58,7 +58,6 @@ fi
 # Belt-and-suspenders: clear the ports regardless of what .pids said.
 free_port 8237   # backend
 free_port 8238   # inference
-free_port 8239   # classifier (9B judge)
 free_port 5400   # frontend
 sleep 1
 
@@ -68,25 +67,8 @@ echo $! >> "$PID_FILE"
 uv run python -m backend.inference.service > /tmp/ablitmd-inference.log 2>&1 &
 echo $! >> "$PID_FILE"
 
-# 9B LLM-as-judge for the post-ablation audit. GPU offload (-ngl 999): the 27B model
-# uses ~53 GB of the 96 GB card, leaving plenty of headroom for the 9B judge.
-# Wait until the first generation completes before spooling up — VRAM needs to stabilize.
-echo "[start] waiting for first generation to complete..."
-while true; do
-  status=$(curl -sf http://localhost:8238/status 2>/dev/null || true)
-  [ -z "$status" ] && { sleep 2; continue; }
-  echo "$status" | grep -q '"first_generation_done"' && break
-  sleep 2
-done
-echo "[start] first generation done, starting classifier..."
-
-/usr/local/bin/llama-server \
-  -m "/workspace/models/Qwen/Qwen3.5-9B-Q8_0.gguf" \
-  --port 8239 -c 4096 -ngl 999 > /tmp/ablitmd-classifier.log 2>&1 &
-echo $! >> "$PID_FILE"
-
 npm run dev --workspace=frontend > /tmp/ablitmd-frontend.log 2>&1 &
 echo $! >> "$PID_FILE"
 
 echo "started — PIDs: $(tr '\n' ' ' < "$PID_FILE")"
-echo "logs: /tmp/ablitmd-{backend,inference,classifier,frontend}.log"
+echo "logs: /tmp/ablitmd-{backend,inference,frontend}.log"
