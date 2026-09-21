@@ -30,8 +30,8 @@ const PRIMARIES: [number, number, number][] = [
 
 // --- SVG geometry -----------------------------------------------------------
 
-const W = 900
-const H = 520
+const W = 1170
+const H = 676
 const MARGIN = { top: 30, right: 30, bottom: 30, left: 30 }
 
 interface Arrow { name: string; x: number; y: number; magnitude?: number }
@@ -147,7 +147,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       const dirY = layout.toY(arrow.y) - tipY
       const len = Math.hypot(dirX, dirY) || 1
       // Sector length scaled to the arrow's on-screen length.
-      const sectorLen = Math.min(len * 1.4, 350)
+      const sectorLen = Math.min(len * 1.4, 455)
       const d = sectorPath(tipX, tipY, dirX / len, dirY / len, sectorLen, HALF_ANGLE)
 
       // Blend with any other direction (in either section) whose cone overlaps this one.
@@ -188,7 +188,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
 
       {data && layout && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '600px', height: 520, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', minWidth: '780px', height: 676, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
             {/* axes */}
             <line x1={MARGIN.left} y1={layout.cy} x2={W - MARGIN.right} y2={layout.cy} stroke="var(--border, #444)" strokeWidth={0.5} />
             <line x1={layout.cx} y1={MARGIN.top} x2={layout.cx} y2={H - MARGIN.bottom} stroke="var(--border, #444)" strokeWidth={0.5} />
