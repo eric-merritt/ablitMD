@@ -86,9 +86,8 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Are we in "recipe preview" mode? (__recipe__ sentinel with no real audit paths.)
-  const isRecipeOnly = selected.has('__recipe__') &&
-    ![...selected].some(p => p !== '__recipe__')
+  // Recipe-only = no real experiments selected (either empty, or only the __recipe__ sentinel).
+  const isRecipeOnly = ![...selected].some(p => p !== '__recipe__')
 
   // Fetch arrows on mount (shows recipe directions immediately), re-fetch when selection changes.
   useEffect(() => {
