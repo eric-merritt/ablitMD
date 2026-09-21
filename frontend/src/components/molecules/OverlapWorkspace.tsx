@@ -114,13 +114,16 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     return () => { cancelled = true }
   }, [selected, run.run_id, run.sequence])
 
+  const arrows = data?.arrows ?? {}
+  const arrowList = useMemo(() => Object.values(arrows), [arrows])
+  const layout = fitLayout(arrowList)
+
   // In recipe-only mode (no audit yet), ALL arrows are "recipe directions" —
   // render them bright, no blending. Otherwise split by refused/ok from experiments.
   const allArrowCats = useMemo(() => Object.keys(arrows), [arrows])
 
   const { refusedCats, okCats } = useMemo(() => {
     if (isRecipeOnly) {
-      // Everything goes into one bucket; renderSection will use recipe color.
       return { refusedCats: [] as string[], okCats: allArrowCats }
     }
     const refused = new Set<string>()
@@ -129,14 +132,9 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       for (const c of exp.refused_categories) refused.add(c)
       for (const c of exp.ok_categories) ok.add(c)
     }
-    // A category is "refused" if it was refused anywhere; drop it from the ok set.
     for (const c of refused) ok.delete(c)
     return { refusedCats: [...refused], okCats: [...ok] }
   }, [data, isRecipeOnly, allArrowCats])
-
-  const arrows = data?.arrows ?? {}
-  const arrowList = useMemo(() => Object.values(arrows), [arrows])
-  const layout = fitLayout(arrowList)
 
   // Assign each direction a primary color (stable by category id order).
   const colorOf = useCallback((catId: string): [number, number, number] => {
