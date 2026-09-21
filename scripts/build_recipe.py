@@ -46,8 +46,8 @@ def main():
                       help="Number of SOM directions (default: 7)")
   parser.add_argument("--grid", type=str, default="4,4",
                       help="SOM grid shape as rows,cols (default: 4,4)")
-  parser.add_argument("--factor", type=float, default=1.5,
-                      help="Ablation factor for SOM-MD directions (default: 1.5)")
+  parser.add_argument("--factor", type=float, default=1.95,
+                      help="Ablation factor for SOM-MD directions (default: 1.95)")
   args = parser.parse_args()
   run_id = resolve_run_id(args.run_id)
 
