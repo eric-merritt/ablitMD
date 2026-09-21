@@ -666,7 +666,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
         try:
             await asyncio.to_thread(unload_model)
             yield json.dumps({"type": "model_loading", "progress": 0.0}) + "\n"
-            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id, api_model_id))
+            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id))
             while not load_task.done():
                 yield json.dumps({"type": "load_progress", "progress": round(get_load_progress(), 3)}) + "\n"
                 await asyncio.sleep(0.5)
@@ -687,7 +687,7 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
             except RuntimeError:
-                await asyncio.to_thread(load_model, model_id, api_model_id)
+                await asyncio.to_thread(load_model, model_id)
             yield (
                 json.dumps(
                     {
@@ -953,7 +953,7 @@ async def ablate_verify_classic(req: VerifyClassicRequest, request: Request):
         try:
             yield json.dumps({"type": "model_loading", "progress": 0.0}) + "\n"
             await asyncio.to_thread(unload_model)
-            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id, api_model_id))
+            load_task = asyncio.create_task(asyncio.to_thread(load_model, model_id))
             while not load_task.done():
                 yield json.dumps({"type": "load_progress", "progress": round(get_load_progress(), 3)}) + "\n"
                 await asyncio.sleep(0.5)
