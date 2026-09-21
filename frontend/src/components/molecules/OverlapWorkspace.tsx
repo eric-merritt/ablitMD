@@ -17,22 +17,12 @@ const CATEGORY_NAMES: Record<string, string> = {}
 for (const cat of CATEGORIES) CATEGORY_NAMES[cat.id] = cat.name
 const labelOf = (id: string): string => CATEGORY_NAMES[id] ?? id
 
-// A small palette of primaries. Directions are assigned in order; the overlap
-// blend is a straight RGB average of whatever primaries actually share space.
-const PRIMARIES: [number, number, number][] = [
-  [255, 0, 0],     // red
-  [0, 0, 255],     // blue
-  [0, 170, 0],     // green
-  [255, 165, 0],   // orange
-  [160, 32, 240],  // purple
-  [0, 200, 200],   // teal
-]
-
-// Bright standalone color for recipe-only preview (no blending).
-const RECIPE_PREVIEW: [number, number, number] = [255, 255, 80] // bright yellow
-
-// Recipe-direction overlay: always-visible red so you can compare against results.
-const RECIPE_OVERLAY: [number, number, number] = [255, 0, 0] // bright red
+// --- Colors ------------------------------------------------------------------
+// Experiment arrows are white. Recipe-only preview arrows are red.
+// When experiments + recipe are shown together, experiment arrows stay white
+// and a thin red overlay is drawn on top for comparison.
+const EXPERIMENT_ARROW = 'rgba(255,255,255,0.95)'   // white
+const RECIPE_ARROW   = 'rgb(255,0,0)'                // bright red
 
 // --- SVG geometry -----------------------------------------------------------
 
@@ -56,30 +46,6 @@ const fitLayout = (arrows: Arrow[]) => {
     cx,
     cy,
   }
-}
-
-// A direction arrow swept into a small cone/sector. Returns an SVG path string.
-const sectorPath = (
-  tipX: number, tipY: number, dirX: number, dirY: number, length: number, halfAngle: number,
-): string => {
-  const angle = Math.atan2(dirY, dirX)
-  const spread = halfAngle // radians
-  const a1 = angle - spread
-  const a2 = angle + spread
-  const p1x = tipX + length * Math.cos(a1)
-  const p1y = tipY + length * Math.sin(a1)
-  const p2x = tipX + length * Math.cos(a2)
-  const p2y = tipY + length * Math.sin(a2)
-  return `M ${tipX} ${tipY} L ${p1x} ${p1y} A ${length} ${length} 0 0 1 ${p2x} ${p2y} Z`
-}
-
-// Average the RGB of a set of primaries → the blended fill for an overlap region.
-const blend = (colors: [number, number, number][]): string => {
-  if (colors.length === 0) return 'rgba(128,128,128,0.30)'
-  const r = Math.round(colors.reduce((s, c) => s + c[0], 0) / colors.length)
-  const g = Math.round(colors.reduce((s, c) => s + c[1], 0) / colors.length)
-  const b = Math.round(colors.reduce((s, c) => s + c[2], 0) / colors.length)
-  return `rgba(${r},${g},${b},0.30)`
 }
 
 // --- Component --------------------------------------------------------------
@@ -121,7 +87,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const layout = fitLayout(arrowList)
 
   // In recipe-only mode (no audit yet), ALL arrows are "recipe directions" —
-  // render them bright, no blending. Otherwise split by refused/ok from experiments.
+  // render them red. Otherwise split by refused/ok from experiments.
   const allArrowCats = useMemo(() => Object.keys(arrows), [arrows])
 
   const { refusedCats, okCats } = useMemo(() => {
@@ -146,75 +112,41 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     return { refusedCats: [...refused], okCats: [...ok] }
   }, [data, isRecipeOnly, allArrowCats])
 
-  // Assign each direction a primary color (stable by category id order).
-  const colorOf = useCallback((catId: string): [number, number, number] => {
-    const all = [...refusedCats, ...okCats]
-    const idx = all.indexOf(catId)
-    return PRIMARIES[(idx < 0 ? 0 : idx) % PRIMARIES.length]
-  }, [refusedCats, okCats])
+  // Draw a single arrow line + label. `stroke` controls the color.
+  const renderArrow = (cat: string, stroke: string, strokeWidth: number) => {
+    if (!layout) return null
+    const arrow = arrows[cat]
+    if (!arrow) return null
+    const tipX = layout.cx
+    const tipY = layout.cy
+    const dirX = layout.toX(arrow.x) - tipX
+    const dirY = layout.toY(arrow.y) - tipY
 
-  // Which directions overlap each other? Two sectors overlap if their tip-to-tip
-  // distance is small relative to sector length. We approximate "shared subspace"
-  // as: the two arrows point in similar-enough directions AND are close at origin —
-  // since all cones share the origin, we blend any pair whose angular separation is
-  // under the cone half-angle sum.
-  const HALF_ANGLE = 0.35 // rad per side → sectors overlap if angle diff < ~0.7
-  const angleOf = (a: Arrow) => Math.atan2(-a.y, a.x) // flip y back to screen space
-
-  const renderSection = (cats: string[], sectionKey: string) => {
-    if (!layout || cats.length === 0) return null
-    const paths: React.ReactNode[] = []
-    for (const cat of cats) {
-      const arrow = arrows[cat]
-      if (!arrow) continue
-      const tipX = layout.cx
-      const tipY = layout.cy
-      const dirX = layout.toX(arrow.x) - tipX
-      const dirY = layout.toY(arrow.y) - tipY
-      const len = Math.hypot(dirX, dirY) || 1
-      // Sector length scaled to the arrow's on-screen length.
-      const sectorLen = Math.min(len * 1.4, 455)
-      const d = sectorPath(tipX, tipY, dirX / len, dirY / len, sectorLen, HALF_ANGLE)
-
-      let fill: string
-      if (isRecipeOnly) {
-        // Recipe preview: solid bright color, no blending.
-        fill = `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.35)`
-      } else {
-        // Blend with any other direction (in either section) whose cone overlaps this one.
-        const myAngle = angleOf(arrow)
-        const overlapping: [number, number, number][] = []
-        for (const otherCat of [...refusedCats, ...okCats]) {
-          if (otherCat === cat) continue
-          const other = arrows[otherCat]
-          if (!other) continue
-          let diff = Math.abs(angleOf(other) - myAngle)
-          if (diff > Math.PI) diff = 2 * Math.PI - diff
-          if (diff < HALF_ANGLE * 2) overlapping.push(colorOf(otherCat))
-        }
-        // When experiments are selected, render arrows in yellow so the red recipe overlay stands out.
-        fill = `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.30)`
-      }
-
-      paths.push(
-        <g key={sectionKey + '-' + cat}>
-          <path d={d} fill={fill} stroke="none" />
-          {/* faint center line so the direction is still readable */}
-          <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
-            stroke={isRecipeOnly ? `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.9)` : `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.7)`} strokeWidth={1.5} opacity={0.9} />
-          <text x={tipX + dirX * 1.08} y={tipY + dirY * 1.08} fontSize={13}
-            fill="var(--text-dim)" textAnchor="middle">{labelOf(cat)}</text>
-        </g>,
-      )
-    }
-    return paths
+    return (
+      <g key={cat}>
+        <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
+          stroke={stroke} strokeWidth={strokeWidth} />
+        <text x={tipX + dirX * 1.08} y={tipY + dirY * 1.08} fontSize={13}
+          fill="var(--text-dim)" textAnchor="middle">{labelOf(cat)}</text>
+      </g>
+    )
   }
 
-  // Recipe-direction overlay: bold red outlines on top so you can see recipe directions.
-  const renderRecipeOverlay = () => {
-    if (!layout) return null
-    console.log('[OverlapWorkspace] renderRecipeOverlay: drawing', allArrowCats.length, 'arrows')
-    const paths: React.ReactNode[] = []
+  // Collect all arrows to render, choosing the right color per mode.
+  const arrowPaths: React.ReactNode[] = []
+  for (const cat of [...refusedCats, ...okCats]) {
+    if (isRecipeOnly) {
+      // Recipe-only mode → red arrows
+      arrowPaths.push(renderArrow(cat, RECIPE_ARROW, 3))
+    } else {
+      // Experiment mode → white arrows
+      arrowPaths.push(renderArrow(cat, EXPERIMENT_ARROW, 2))
+    }
+  }
+
+  // Recipe-direction overlay: thin red lines on top when experiments are selected.
+  const recipeOverlay: React.ReactNode[] = []
+  if (!isRecipeOnly && layout) {
     for (const cat of allArrowCats) {
       const arrow = arrows[cat]
       if (!arrow) continue
@@ -222,21 +154,13 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       const tipY = layout.cy
       const dirX = layout.toX(arrow.x) - tipX
       const dirY = layout.toY(arrow.y) - tipY
-      const len = Math.hypot(dirX, dirY) || 1
-      const sectorLen = Math.min(len * 1.4, 455)
-      const d = sectorPath(tipX, tipY, dirX / len, dirY / len, sectorLen, HALF_ANGLE)
-
-      paths.push(
+      recipeOverlay.push(
         <g key={'recipe-overlay-' + cat} style={{ pointerEvents: 'none' }}>
-          {/* Red outline only — no fill, so yellow shows through but red border is visible */}
-          <path d={d} fill="none" stroke={`rgb(${RECIPE_OVERLAY[0]},${RECIPE_OVERLAY[1]},${RECIPE_OVERLAY[2]})`} strokeWidth={4} strokeLinejoin="round" />
-          {/* Bold red center line */}
           <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
-            stroke={`rgb(${RECIPE_OVERLAY[0]},${RECIPE_OVERLAY[1]},${RECIPE_OVERLAY[2]})`} strokeWidth={4} />
+            stroke={RECIPE_ARROW} strokeWidth={1.5} />
         </g>,
       )
     }
-    return paths
   }
 
   return (
@@ -252,12 +176,11 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
             <line x1={MARGIN.left} y1={layout.cy} x2={W - MARGIN.right} y2={layout.cy} stroke="var(--border, #444)" strokeWidth={0.5} />
             <line x1={layout.cx} y1={MARGIN.top} x2={layout.cx} y2={H - MARGIN.bottom} stroke="var(--border, #444)" strokeWidth={0.5} />
 
-            {/* Refused section */}
-            {renderSection(refusedCats, 'refused')}
-            {/* Non-refused section */}
-            {renderSection(okCats, 'ok')}
-            {/* Recipe-direction overlay — RED on top of everything when experiments selected */}
-            {!isRecipeOnly && (() => { console.log('[OverlapWorkspace] overlay condition: !isRecipeOnly=true, rendering overlay'); return renderRecipeOverlay() })()}
+            {/* Arrow lines */}
+            {arrowPaths}
+
+            {/* Recipe overlay (red) when experiments are selected */}
+            {!isRecipeOnly && recipeOverlay}
           </svg>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
