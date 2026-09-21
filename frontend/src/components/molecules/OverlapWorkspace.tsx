@@ -31,6 +31,9 @@ const PRIMARIES: [number, number, number][] = [
 // Bright standalone color for recipe-only preview (no blending).
 const RECIPE_PREVIEW: [number, number, number] = [255, 255, 80] // bright yellow
 
+// Recipe-direction overlay: always-visible red so you can compare against results.
+const RECIPE_OVERLAY: [number, number, number] = [255, 0, 0] // bright red
+
 // --- SVG geometry -----------------------------------------------------------
 
 const W = 1170
@@ -86,13 +89,14 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Recipe-only = no real experiments selected (either empty, or only the __recipe__ sentinel).
-  const isRecipeOnly = ![...selected].some(p => p !== '__recipe__')
+  // Recipe-only = __recipe__ sentinel present with no real audit paths.
+  const isRecipeOnly = selected.has('__recipe__') &&
+    ![...selected].some(p => p !== '__recipe__')
 
   // Fetch arrows on mount (shows recipe directions immediately), re-fetch when selection changes.
   useEffect(() => {
     const step = run.sequence?.[0]
-    if (!step) { setError('No model/mode in run sequence'); console.warn('[OverlapWorkspace] no sequence:', run); return }
+    if (!step) { setError('No model/mode in run sequence'); return }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -100,15 +104,14 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     // Filter out the __recipe__ sentinel — it means "show arrows from recipe, no experiments."
     const realPaths = [...selected].filter(p => p !== '__recipe__')
 
-    console.log('[OverlapWorkspace] fetching arrows', { run_id: run.run_id, model: step.model, mode: step.mode, expCount: realPaths.length })
     directionOverlap({
       run_id: run.run_id,
       model_id: step.model,
       mode: step.mode,
       experiments: realPaths.map(path => ({ path })),
     })
-      .then(res => { if (!cancelled) { console.log('[OverlapWorkspace] got arrows:', Object.keys(res.arrows ?? {}).length); setData(res) } })
-      .catch(err => { if (!cancelled) { console.error('[OverlapWorkspace] fetch failed:', err); setError(err instanceof Error ? err.message : String(err)) } })
+      .then(res => { if (!cancelled) setData(res) })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [selected, run.run_id, run.sequence])
@@ -160,7 +163,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
 
   const renderSection = (cats: string[], sectionKey: string) => {
     if (!layout || cats.length === 0) return null
-    const paths = []
+    const paths: React.ReactNode[] = []
     for (const cat of cats) {
       const arrow = arrows[cat]
       if (!arrow) continue
@@ -189,7 +192,8 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
           if (diff > Math.PI) diff = 2 * Math.PI - diff
           if (diff < HALF_ANGLE * 2) overlapping.push(colorOf(otherCat))
         }
-        fill = blend(overlapping.length ? [colorOf(cat), ...overlapping] : [colorOf(cat)])
+        // When experiments are selected, render arrows in yellow so the red recipe overlay stands out.
+        fill = `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.30)`
       }
 
       paths.push(
@@ -197,9 +201,38 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
           <path d={d} fill={fill} stroke="none" />
           {/* faint center line so the direction is still readable */}
           <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
-            stroke={isRecipeOnly ? `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.9)` : blend([colorOf(cat)])} strokeWidth={1.5} opacity={0.9} />
+            stroke={isRecipeOnly ? `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.9)` : `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.7)`} strokeWidth={1.5} opacity={0.9} />
           <text x={tipX + dirX * 1.08} y={tipY + dirY * 1.08} fontSize={13}
             fill="var(--text-dim)" textAnchor="middle">{labelOf(cat)}</text>
+        </g>,
+      )
+    }
+    return paths
+  }
+
+  // Recipe-direction overlay: bold red outlines on top so you can see recipe directions.
+  const renderRecipeOverlay = () => {
+    if (!layout) return null
+    console.log('[OverlapWorkspace] renderRecipeOverlay: drawing', allArrowCats.length, 'arrows')
+    const paths: React.ReactNode[] = []
+    for (const cat of allArrowCats) {
+      const arrow = arrows[cat]
+      if (!arrow) continue
+      const tipX = layout.cx
+      const tipY = layout.cy
+      const dirX = layout.toX(arrow.x) - tipX
+      const dirY = layout.toY(arrow.y) - tipY
+      const len = Math.hypot(dirX, dirY) || 1
+      const sectorLen = Math.min(len * 1.4, 455)
+      const d = sectorPath(tipX, tipY, dirX / len, dirY / len, sectorLen, HALF_ANGLE)
+
+      paths.push(
+        <g key={'recipe-overlay-' + cat} style={{ pointerEvents: 'none' }}>
+          {/* Red outline only — no fill, so yellow shows through but red border is visible */}
+          <path d={d} fill="none" stroke={`rgb(${RECIPE_OVERLAY[0]},${RECIPE_OVERLAY[1]},${RECIPE_OVERLAY[2]})`} strokeWidth={4} strokeLinejoin="round" />
+          {/* Bold red center line */}
+          <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
+            stroke={`rgb(${RECIPE_OVERLAY[0]},${RECIPE_OVERLAY[1]},${RECIPE_OVERLAY[2]})`} strokeWidth={4} />
         </g>,
       )
     }
@@ -223,6 +256,8 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
             {renderSection(refusedCats, 'refused')}
             {/* Non-refused section */}
             {renderSection(okCats, 'ok')}
+            {/* Recipe-direction overlay — RED on top of everything when experiments selected */}
+            {!isRecipeOnly && (() => { console.log('[OverlapWorkspace] overlay condition: !isRecipeOnly=true, rendering overlay'); return renderRecipeOverlay() })()}
           </svg>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
