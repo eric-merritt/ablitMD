@@ -187,9 +187,8 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       )}
 
       {data && layout && (
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}
-            style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', minHeight: 480, background: 'var(--surface-2)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
             {/* axes */}
             <line x1={MARGIN.left} y1={layout.cy} x2={W - MARGIN.right} y2={layout.cy} stroke="var(--border, #444)" strokeWidth={0.5} />
             <line x1={layout.cx} y1={MARGIN.top} x2={layout.cx} y2={H - MARGIN.bottom} stroke="var(--border, #444)" strokeWidth={0.5} />
@@ -200,7 +199,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
             {renderSection(okCats, 'ok')}
           </svg>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '140px' }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
             <OverlapStats data={data} />
             <OverlapLegend refusedCats={refusedCats} okCats={okCats} />
           </div>

@@ -62,13 +62,14 @@ a:hover {
 
 #audit-panel {
   display: grid;
-  grid-template-columns: 1.33fr 5fr 2fr;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto 1fr;
   gap: 16px;
   grid-auto-flow: row;
   grid-template-areas:
-    ". audit-controls ."
-    "experiment-list overlap-workspace saved-audits-block";
+    "experiment-list audit-controls"
+    "overlap-workspace overlap-workspace"
+    "saved-audits-block saved-audits-block";
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -79,6 +80,6 @@ a:hover {
 
 #audit-controls { grid-area: audit-controls; }
 
-#overlap-workspace { grid-area: overlap-workspace; overflow-y: auto; position: relative; z-index: 2; }
+#overlap-workspace { grid-area: overlap-workspace; overflow-y: auto; position: relative; z-index: 2; min-height: 500px; }
 
 #saved-audits-block { grid-area: saved-audits-block; min-height: 0; display: flex; flex-direction: column; position: relative; z-index: 2; }
