@@ -133,6 +133,14 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       for (const c of exp.ok_categories) ok.add(c)
     }
     for (const c of refused) ok.delete(c)
+
+    // Always include every arrow category — experiment data just tags which are refused.
+    // Categories not mentioned by any experiment still render (as non-refused).
+    const allCats = new Set(allArrowCats)
+    for (const c of allCats) {
+      if (!refused.has(c) && !ok.has(c)) ok.add(c)
+    }
+
     return { refusedCats: [...refused], okCats: [...ok] }
   }, [data, isRecipeOnly, allArrowCats])
 
