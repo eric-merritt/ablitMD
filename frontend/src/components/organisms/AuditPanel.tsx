@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { runAuditFull, listAudits } from '../../api/ablation'
+import { inferenceLoad, inferenceStatus } from '../../api/inference'
 import type { AuditRecord, AuditSummary, AuditTrial } from '../../types/ablation'
 import { AuditControls } from '../molecules/AuditControls'
 import { ExperimentList } from '../molecules/ExperimentList'
@@ -54,6 +55,27 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
   }
 
   useEffect(refreshList, [run.run_id])
+
+  // Pre-load the model so it's resident in memory before the user clicks Run.
+  // This avoids OOM from cold-start loading during the audit itself.
+  useEffect(() => {
+    const step = run.sequence?.[0]
+    if (!step) return
+
+    const load = async () => {
+      try {
+        const status = await inferenceStatus()
+        if (status.loaded_model !== step.model) {
+          console.log(`[audit] pre-loading model: ${step.model}`)
+          await inferenceLoad({ model_id: step.model, api_model_id: step.model })
+          console.log(`[audit] model loaded: ${step.model}`)
+        }
+      } catch (e) {
+        console.warn('[audit] pre-load failed — audit will load on demand:', e)
+      }
+    }
+    load()
+  }, [run.run_id, run.sequence])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.inference import classifier_llm, generator
+from backend.inference.judge_server import ensure_judge_server
 
 RUNS_DIR = Path(__file__).resolve().parents[2] / "data" / "runs"
 
@@ -41,6 +42,7 @@ def _recipe_master(run_data: dict) -> str | None:
 
 
 def run_audit(run_id: str, n_categories: int = 5, rounds: int = 3) -> dict:
+    ensure_judge_server()
     run_data = _load_run(run_id)
     prompts = run_data.get("prompts") or []
     if not prompts:
@@ -102,6 +104,7 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
 
     The final record is written to disk exactly like :func:`run_audit`.
     """
+    ensure_judge_server()
     run_data = _load_run(run_id)
     prompts = run_data.get("prompts") or []
     if not prompts:

@@ -12,10 +12,9 @@ const autoGrid = (n: number): [number, number] => {
   return [side, side];
 };
 
-// Small SVG grid showing the SOM lattice. Neurons are colored by "activation"
-// (top-k get a bright fill, rest are dim). Purely illustrative — we don't have
-// per-neuron activation data from the slim recipe, so we highlight k positions
-// deterministically based on best_layer for visual variety.
+// Hexagonal SOM lattice visualization. Draws hexagons in a staggered grid
+// (odd-row offset — "pointy-top" layout). Neurons are colored by activation
+// (top-k get a bright fill, rest are dim).
 const SomGridViz = ({
   rows,
   cols,
@@ -27,36 +26,55 @@ const SomGridViz = ({
   k: number;
   bestLayer: number;
 }) => {
-  const cellSize = Math.min(24, 180 / Math.max(rows, cols));
-  const gap = 2;
-  const width = cols * (cellSize + gap) - gap;
-  const height = rows * (cellSize + gap) - gap;
+  const totalNeurons = rows * cols;
+  const pad = 4;
+  const hexR = Math.max(6, Math.min(14, 220 / Math.max(rows + cols, 6)));
+  const hexW = Math.sqrt(3) * hexR;
+  const hexH = 2 * hexR;
+  const vGap = hexH + 2;
+  const hGap = hexW + 2;
+
+  // Hexagon path (pointy-top, centered at 0,0).
+  const hexPath = (() => {
+    const pts: [number, number][] = [];
+    for (let a = 0; a < 6; a++) {
+      const angle = (Math.PI / 3) * a - Math.PI / 6;
+      pts.push([hexR * Math.cos(angle), hexR * Math.sin(angle)]);
+    }
+    return `M${pts.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join("L")}Z`;
+  })();
+
+  const width = cols * hGap + pad * 2;
+  const height = rows * vGap + pad * 2;
 
   // Deterministic "active" neurons: pick k positions seeded by best_layer.
   const active = new Set<number>();
   let seed = bestLayer * 7919 + k;
   for (let i = 0; i < k; i++) {
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    active.add(seed % (rows * cols));
+    active.add(seed % totalNeurons);
   }
 
   return (
     <svg width={width} height={height} style={{ display: "block" }}>
-      {Array.from({ length: rows * cols }, (_, i) => {
+      {Array.from({ length: totalNeurons }, (_, i) => {
         const r = Math.floor(i / cols);
         const c = i % cols;
+        // Odd-row offset for hexagonal stagger.
+        const offsetX = (r % 2) * (hGap / 2);
+        const cx = pad + c * hGap + offsetX + hexW / 2;
+        const cy = pad + r * vGap + hexH / 2;
         const isActive = active.has(i);
         return (
-          <rect
-            key={i}
-            x={c * (cellSize + gap)}
-            y={r * (cellSize + gap)}
-            width={cellSize}
-            height={cellSize}
-            rx={3}
-            fill={isActive ? "var(--accent)" : "var(--surface-3)"}
-            opacity={isActive ? 0.9 : 0.4}
-          />
+          <g key={i} transform={`translate(${cx},${cy})`}>
+            <path
+              d={hexPath}
+              fill={isActive ? "var(--accent)" : "var(--surface-3)"}
+              stroke={isActive ? "var(--accent)" : "var(--border)"}
+              strokeWidth={isActive ? 1.5 : 0.5}
+              opacity={isActive ? 0.95 : 0.45}
+            />
+          </g>
         );
       })}
     </svg>
@@ -65,7 +83,7 @@ const SomGridViz = ({
 
 export const SomMdPanel = ({ runId, nCategories }: SomMdPanelProps) => {
   const [gridOverride, setGridOverride] = useState<[number, number] | null>(null);
-  const [k, setK] = useState(7);
+  const [k, setK] = useState(44);
   const [factor, setFactor] = useState(1.0);
   const [status, setStatus] = useState<"idle" | "building" | "done" | "error">("idle");
   const [recipe, setRecipe] = useState<SomMdRecipe>();
@@ -73,7 +91,7 @@ export const SomMdPanel = ({ runId, nCategories }: SomMdPanelProps) => {
 
   // Grid is auto-sized from category count unless user overrides.
   const grid: [number, number] = gridOverride ?? autoGrid(nCategories);
-  const maxK = Math.min(20, grid[0] * grid[1]);
+  const maxK = grid[0] * grid[1];
 
   const handleBuild = async () => {
     setStatus("building");
@@ -175,7 +193,7 @@ export const SomMdPanel = ({ runId, nCategories }: SomMdPanelProps) => {
               auto ({autoGrid(nCategories)[0]}×{autoGrid(nCategories)[1]})
             </button>
             {/* Manual overrides */}
-            {([[3, 3], [4, 4], [5, 5], [6, 6], [8, 8]] as [number, number][]).map(
+            {([[3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [8, 8], [10, 10]] as [number, number][]).map(
               ([r, c]) => (
                 <button
                   key={`${r}x${c}`}

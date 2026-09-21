@@ -37,6 +37,7 @@ from backend.inference.ablation import (
 from backend.inference.direction import compute_run_directions as compute_directions
 from backend.inference.recipe import latest_recipe_path
 from backend.inference.verify import auto_classify_response, looks_like_refusal, projection_strength
+from backend.inference import classifier_llm
 from backend.inference import audit as audit_agent
 
 _project_root = Path(__file__).resolve().parents[2]
@@ -454,6 +455,14 @@ def audit_run(req: AuditRunRequest):
 
     def events():
         try:
+            # Ensure model is loaded — the UI pre-loads on panel mount, but guard here.
+            run_file = RUNS_DIR / f"{run_id}.json"
+            run_data = json.loads(run_file.read_text())
+            model_id = run_data["models"][0]
+            if get_loaded_model_id() != model_id:
+                yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
+                load_model(MODELS_DIR, MODELS_DIR)
+
             for ev in audit_agent.run_audit_streaming(run_id, n_categories, rounds):
                 yield json.dumps(ev) + "\n"
         except FileNotFoundError as e:
@@ -514,12 +523,7 @@ def audit_run_full(req: AuditRunRequest):
             snapshots = apply_ablation_in_place(recipe, get_model())
             set_model_dirty(True)
 
-            # 5. Make sure the 9B judge is up (spawns llama-server if not).
-            yield json.dumps({"type": "stage", "stage": "starting_judge"}) + "\n"
-            from backend.inference import judge_server
-            judge_server.ensure_judge_server()
-
-            # 6. Adversarial audit against the ablated model.
+            # 5. Adversarial audit against the ablated model.
             yield json.dumps({"type": "stage", "stage": "auditing"}) + "\n"
             for ev in audit_agent.run_audit_streaming(run_id, n_categories, rounds):
                 yield json.dumps(ev) + "\n"
@@ -801,10 +805,9 @@ async def ablate_verify(req: VerifyRequest, request: Request):
                 torch.cuda.empty_cache()
                 torch.cuda.ipc_collect()
 
-                # Auto-classify the generated response. The frontend shows the user
-                # the proposed label; if they reject it ("this bad") we fall back to
-                # manual labeling via the existing label queue.
-                auto_label = auto_classify_response(response_after)
+                # Classify the response using the LLM judge (9B model).
+                # Falls back to 'hard' (refusal) if the judge is unavailable.
+                auto_label = classifier_llm.classify_one(prompt_text=prompt["text"], response=response_after)
                 yield (
                     json.dumps({"type": "generation_done", "auto_classified": auto_label})
                     + "\n"

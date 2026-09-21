@@ -10,6 +10,10 @@ word), and wait until it's ready.
 The model file is searched for, not hardcoded: we look under the app's models dir
 (ABLIT_MODELS_DIR, default /workspace/models on vast.ai) and ~/models, so the same
 code works on this box and on the instance.
+
+IMPORTANT: The classifier MUST NOT start until AFTER the first generation completes
+and VRAM stabilizes. We poll the inference service's /status endpoint for
+first_generation_done=true before spawning llama-server.
 """
 
 import os
@@ -18,7 +22,12 @@ import subprocess
 import time
 from pathlib import Path
 
+import requests
+
 CLASSIFIER_PORT = int(os.environ.get("CLASSIFIER_PORT", "8239"))
+INFERENCE_STATUS_URL = os.environ.get(
+    "INFERENCE_STATUS_URL", "http://localhost:8238/status"
+)
 
 # Roots to search for the Qwen3.5-9B GGUF, in order. The app's models dir comes
 # first (that's where it lives on vast.ai); ~/models is this dev box's home for it.
@@ -28,6 +37,26 @@ _SEARCH_ROOTS = [
 ]
 
 _proc: subprocess.Popen | None = None
+
+
+def _wait_for_first_generation(timeout: float = 600.0) -> None:
+    """Block until the inference service reports first_generation_done=true."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = requests.get(INFERENCE_STATUS_URL, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("first_generation_done"):
+                    print("[judge] first generation complete, proceeding...", flush=True)
+                    return
+        except (requests.ConnectionError, requests.Timeout, ValueError):
+            pass
+        time.sleep(3)
+    raise TimeoutError(
+        "Inference service did not report first_generation_done=true "
+        f"within {timeout}s"
+    )
 
 
 def find_judge_model() -> str:
@@ -61,7 +90,7 @@ def _port_open(port: int = CLASSIFIER_PORT) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
-def _wait_ready(timeout: float = 300.0) -> None:
+def _wait_ready(timeout: float = 900.0) -> None:
     """Block until the server answers on its port, or raise after `timeout` seconds."""
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -75,10 +104,14 @@ def ensure_judge_server(model_path: str | None = None) -> None:
     """Make sure the judge is reachable on CLASSIFIER_PORT, spawning it if needed.
 
     Idempotent: if something already answers on the port we do nothing. Otherwise
-    locate the 9B GGUF, launch llama-server on it, and wait for readiness."""
+    wait for first generation to complete (so VRAM has stabilized), locate the 9B
+    GGUF, launch llama-server on it, and wait for readiness."""
     global _proc
     if _port_open():
         return
+
+    # Wait for VRAM to stabilize after first generation
+    _wait_for_first_generation()
 
     model = model_path or find_judge_model()
     log_path = os.path.expanduser("~/llama_server_judge.log")
@@ -90,7 +123,7 @@ def ensure_judge_server(model_path: str | None = None) -> None:
             "-m", model,
             "--port", str(CLASSIFIER_PORT),
             # A classifier reads one prompt and answers a word; no big context needed.
-            # Run on CPU (-ngl 0) — the 27B already owns the entire GPU.
+            # GPU offload (-ngl 999) — the 27B uses ~53GB of 96GB, leaving headroom for the 9B.
             "-c", "4096",
             "-ngl", "999",
             "--parallel", "1",
@@ -104,7 +137,10 @@ def ensure_judge_server(model_path: str | None = None) -> None:
     try:
         _wait_ready()
     except BaseException:
-        # Don't leave a half-started server orphaned if we bail.
+        # Dump the log so the user sees WHY it failed (OOM, file not found, etc.)
+        log_file.seek(0)
+        log_snippet = log_file.read(-1)[-2000:]  # last 2KB
+        print(f"[judge] FAILED to start — log tail:\n{log_snippet}", flush=True)
         _proc.terminate()
         raise
     print(f"[judge] ready on port {CLASSIFIER_PORT}", flush=True)

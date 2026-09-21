@@ -109,6 +109,15 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
     layers = _decoder_layers(model)
     snapshots: dict = {}
 
+    method = recipe.get("method", "<MISSING>")
+    pld = recipe.get("per_layer_directions", {})
+    factor = recipe.get("factor", 0.0)
+    print(
+        f"[ablation] ENTER: method={method}, factor={factor}, "
+        f"per_layer_directions keys={sorted(pld.keys(), key=int) if pld else 'EMPTY'}",
+        flush=True,
+    )
+
     _first_logged = False
     with torch.inference_mode():
         # Layer 0 (embed_tokens / MTP head) is not ablated: even factor=0.1 destroys output entirely.
@@ -129,7 +138,13 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
 
         for decoder_idx in range(len(layers)):
             raw = directions_for_layer(recipe, hidden_index=decoder_idx + 1)
-            if not raw:
+            if raw:
+                print(
+                    f"[ablation] layer {decoder_idx}: applying {len(raw)} direction(s)",
+                    flush=True,
+                )
+            else:
+                print(f"[ablation] layer {decoder_idx}: SKIPPED (no directions)", flush=True)
                 continue
 
             # Assume _projection_modules yields pairs of (name, module) or just inspect the name attribute
@@ -140,19 +155,39 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
                 W = proj.weight.data
                 proj_name = getattr(proj, "name", type(proj).__name__).lower()
 
-                for vector, factor in raw:
-                    direction = torch.tensor(vector, device=device, dtype=torch.float32)
+                # Gram-Schmidt orthogonalize directions within this layer to prevent
+                # overlapping SOM neurons from amplifying each other (double-counting).
+                # After GS, only truly unique axes are applied.
+                ortho_directions: list[tuple[torch.Tensor, float]] = []
+                seen: list[torch.Tensor] = []
+                for vector, fac in raw:
+                    d = torch.tensor(vector, device=device, dtype=torch.float32)
+                    # Subtract projections onto all previously kept directions
+                    for s in seen:
+                        proj_scalar = (d * s).sum()
+                        d = d - proj_scalar * s
+                    norm = d.norm().item()
+                    if norm > 1e-6:
+                        d = d / norm
+                        seen.append(d)
+                        ortho_directions.append((d, float(fac)))
+                    else:
+                        print(
+                            f"[ablation] direction dropped (collinear, norm={norm:.2e})",
+                            flush=True,
+                        )
 
+                for direction, fac in ortho_directions:
                     # 1. Columns/Input space ablation (Hidden dim 5120)
                     if any(x in proj_name for x in ["o_proj", "down_proj"]):
-                        orthogonalize_input_inplace(W, direction, float(factor))
+                        orthogonalize_input_inplace(W, direction, fac)
 
                     # 2. Rows/Output space ablation (Intermediate dim 6144)
                     elif any(x in proj_name for x in ["gate_proj", "up_proj", "q_proj", "k_proj", "v_proj"]):
                         # If your direction vector is 5120 but this layer expects 6144 outputs,
                         # you shouldn't directly orthogonalize weights by row using a 5120-dim vector.
                         # Either skip these layers, or transform the vector first.
-                        orthogonalize_weight_inplace(W, direction, float(factor))
+                        orthogonalize_weight_inplace(W, direction, fac)
 
                 if not _first_logged:
                     _first_logged = True
@@ -175,10 +210,26 @@ def apply_ablation_in_place(recipe: dict, model) -> dict:
                 for v, f in layer_dirs
             ]
             if all_directions:
+                # GS-orthogonalize to avoid double-counting overlapping directions
+                ortho_lm: list[tuple[torch.Tensor, float]] = []
+                seen_lm: list[torch.Tensor] = []
+                for d_raw, f in all_directions:
+                    d = d_raw.clone()
+                    for s in seen_lm:
+                        d = d - (d * s).sum() * s
+                    norm = d.norm().item()
+                    if norm > 1e-6:
+                        seen_lm.append(d / norm)
+                        ortho_lm.append((d / norm, f))
+                print(
+                    f"[ablation] lm_head: {len(all_directions)} raw -> "
+                    f"{len(ortho_lm)} orthogonal directions",
+                    flush=True,
+                )
                 if id(lm_head) not in snapshots:
                     snapshots[id(lm_head)] = (lm_head, lm_head.weight.data.cpu().clone())
                 W = lm_head.weight.data
-                for direction, factor in all_directions:
+                for direction, factor in ortho_lm:
                     orthogonalize_input_inplace(W, direction, factor)
 
         # MTP o_proj targeting removed — same reason as layer 0: destroys output coherence.
