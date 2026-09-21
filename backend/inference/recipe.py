@@ -219,8 +219,8 @@ def build_som_md_recipe(
     run: dict,
     model_id: str,
     gen_mode: str,
-    k: int = 5,
-    grid_shape: tuple[int, int] = (7, 7),
+    k: int = 1,
+    grid_shape: tuple[int, int] = (2, 2),
     factor: float = 1.2,
     state_dir=None,
 ) -> dict:

@@ -88,6 +88,9 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
     const controller = new AbortController()
     abortRef.current = controller
 
+    // Show direction arrows immediately when the button is clicked.
+    setSelected(prev => new Set([...prev, '__recipe__']))
+
     try {
       await runAuditFull(run.run_id, (event) => {
         if (controller.signal.aborted) return
@@ -116,6 +119,10 @@ export const AuditPanel = ({ run }: AuditPanelProps) => {
           case 'audit_done':
             setLatest(event.record)
             refreshList()
+            // Add the new audit to selected so its category data shows in overlap too.
+            if (event.record.path) {
+              setSelected(prev => new Set([...prev, event.record.path]))
+            }
             break
           case 'error':
             setError(event.message)

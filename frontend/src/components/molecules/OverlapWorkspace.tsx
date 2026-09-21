@@ -91,11 +91,15 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     let cancelled = false
     setLoading(true)
     setError(null)
+
+    // Filter out the __recipe__ sentinel — it means "show arrows from recipe, no experiments."
+    const realPaths = [...selected].filter(p => p !== '__recipe__')
+
     directionOverlap({
       run_id: run.run_id,
       model_id: step.model,
       mode: step.mode,
-      experiments: Array.from(selected).map(path => ({ path })),
+      experiments: realPaths.map(path => ({ path })),
     })
       .then(res => { if (!cancelled) setData(res) })
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)) })

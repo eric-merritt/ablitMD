@@ -42,10 +42,10 @@ def main():
   parser.add_argument("--factor-a-per-category", type=json.loads, default=None,
                       help='JSON map of category_id -> factor, e.g. \'{"cbrn":1.5}\'')
   # SOM-MD args
-  parser.add_argument("--k", type=int, default=5,
-                      help="Number of SOM directions (default: 5)")
-  parser.add_argument("--grid", type=str, default="7,7",
-                      help="SOM grid shape as rows,cols (default: 7,7)")
+  parser.add_argument("--k", type=int, default=1,
+                      help="Number of SOM directions (default: 1)")
+  parser.add_argument("--grid", type=str, default="2,2",
+                      help="SOM grid shape as rows,cols (default: 2,2)")
   parser.add_argument("--factor", type=float, default=1.2,
                       help="Ablation factor for SOM-MD directions (default: 1.2)")
   args = parser.parse_args()

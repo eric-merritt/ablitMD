@@ -254,7 +254,8 @@ class DirectionOverlapRequest(BaseModel):
     model_id: str
     mode: str
     # Each selected experiment: the audit file path + which trial indices to include.
-    experiments: list[dict]
+    # Optional — omit or pass [] to get arrows without experiment category splits.
+    experiments: list[dict] = []
 
 
 class LabelRequest(BaseModel):
