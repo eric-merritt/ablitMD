@@ -219,9 +219,9 @@ def build_som_md_recipe(
     run: dict,
     model_id: str,
     gen_mode: str,
-    k: int = 44,
-    grid_shape: tuple[int, int] = (7, 12),
-    factor: float = 1.5,
+    k: int = 5,
+    grid_shape: tuple[int, int] = (7, 7),
+    factor: float = 1.2,
     state_dir=None,
 ) -> dict:
     """Build a SOM-MD recipe: train a SOM on harmful hidden states at the best
