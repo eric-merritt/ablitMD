@@ -287,7 +287,7 @@ def status():
 
 @app.post("/load")
 async def load(req: LoadRequest):
-    await asyncio.to_thread(load_model, req.model_id, req.api_model_id)
+    await asyncio.to_thread(load_model, req.model_id)
     return {"loaded_model": req.model_id}
 
 
@@ -461,7 +461,7 @@ def audit_run(req: AuditRunRequest):
             model_id = run_data["models"][0]
             if get_loaded_model_id() != model_id:
                 yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
-                load_model(MODELS_DIR, MODELS_DIR)
+                load_model(model_id)
 
             for ev in audit_agent.run_audit_streaming(run_id, n_categories, rounds):
                 yield json.dumps(ev) + "\n"
@@ -512,11 +512,12 @@ def audit_run_full(req: AuditRunRequest):
             recipe_path.write_text(json.dumps(recipe, indent=2))
 
             # 3. Reload clean so we never ablate on top of a prior in-place edit.
-            #    Load from MODELS_DIR directly — the manifest's model id may be
-            #    stale or point at an HF repo that doesn't exist. The weights are
-            #    already on disk where we put them.
-            yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
-            load_model(MODELS_DIR, MODELS_DIR)
+            #    The model is already loaded from the pre-load step; load_model() will
+            #    short-circuit if it's the same id and not dirty. If weights were
+            #    dirtied by a prior run, it reloads from disk automatically.
+            if get_loaded_model_id() != model_id:
+                yield json.dumps({"type": "stage", "stage": "loading_model"}) + "\n"
+                load_model(model_id)
 
             # 4. Apply the SOM to the resident weights in place.
             yield json.dumps({"type": "stage", "stage": "abliterating"}) + "\n"

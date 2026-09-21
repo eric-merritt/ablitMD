@@ -55,25 +55,19 @@ _load_progress: float = 0.0
 BAKE_DIR = os.environ.get("ABLIT_BAKE_DIR", MODELS_DIR)
 
 
-def _resolve_model_path(model_id: str, api_model_id: str) -> str:
+def _resolve_model_path(model_id: str) -> str:
     """Resolve the on-disk path for model_id.
 
-    If it's already a directory (or resolves under MODELS_DIR), use it;
+    If it's already a directory (or lives loose in MODELS_DIR), use it;
     otherwise treat it as an HF repo id and download into MODELS_DIR."""
     if os.path.isdir(model_id):
         return model_id
-    # A model may live loose directly in MODELS_DIR (files at the top level, no
-    # subdirectory). Check that first so we never fall through to a needless
-    # HF download when the weights are already on disk.
+    # Model files may live loose directly in MODELS_DIR (no subdirectory).
     if os.path.isfile(os.path.join(MODELS_DIR, "config.json")):
         return MODELS_DIR
-    candidates = [
-        os.path.join(MODELS_DIR, api_model_id),
-        os.path.join(MODELS_DIR, model_id),
-    ]
-    for candidate in candidates:
-        if os.path.isfile(os.path.join(candidate, "config.json")):
-            return candidate
+    candidate = os.path.join(MODELS_DIR, model_id)
+    if os.path.isfile(os.path.join(candidate, "config.json")):
+        return candidate
     print(f"[model_loader] downloading {model_id} from HF", flush=True)
     return snapshot_download(model_id, local_dir=os.path.join(MODELS_DIR, model_id))
 
@@ -116,8 +110,8 @@ def _restore_tqdm(orig):
     _load_progress = 1.0
 
 
-def load_model(model_id: str, api_model_id: str) -> None:
-    """Load model_id (api_model_id on disk) into the resident slot.
+def load_model(model_id: str) -> None:
+    """Load model into the resident slot.
 
     Reuses the existing resident model unless it's a different id or was
     marked dirty by an in-place ablation."""
@@ -127,7 +121,7 @@ def load_model(model_id: str, api_model_id: str) -> None:
             return
         unload_model()
         _load_progress = 0.0
-        model_path = _resolve_model_path(model_id, api_model_id)
+        model_path = _resolve_model_path(model_id)
         print(f"[model_loader] loading {model_path} (device_map=auto)", flush=True)
         orig = _patch_tqdm()
         try:
