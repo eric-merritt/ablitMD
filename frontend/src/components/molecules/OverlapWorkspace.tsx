@@ -28,6 +28,9 @@ const PRIMARIES: [number, number, number][] = [
   [0, 200, 200],   // teal
 ]
 
+// Bright standalone color for recipe-only preview (no blending).
+const RECIPE_PREVIEW: [number, number, number] = [255, 255, 80] // bright yellow
+
 // --- SVG geometry -----------------------------------------------------------
 
 const W = 1170
@@ -83,6 +86,10 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Are we in "recipe preview" mode? (__recipe__ sentinel with no real audit paths.)
+  const isRecipeOnly = selected.has('__recipe__') &&
+    ![...selected].some(p => p !== '__recipe__')
+
   // Fetch the overlap geometry whenever the selection changes.
   useEffect(() => {
     if (selected.size === 0) { setData(null); return }
@@ -107,8 +114,15 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     return () => { cancelled = true }
   }, [selected, run.run_id, run.sequence])
 
-  // Split categories: refused in ANY selected run → Refused section; else Non-refused.
+  // In recipe-only mode (no audit yet), ALL arrows are "recipe directions" —
+  // render them bright, no blending. Otherwise split by refused/ok from experiments.
+  const allArrowCats = useMemo(() => Object.keys(arrows), [arrows])
+
   const { refusedCats, okCats } = useMemo(() => {
+    if (isRecipeOnly) {
+      // Everything goes into one bucket; renderSection will use recipe color.
+      return { refusedCats: [] as string[], okCats: allArrowCats }
+    }
     const refused = new Set<string>()
     const ok = new Set<string>()
     for (const exp of data?.experiments ?? []) {
@@ -118,7 +132,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     // A category is "refused" if it was refused anywhere; drop it from the ok set.
     for (const c of refused) ok.delete(c)
     return { refusedCats: [...refused], okCats: [...ok] }
-  }, [data])
+  }, [data, isRecipeOnly, allArrowCats])
 
   const arrows = data?.arrows ?? {}
   const arrowList = useMemo(() => Object.values(arrows), [arrows])
@@ -154,25 +168,31 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       const sectorLen = Math.min(len * 1.4, 455)
       const d = sectorPath(tipX, tipY, dirX / len, dirY / len, sectorLen, HALF_ANGLE)
 
-      // Blend with any other direction (in either section) whose cone overlaps this one.
-      const myAngle = angleOf(arrow)
-      const overlapping: [number, number, number][] = []
-      for (const otherCat of [...refusedCats, ...okCats]) {
-        if (otherCat === cat) continue
-        const other = arrows[otherCat]
-        if (!other) continue
-        let diff = Math.abs(angleOf(other) - myAngle)
-        if (diff > Math.PI) diff = 2 * Math.PI - diff
-        if (diff < HALF_ANGLE * 2) overlapping.push(colorOf(otherCat))
+      let fill: string
+      if (isRecipeOnly) {
+        // Recipe preview: solid bright color, no blending.
+        fill = `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.35)`
+      } else {
+        // Blend with any other direction (in either section) whose cone overlaps this one.
+        const myAngle = angleOf(arrow)
+        const overlapping: [number, number, number][] = []
+        for (const otherCat of [...refusedCats, ...okCats]) {
+          if (otherCat === cat) continue
+          const other = arrows[otherCat]
+          if (!other) continue
+          let diff = Math.abs(angleOf(other) - myAngle)
+          if (diff > Math.PI) diff = 2 * Math.PI - diff
+          if (diff < HALF_ANGLE * 2) overlapping.push(colorOf(otherCat))
+        }
+        fill = blend(overlapping.length ? [colorOf(cat), ...overlapping] : [colorOf(cat)])
       }
-      const fill = blend(overlapping.length ? [colorOf(cat), ...overlapping] : [colorOf(cat)])
 
       paths.push(
         <g key={sectionKey + '-' + cat}>
           <path d={d} fill={fill} stroke="none" />
           {/* faint center line so the direction is still readable */}
           <line x1={tipX} y1={tipY} x2={tipX + dirX} y2={tipY + dirY}
-            stroke={blend([colorOf(cat)])} strokeWidth={1.5} opacity={0.9} />
+            stroke={isRecipeOnly ? `rgba(${RECIPE_PREVIEW[0]},${RECIPE_PREVIEW[1]},${RECIPE_PREVIEW[2]},0.9)` : blend([colorOf(cat)])} strokeWidth={1.5} opacity={0.9} />
           <text x={tipX + dirX * 1.08} y={tipY + dirY * 1.08} fontSize={13}
             fill="var(--text-dim)" textAnchor="middle">{labelOf(cat)}</text>
         </g>,
