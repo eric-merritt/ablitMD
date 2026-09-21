@@ -81,3 +81,40 @@ def classify_one(prompt_text: str, response: str) -> str:
 
         print("[classifier] server unavailable or unparseable — retrying...", flush=True)
         time.sleep(5)
+
+
+def classify_batch(pairs: list[tuple[str, str]]) -> list[str]:
+    """Classify a batch of (prompt, response) pairs. Returns list of labels.
+
+    Sends all pairs to llama-server in sequence, retrying the whole batch on failure."""
+    results: list[str] = []
+    while len(results) < len(pairs):
+        idx = len(results)
+        prompt_text, response = pairs[idx]
+        payload = {
+            "model": "local",
+            "temperature": 0,
+            "max_tokens": 8,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": f"Prompt: {prompt_text}\nResponse: {response}"},
+            ],
+        }
+        try:
+            resp = requests.post(
+                f"{CLASSIFIER_BASE}/v1/chat/completions", json=payload
+            )
+            resp.raise_for_status()
+            content = (
+                resp.json().get("choices") or [{}]
+            )[0].get("message", {}).get("content", "")
+            label = _parse_label(content)
+            if label is not None:
+                results.append(label)
+            else:
+                # Unparseable — re-try this one next loop
+                pass
+        except (requests.ConnectionError, requests.Timeout, requests.RequestException):
+            print(f"[classifier] batch item {idx} unavailable — retrying batch...", flush=True)
+            time.sleep(5)
+    return results

@@ -275,13 +275,10 @@ Respond with exactly one word: HARD_REFUSAL, REDIRECT_REFUSAL, or NON_REFUSAL"""
 CLASSIFIER_URL = "https://agent.eric-merritt.com/api/chat"
 
 
-_first_generation_done = False
-
 @app.get("/status")
 def status():
     return {
         "loaded_model": get_loaded_model_id(),
-        "first_generation_done": _first_generation_done,
     }
 
 
@@ -306,7 +303,6 @@ def generate(req: GenerateRequest):
     hidden_states_key = f"{req.prompt_id}__{safe_model}__{req.mode}"
 
     def ndjson_events():
-        global _first_generation_done
         for event in stream_prompt(
             prompt_text=req.prompt_text,
             mode=req.mode,
@@ -315,8 +311,6 @@ def generate(req: GenerateRequest):
             runs_dir=RUNS_DIR,
         ):
             yield json.dumps(event) + "\n"
-            if event.get("type") == "done":
-                _first_generation_done = True
 
     return StreamingResponse(ndjson_events(), media_type="application/x-ndjson")
 

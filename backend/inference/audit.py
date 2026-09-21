@@ -12,11 +12,12 @@ one selectable "experiment" in the overlap workspace.
 
 import json
 import random
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from backend.inference import classifier_llm, generator
-from backend.inference.judge_server import ensure_judge_server
+from backend.inference.judge_server import start_judge_server
 
 RUNS_DIR = Path(__file__).resolve().parents[2] / "data" / "runs"
 
@@ -42,7 +43,7 @@ def _recipe_master(run_data: dict) -> str | None:
 
 
 def run_audit(run_id: str, n_categories: int = 5, rounds: int = 3) -> dict:
-    ensure_judge_server()
+    start_judge_server()
     run_data = _load_run(run_id)
     prompts = run_data.get("prompts") or []
     if not prompts:
@@ -103,8 +104,11 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
       {"type": "audit_done", "record"}               # full record, persisted
 
     The final record is written to disk exactly like :func:`run_audit`.
+
+    Flow: start judge server, generate all responses (streaming tokens), wait 20s
+    for llama-server to stabilize, then batch-classify everything.
     """
-    ensure_judge_server()
+    start_judge_server()
     run_data = _load_run(run_id)
     prompts = run_data.get("prompts") or []
     if not prompts:
@@ -124,7 +128,8 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
     yield {"type": "audit_start", "run_id": run_id, "n_categories": n_categories,
            "rounds": rounds, "total": total}
 
-    trials = []
+    # Phase 1: generate all responses, streaming tokens. Collect (prompt, response) pairs.
+    pending: list[dict] = []  # dicts with index, round, category, prompt, response
     index = 0
     for round_no in range(rounds):
         chosen = random.sample(categories, min(n_categories, len(categories)))
@@ -134,7 +139,6 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
                    "category": category, "prompt": prompt["text"]}
 
             collected = ""
-            label = None
             for ev in generator.stream_prompt(
                 prompt["text"], mode, run_id, "audit", RUNS_DIR,
                 skip_hidden_states=True,
@@ -147,18 +151,38 @@ def run_audit_streaming(run_id: str, n_categories: int = 5, rounds: int = 3):
                 elif ev["type"] == "error":
                     raise RuntimeError(ev.get("error") or "generation failed")
 
-            label = classifier_llm.classify_one(prompt["text"], collected)
-            trial = {
+            pending.append({
+                "index": index,
                 "round": round_no,
                 "category": category,
                 "prompt": prompt["text"],
                 "response": collected,
-                "classification": label,
-                "refused": label != "none",
-            }
-            trials.append(trial)
-            yield {"type": "trial_done", "index": index, **trial}
+            })
             index += 1
+
+    # Phase 2: wait for llama-server to stabilize after main model generation.
+    print("[audit] waiting 20s for judge to stabilize before classifying...", flush=True)
+    time.sleep(20)
+
+    # Phase 3: batch-classify all responses at once.
+    pairs = [(p["prompt"], p["response"]) for p in pending]
+    print(f"[audit] classifying {len(pairs)} trials...", flush=True)
+    labels = classifier_llm.classify_batch(pairs)
+
+    # Phase 4: yield trial_done events with classifications.
+    trials = []
+    for i, label in enumerate(labels):
+        p = pending[i]
+        trial = {
+            "round": p["round"],
+            "category": p["category"],
+            "prompt": p["prompt"],
+            "response": p["response"],
+            "classification": label,
+            "refused": label != "none",
+        }
+        trials.append(trial)
+        yield {"type": "trial_done", "index": p["index"], **trial}
 
     record = {
         "run_id": run_id,
