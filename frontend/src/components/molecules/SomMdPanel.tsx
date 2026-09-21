@@ -83,7 +83,7 @@ const SomGridViz = ({
 
 export const SomMdPanel = ({ runId, nCategories }: SomMdPanelProps) => {
   const [gridOverride, setGridOverride] = useState<[number, number] | null>(null);
-  const [k, setK] = useState(44);
+  const [k, setK] = useState(4);
   const [factor, setFactor] = useState(1.5);
   const [status, setStatus] = useState<"idle" | "building" | "done" | "error">("idle");
   const [recipe, setRecipe] = useState<SomMdRecipe>();
