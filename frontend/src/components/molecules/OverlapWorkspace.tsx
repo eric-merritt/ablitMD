@@ -32,7 +32,7 @@ const PRIMARIES: [number, number, number][] = [
 
 const W = 1170
 const H = 676
-const MARGIN = { top: 30, right: 30, bottom: 30, left: 30 }
+const MARGIN = { top: 60, right: 60, bottom: 60, left: 60 }
 
 interface Arrow { name: string; x: number; y: number; magnitude?: number }
 
@@ -199,9 +199,9 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
             {renderSection(okCats, 'ok')}
           </svg>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <OverlapStats data={data} />
-            <OverlapLegend refusedCats={refusedCats} okCats={okCats} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ maxWidth: '30%' }}><OverlapStats data={data} /></div>
+            <div style={{ maxWidth: '30%' }}><OverlapLegend refusedCats={refusedCats} okCats={okCats} /></div>
           </div>
         </div>
       )}
