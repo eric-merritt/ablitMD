@@ -93,7 +93,7 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   // Fetch arrows on mount (shows recipe directions immediately), re-fetch when selection changes.
   useEffect(() => {
     const step = run.sequence?.[0]
-    if (!step) { setError('No model/mode in run sequence'); return }
+    if (!step) { setError('No model/mode in run sequence'); console.warn('[OverlapWorkspace] no sequence:', run); return }
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -101,14 +101,15 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
     // Filter out the __recipe__ sentinel — it means "show arrows from recipe, no experiments."
     const realPaths = [...selected].filter(p => p !== '__recipe__')
 
+    console.log('[OverlapWorkspace] fetching arrows', { run_id: run.run_id, model: step.model, mode: step.mode, expCount: realPaths.length })
     directionOverlap({
       run_id: run.run_id,
       model_id: step.model,
       mode: step.mode,
       experiments: realPaths.map(path => ({ path })),
     })
-      .then(res => { if (!cancelled) setData(res) })
-      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)) })
+      .then(res => { if (!cancelled) { console.log('[OverlapWorkspace] got arrows:', Object.keys(res.arrows ?? {}).length); setData(res) } })
+      .catch(err => { if (!cancelled) { console.error('[OverlapWorkspace] fetch failed:', err); setError(err instanceof Error ? err.message : String(err)) } })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [selected, run.run_id, run.sequence])
