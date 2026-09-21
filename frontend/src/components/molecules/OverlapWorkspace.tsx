@@ -90,9 +90,8 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
   const isRecipeOnly = selected.has('__recipe__') &&
     ![...selected].some(p => p !== '__recipe__')
 
-  // Fetch the overlap geometry whenever the selection changes.
+  // Fetch arrows on mount (shows recipe directions immediately), re-fetch when selection changes.
   useEffect(() => {
-    if (selected.size === 0) { setData(null); return }
     const step = run.sequence?.[0]
     if (!step) { setError('No model/mode in run sequence'); return }
     let cancelled = false
@@ -212,9 +211,6 @@ export const OverlapWorkspace = ({ run, selected }: OverlapWorkspaceProps) => {
       <SectionTitle>Direction-overlap workspace</SectionTitle>
       {error && <ErrorText message={error} />}
       {loading && <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Computing overlap…</div>}
-      {!data && !loading && selected.size > 0 && (
-        <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>Select experiments to project.</div>
-      )}
 
       {data && layout && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
